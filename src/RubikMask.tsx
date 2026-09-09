@@ -44,6 +44,21 @@ export type RubikHandle = {
   busy: () => boolean
 }
 type Cubie = { mesh: THREE.Mesh; pos: THREE.Vector3 }
+/** turn feel: a layer under a finger flick is the step response of an underdamped second-order system: no velocity
+ *  at the start (inertia), fastest about a sixth of the way in, a few degrees past the detent, then it settles. The
+ *  body recoils a touch against the layer while the layer accelerates. */
+export type Feel = { duration: number; f: (p: number) => number; peak: number; recoil: number }
+const response = (zeta: number, w: number, duration: number, recoil: number): Feel => {
+  const wd = w * Math.sqrt(1 - zeta * zeta)
+  const raw = (p: number) => 1 - Math.exp(-zeta * w * p) * (Math.cos(wd * p) + ((zeta * w) / wd) * Math.sin(wd * p))
+  const f1 = raw(1)
+  const f = (p: number) => raw(p) / f1
+  let peak = 0
+  for (let i = 0; i < 200; i++) peak = Math.max(peak, (f((i + 1) / 200) - f(i / 200)) * 200)
+  return { duration, f, peak, recoil }
+}
+/** deck / idle turns: 0.5 s, 3.7° overshoot; algorithms: 0.14 s, 2.5° */
+export const FEEL = { turn: response(0.7, 7, 0.5, 0.025), fast: response(0.75, 8, 0.14, 0.012) }
 const AXES: Axis[] = ['x', 'y', 'z']
 // snap a cubie onto the nearest exact quarter-turn orientation by rounding its rotation matrix, so
 // error never accumulates (rounding Euler angles is not safe near gimbal lock)
@@ -68,13 +83,13 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
     const busy = useRef(false)
     const alive = useRef(true)
     const pending = useRef<(() => void) | null>(null)
+    const tween = useRef<gsap.core.Tween | null>(null)
     // a tween still in flight when we unmount must not touch dead refs, and its promise must still settle
     useEffect(() => {
       alive.current = true
-      const pv = pivot.current
       return () => {
         alive.current = false
-        gsap.killTweensOf(pv.rotation)
+        tween.current?.kill()
         pending.current?.()
         pending.current = null
       }
@@ -103,7 +118,7 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
 
     // one layer move; callers hold `busy`
     const turnOne = useMemo(
-      () => (ax: Axis, ly: -1 | 0 | 1, d: 1 | -1, quarters: 1 | 2, duration: number, ease: string) => {
+      () => (ax: Axis, ly: -1 | 0 | 1, d: 1 | -1, quarters: 1 | 2, feel: Feel) => {
         const angle = (d * quarters * Math.PI) / 2
         const slice = cubies.current.filter((c) => Math.round(c.pos[ax]) === ly)
         const pv = pivot.current
@@ -118,12 +133,22 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
         })
         return new Promise<void>((res) => {
           pending.current = res
-          gsap.to(pv.rotation, {
-            [ax]: angle,
-            duration,
-            ease,
+          const proxy = { t: 0 }
+          const body = root.current
+          tween.current = gsap.to(proxy, {
+            t: 1,
+            duration: feel.duration * (quarters === 2 ? 1.4 : 1),
+            ease: 'none',
+            onUpdate: () => {
+              const t = proxy.t
+              pv.rotation[ax] = angle * feel.f(t)
+              const speed = (feel.f(Math.min(t + 1e-3, 1)) - feel.f(t)) * 1e3
+              body.rotation[ax] = (-Math.sign(angle) * feel.recoil * Math.max(0, speed)) / feel.peak
+            },
             onComplete: () => {
               if (!alive.current) return
+              body.rotation[ax] = 0
+              pv.rotation[ax] = angle
               const rot = new THREE.Vector3(ax === 'x' ? 1 : 0, ax === 'y' ? 1 : 0, ax === 'z' ? 1 : 0)
               pv.updateMatrixWorld(true)
               slice.forEach((c) => {
@@ -150,19 +175,20 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
         const ax = axis ?? AXES[Math.floor(Math.random() * 3)]
         const ly = layer ?? (([-1, 0, 1] as const)[Math.floor(Math.random() * 3)])
         const d = dir ?? (Math.random() < 0.5 ? 1 : -1)
-        return turnOne(ax, ly, d, 1, 0.55, 'power3.inOut').finally(() => { busy.current = false })
+        return turnOne(ax, ly, d, 1, FEEL.turn).finally(() => { busy.current = false })
       },
       [turnOne],
     )
-    // speedcubing pace: ~8 turns a second, a half turn a touch longer
+    // speedcubing pace: ~7 turns a second, a half turn a touch longer
     const run = useMemo<RubikHandle['run']>(
-      () => async (alg, duration = 0.12) => {
+      () => async (alg, duration = FEEL.fast.duration) => {
         if (busy.current) return
         busy.current = true
+        const feel = { ...FEEL.fast, duration }
         try {
           for (const m of typeof alg === 'string' ? parseAlg(alg) : alg) {
             if (!alive.current) break
-            await turnOne(m.axis, m.layer, m.dir, m.quarters, duration * (m.quarters === 2 ? 1.5 : 1), 'power2.inOut')
+            await turnOne(m.axis, m.layer, m.dir, m.quarters, feel)
           }
         } finally {
           busy.current = false
