@@ -38,3 +38,4 @@ Aaron's brief: "heat cube does not match the shaders at all, during the process 
 - 04:00 commits: fusions v27-v29, review-2 fixes, swipe, old lab regression ok. Next: presets grain/diagonal, v30 smoke plume, v31 quarter-res big blur (iGPU), then wrap prep
 - 04:10 commits: v30/v31, README, report, scheme bg fix (light schemes), mobile panel fix; 31 versions; third review running; tour video. Next: review-3 fixes, then wrap ≥06:50 (final sheet done)
 - 04:25 commits: review-3 fixes, URL params, v32, ASCII portrait, palette sheet, panel emerges from cube. 32 versions. Next: idle checks via cron; wrap ≥06:50
+- 04:40 commits: v33-v35 rounded cubies, layout A/B (key l), report/README. 35 versions. Remaining: final reshoot + sheet-all, memory, cron delete, summary at ≥06:50

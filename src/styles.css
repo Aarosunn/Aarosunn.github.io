@@ -551,7 +551,7 @@ body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130
   opacity: 0.12;
 }
 /* deck-only layout: corners empty, the active section lives above the deck */
-.layout-deck .sec { display: none; }
+.layout-deck .sec, .layout-deck .sec.on { display: none; }
 .layout-deck .floral { opacity: 0.16; }
 .deck-blurb {
   display: grid;
