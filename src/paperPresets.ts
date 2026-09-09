@@ -18,11 +18,13 @@ const smoke = (name: string, colors: string[], extra: Record<string, unknown> = 
 })
 
 const PAPER_HEAT = heatmapPresets[0].params.colors as string[]
+/** paper's default chrome, recoloured: the stripes' luminance through a palette */
+const CHROME = liquidMetalPresets[0].params as Record<string, unknown>
+const tinted = (name: string, ramp: string[], extra: Record<string, unknown> = {}): PaperPreset => ({ name, params: { ...CHROME, ramp, rampGamma: 1, ...extra } })
+
 const OWN: Record<PaperShader, PaperPreset[]> = {
   heat: [
     heat('icemint', ICEMINT),
-    heat('grain', PAPER_HEAT, { noise: 0.3 }),
-    heat('icemint grain', ICEMINT, { noise: 0.3 }),
     heat('ember', ['#12060a', '#3a0d1f', '#7a1533', '#d43d3a', '#ff8a3d', '#ffd08a', '#fff3d6']),
     heat('graphite', ['#050608', '#15181f', '#2a2f3a', '#4a5262', '#8b95a8', '#c9d2d8', '#f2f5f7']),
     heat('icemint slow', ICEMINT, { speed: 0.55 }),
@@ -31,6 +33,10 @@ const OWN: Record<PaperShader, PaperPreset[]> = {
     { name: 'ice', params: { colorBack: '#07090c', colorTint: '#bfe0ff', softness: 0.2, repetition: 2, shiftRed: 0.3, shiftBlue: 0.3, distortion: 0.07, contour: 0.4, angle: 70, speed: 0.6, scale: 0.6 } },
     { name: 'noir slow', params: { colorBack: '#000000', colorTint: '#a0a0a4', softness: 0.35, repetition: 1.5, shiftRed: 0, shiftBlue: 0, distortion: 0, contour: 0, angle: 90, speed: 0.45, scale: 0.6 } },
     { name: 'mint', params: { colorBack: '#07090c', colorTint: '#9de8d4', softness: 0.15, repetition: 2.5, shiftRed: 0.2, shiftBlue: 0.4, distortion: 0.05, contour: 0.5, angle: 60, speed: 0.6, scale: 0.6 } },
+    tinted('heatmap', PAPER_HEAT, { rampGamma: 1.2 }),
+    tinted('heatmap grain', PAPER_HEAT, { rampGamma: 1.2, grain: 0.3 }),
+    tinted('icemint', ICEMINT),
+    tinted('icemint grain', ICEMINT, { grain: 0.3 }),
   ],
   smoke: [
     smoke('icemint', ['#0b1a2a', '#8fb8ff', '#9de8d4']),

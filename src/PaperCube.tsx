@@ -178,6 +178,21 @@ function finalFragment(shader: PaperShader) {
     float shade = ${shader === 'heat' ? 'm.g' : 'm.b'};
     fragColor = mix(u_colorBack, fragColor, max(inside, u_halo));
     fragColor.rgb *= mix(1.0, shade, u_shade * inside);
+    ${shader === 'heat' ? '' : `
+    // colour ramp: the effect's luminance through a palette (heatmap / icemint), with optional static grain
+    if (u_rampCount > 0.5) {
+      float l = dot(fragColor.rgb, vec3(0.299, 0.587, 0.114));
+      l += u_grain * 0.35 * (fract(sin(dot(v_imageUV * 1000.0, vec2(12.9898, 78.233))) * 43758.5453123) - 0.5);
+      l = pow(clamp(l, 0.0, 1.0), abs(u_rampGamma));
+      if (u_rampGamma < 0.0) l = 1.0 - l;
+      float mixer = l * u_rampCount;
+      vec4 g = u_ramp[0];
+      for (int i = 1; i < 11; i++) {
+        if (i > int(u_rampCount)) break;
+        g = mix(g, u_ramp[i - 1], clamp(mixer - float(i - 1), 0.0, 1.0));
+      }
+      fragColor.rgb = mix(fragColor.rgb, g.rgb, inside);
+    }`}
     // look controls: brightness on the whole effect, opacity fades the cube body toward the page
     fragColor.rgb *= u_gain;
     fragColor.rgb = mix(u_colorBack.rgb, fragColor.rgb, mix(1.0, u_alpha, inside));
@@ -186,7 +201,7 @@ function finalFragment(shader: PaperShader) {
   const marker = 'fragColor = vec4(color, opacity);'
   const i = src.lastIndexOf(marker)
   const body = src.slice(0, i + marker.length) + tail + src.slice(i + marker.length)
-  return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha;')
+  return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_grain;')
 }
 
 const rt = (size: number, depth = false, samples = 0) =>
@@ -209,6 +224,10 @@ const finalUniforms = (): Record<string, THREE.IUniform> => ({
   u_fuse: { value: 0 },
   u_gain: { value: 1 },
   u_alpha: { value: 1 },
+  u_ramp: { value: new Float32Array(40) },
+  u_rampCount: { value: 0 },
+  u_rampGamma: { value: 1 },
+  u_grain: { value: 0 },
   u_aspect: { value: 1 },
   u_scale: { value: 1 },
   u_colorBack: { value: [0, 0, 0, 1] },
@@ -246,6 +265,14 @@ const applyParams = (u: Record<string, THREE.IUniform>, params: Record<string, u
   u.u_colorInner.value = color(params.colorInner, '#ffffff')
   for (const k of NUMERIC) if (typeof params[k] === 'number') u[`u_${k}`].value = params[k]
   u.u_scale.value = typeof params.scale === 'number' ? params.scale : 1
+  // ours: a palette over the effect's luminance
+  const ramp = new Float32Array(40)
+  const stops = Array.isArray(params.ramp) ? (params.ramp as string[]).map(getShaderColorFromString) : []
+  stops.forEach((c, i) => ramp.set(c, i * 4))
+  u.u_ramp.value = ramp
+  u.u_rampCount.value = stops.length
+  u.u_rampGamma.value = typeof params.rampGamma === 'number' ? params.rampGamma : 1
+  u.u_grain.value = typeof params.grain === 'number' ? params.grain : 0
 }
 
 export type PaperCubeProps = {

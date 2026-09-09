@@ -27,6 +27,8 @@ export default function App() {
   const [debug, setDebug] = useState<PaperDebug>('off')
   const [gain, setGain] = useState(1)
   const [alpha, setAlpha] = useState(1)
+  // review hook: merge arbitrary params over the theme (scripts iterate looks without editing presets)
+  const [override, setOverride] = useState<Record<string, unknown>>({})
   const rubik = useRef<RubikHandle | null>(null)
   const s = SCHEMES[si]
   const base = VERSION_OF(version) ?? PAPER_VERSIONS[0]
@@ -37,7 +39,7 @@ export default function App() {
   const PV = withTheme(base, theme)
   // every lab cube sits on the scheme's background, like the site
   // themed versions share one scale per shader so every theme sits at the same size on screen
-  const params = { ...presetNamed(PV.shader, theme ? theme.preset : choice).params, colorBack: s.bg, ...(theme ? { scale: PV.shader === 'heat' ? 0.75 : 0.6 } : {}) }
+  const params = { ...presetNamed(PV.shader, theme ? theme.preset : choice).params, colorBack: s.bg, ...(theme ? { scale: PV.shader === 'heat' ? 0.75 : 0.6 } : {}), ...override }
 
   // switching version also selects its default preset
   const setVersion = (v: string) => {
@@ -70,6 +72,7 @@ export default function App() {
       setShaderSpin: setSpin,
       setShaderDebug: setDebug,
       setShaderLook: (g: number, a: number) => { setGain(g); setAlpha(a) },
+      setShaderOverride: setOverride,
       paperTurn: (...args: Parameters<RubikHandle['turn']>) => rubik.current?.turn(...args) ?? Promise.resolve(),
       paperPositions: () => rubik.current?.positions() ?? [],
       paperOrientationError: () => rubik.current?.orientationError() ?? 0,
@@ -164,6 +167,7 @@ declare global {
       setShaderSpin: (b: boolean) => void
       setShaderDebug: (v: PaperDebug) => void
       setShaderLook: (gain: number, alpha: number) => void
+      setShaderOverride: (o: Record<string, unknown>) => void
       paperTurn: RubikHandle['turn']
       paperPositions: () => number[][]
       paperOrientationError: () => number

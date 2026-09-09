@@ -60,9 +60,6 @@ const heat = { ...base, shader: 'heat' as const, rubikGap: 1.03, seam: 0.035, ca
 const liquid = { ...base, shader: 'liquid' as const, camZ: 11 }
 const smoke = { ...base, shader: 'smoke' as const, camZ: 11, halo: false, shade: 0.3 }
 
-/** v11's heat themes: the same rounded cube with heat's mask, hairline seams and camera */
-const HEAT_ON_ROUNDED: Partial<PaperVersion> = { rubikGap: 1.03, seam: 0.015, camZ: 20, halo: true, shade: 0.3, field: 'face' }
-
 export const PAPER_VERSIONS: PaperVersion[] = [
   { ...heat, name: 'v1', note: "heatmap on the Rubik's cube: rim glow on every seam, halo, the hot band sweeping the base" },
   { ...heat, name: 'v2', halo: false, shade: 0.45, note: 'v1 without the halo, faces shaded' },
@@ -84,17 +81,9 @@ export const PAPER_VERSIONS: PaperVersion[] = [
     halo: false,
     shade: 0.35,
     preset: 'ice',
-    themes: [
-      { name: 'default', shader: 'liquid', preset: 'default' },
-      { name: 'backdrop', shader: 'liquid', preset: 'backdrop' },
-      { name: 'heatmap', shader: 'heat', preset: 'default', over: HEAT_ON_ROUNDED },
-      { name: 'heatmap grain', shader: 'heat', preset: 'grain', over: HEAT_ON_ROUNDED },
-      { name: 'ice', shader: 'liquid', preset: 'ice' },
-      { name: 'mint', shader: 'liquid', preset: 'mint' },
-      { name: 'icemint', shader: 'heat', preset: 'icemint', over: HEAT_ON_ROUNDED },
-      { name: 'icemint grain', shader: 'heat', preset: 'icemint grain', over: HEAT_ON_ROUNDED },
-    ],
-    note: "v10's rounded cube for the site: eight themes across liquid metal and heat on the scheme's background, brightness and opacity to taste",
+    // all liquid metal: the heatmap / icemint themes are v10's chrome with its luminance run through the palette
+    themes: ['default', 'backdrop', 'heatmap', 'heatmap grain', 'ice', 'mint', 'icemint', 'icemint grain'].map((name) => ({ name, shader: 'liquid' as const, preset: name })),
+    note: "v10's cube and effect for the site: eight colour themes on the scheme's background, nothing outside the cube, brightness and opacity to taste",
   },
 ]
 
