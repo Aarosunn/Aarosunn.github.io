@@ -13,8 +13,11 @@ const TABS: Tab[] = ['site', 'shader', 'paper']
 const LABEL: Record<Tab, string> = { site: 'site', shader: 'shader cube', paper: 'paper shaders' }
 const SHADER_NAME = { heat: 'heatmap', liquid: 'liquid metal', smoke: 'gem smoke' }
 const GAINS = [0.7, 0.85, 1, 1.2, 1.4]
-const OUTLINES = ['off', 'line', 'glow'] as const
+const OUTLINES = ['off', 'line', 'glow', 'ascii'] as const
+/** ascii outline reach presets: base reach and the extra reach to the left (glyphs trail right) */
+const WINDS: Record<string, { reach: number; bias: number; scatter: number }> = { tight: { reach: 0.03, bias: 1, scatter: 0.3 }, breeze: { reach: 0.05, bias: 3, scatter: 0.5 }, gale: { reach: 0.07, bias: 6, scatter: 0.6 }, storm: { reach: 0.09, bias: 10, scatter: 0.7 } }
 const ALPHAS = [0.5, 0.7, 0.85, 1]
+const CELLS = [7, 9, 12, 16]
 
 export default function App() {
   // ?tab=&c=&v= let a specific state be linked for review
@@ -28,7 +31,9 @@ export default function App() {
   const [debug, setDebug] = useState<PaperDebug>('off')
   const [gain, setGain] = useState(1)
   const [alpha, setAlpha] = useState(1)
-  const [outline, setOutline] = useState<(typeof OUTLINES)[number]>('off')
+  const [outline, setOutline] = useState<(typeof OUTLINES)[number] | undefined>(undefined)
+  const [wind, setWind] = useState('version')
+  const [cell, setCell] = useState<number | undefined>(undefined)
   // review hook: merge arbitrary params over the theme (scripts iterate looks without editing presets)
   const [override, setOverride] = useState<Record<string, unknown>>({})
   const [vOverride, setVOverride] = useState<Partial<PaperVersion>>({})
@@ -49,6 +54,9 @@ export default function App() {
     const pv = VERSION_OF(v)
     if (!pv) return
     setVersionRaw(v)
+    setOutline(undefined)
+    setWind('version')
+    setCell(undefined)
     setPresetIx(pv.themes ? Math.max(0, pv.themes.findIndex((t) => t.preset === pv.preset)) : Math.max(0, PRESETS_OF[pv.shader].findIndex((p) => p.name.toLowerCase() === pv.preset)))
   }
 
@@ -77,6 +85,8 @@ export default function App() {
       setShaderLook: (g: number, a: number) => { setGain(g); setAlpha(a) },
       setShaderOverride: setOverride,
       setShaderOutline: setOutline,
+      setShaderWind: setWind,
+      setShaderCell: setCell,
       setShaderVersionOverride: setVOverride,
       paperTurn: (...args: Parameters<RubikHandle['turn']>) => rubik.current?.turn(...args) ?? Promise.resolve(),
       paperPositions: () => rubik.current?.positions() ?? [],
@@ -118,7 +128,7 @@ export default function App() {
   return (
     <>
       <Canvas key={version + (theme?.name ?? '')} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
-        <PaperCube version={PV} params={params} spin={spin} auto={auto} debug={debug} gain={gain} alpha={alpha} outline={outline} outlineColor={s.accent} rubik={rubik} />
+        <PaperCube version={PV} params={params} spin={spin} auto={auto} debug={debug} gain={gain} alpha={alpha} outline={outline} outlineColor={s.accent} ascii={{ ...WINDS[wind], ...(cell ? { cell } : {}) }} rubik={rubik} />
       </Canvas>
       <div className="ui">
         <div className="wordmark">aarcube</div>
@@ -128,7 +138,9 @@ export default function App() {
           <Row label={base.themes ? 'theme' : 'preset'} items={choices} on={choice} pick={(n) => setPresetIx(choices.indexOf(n))} />
           <Row label="brightness" items={GAINS.map(String)} on={String(gain)} pick={(n) => setGain(Number(n))} />
           <Row label="opacity" items={ALPHAS.map(String)} on={String(alpha)} pick={(n) => setAlpha(Number(n))} />
-          <Row label="outline" items={[...OUTLINES]} on={outline} pick={setOutline} />
+          <Row label="outline" items={[...OUTLINES]} on={outline ?? PV.outline ?? 'off'} pick={setOutline} />
+          {(outline ?? PV.outline) === 'ascii' && <Row label="wind" items={['version', ...Object.keys(WINDS)]} on={wind} pick={setWind} />}
+          {(outline ?? PV.outline) === 'ascii' && <Row label="cell" items={CELLS.map(String)} on={String(cell ?? PV.ascii?.cell ?? 9)} pick={(n) => setCell(Number(n))} />}
           <div className="row">
             <span className="k">motion</span>
             <button className={spin ? 'on' : ''} onClick={() => setSpin((v) => !v)}>
@@ -176,7 +188,9 @@ declare global {
       setShaderDebug: (v: PaperDebug) => void
       setShaderLook: (gain: number, alpha: number) => void
       setShaderOverride: (o: Record<string, unknown>) => void
-      setShaderOutline: (o: 'off' | 'line' | 'glow') => void
+      setShaderOutline: (o: 'off' | 'line' | 'glow' | 'ascii') => void
+      setShaderWind: (w: string) => void
+      setShaderCell: (c: number) => void
       setShaderVersionOverride: (o: Partial<PaperVersion>) => void
       paperTurn: RubikHandle['turn']
       paperPositions: () => number[][]

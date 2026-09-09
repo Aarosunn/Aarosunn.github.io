@@ -50,8 +50,13 @@ export type PaperVersion = {
   fusePreset?: string
   /** when set, the preset row shows these themes instead of the shader's presets */
   themes?: PaperTheme[]
+  /** default outline behind the silhouette (the outline row overrides): 'ascii' draws glyph cells around the cube */
+  outline?: 'off' | 'line' | 'glow' | 'ascii'
+  /** ascii outline: cell size (css px), base reach (mask uv), extra reach to the left of a cell (the glyphs trail off to the right), random drop-out, colour */
+  ascii?: AsciiParams
   note: string
 }
+export type AsciiParams = { cell: number; reach: number; bias: number; scatter: number; color: string }
 
 const base = {
   size: 1024,
@@ -148,6 +153,28 @@ export const PAPER_VERSIONS: PaperVersion[] = [
       { name: 'icemint grain', shader: 'liquid', preset: 'icemint grain soft' },
     ],
     note: "v13's cube with the keepers: ice, mint, their grain versions, and icemint grain with its brightest stop toned down; outline row draws a line or glow behind the silhouette",
+  },
+  {
+    ...liquid,
+    name: 'v15',
+    field: 'poisson',
+    poissonIters: 60,
+    seamSpace: 'cube',
+    rubikRound: 0.07,
+    seam: 0.03,
+    halo: false,
+    shade: 0.35,
+    preset: 'mint grain',
+    outline: 'ascii',
+    ascii: { cell: 9, reach: 0.05, bias: 3, scatter: 0.5, color: '#ece8df' },
+    themes: [
+      { name: 'ice', shader: 'liquid', preset: 'ice' },
+      { name: 'ice grain', shader: 'liquid', preset: 'ice grain' },
+      { name: 'mint', shader: 'liquid', preset: 'mint' },
+      { name: 'mint grain', shader: 'liquid', preset: 'mint grain' },
+      { name: 'icemint grain', shader: 'liquid', preset: 'icemint grain soft' },
+    ],
+    note: "v14 mint grain with an off-white ascii outline: glyph cells hug the silhouette and trail off to the right (wind row sets the reach)",
   },
 ]
 

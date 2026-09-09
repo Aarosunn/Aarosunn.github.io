@@ -15,7 +15,7 @@ import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { gemSmokeFragmentShader, getShaderColorFromString, heatmapFragmentShader, liquidMetalFragmentShader } from '@paper-design/shaders'
 import { RubikMask, type RubikHandle } from './RubikMask'
-import type { PaperShader, PaperVersion } from './paperVersions'
+import type { AsciiParams, PaperShader, PaperVersion } from './paperVersions'
 import { presetNamed } from './paperPresets'
 
 export type PaperDebug = 'off' | 'mask' | 'combined'
@@ -271,7 +271,7 @@ function finalFragment(shader: PaperShader) {
     fragColor.rgb = mix(u_colorBack.rgb, fragColor.rgb, mix(1.0, u_alpha, inside));
     // outline behind the silhouette: 1 = a line of constant width, 2 = a soft glow; drawn where the pixel is
     // outside the cube but within reach of it (mask B = lambert > 0 inside, seams included, 0 outside)
-    if (u_outline > 0.5) {
+    if (u_outline > 0.5 && u_outline < 2.5) {
       float sil = step(0.01, m.b) * inFrame;
       float near = 0.0;
       for (int i = 0; i < 16; i++) {
@@ -285,12 +285,42 @@ function finalFragment(shader: PaperShader) {
       float ring = (1.0 - sil) * near;
       fragColor.rgb = mix(fragColor.rgb, u_outlineColor, ring);
     }
+    // ascii outline: the screen in glyph cells; a cell's density is how near the cube is when looking out from its
+    // centre, with a longer reach toward the left (u_asciiBias) so the glyphs trail off to the right of the cube;
+    // a per-cell hash thins the far cells so the trail scatters. Glyphs are 5x5 bitmaps packed into ints.
+    if (u_outline > 2.5) {
+      vec2 cid = floor(gl_FragCoord.xy / u_asciiCell);
+      vec2 cuv = (cid + 0.5) * u_asciiCell / u_resolution;
+      vec2 cq = (cuv - 0.5) * vec2(u_aspect, 1.0) / u_scale;
+      vec2 cm = vec2(cq.x + 0.5, 0.5 - cq.y);
+      ${shader === 'heat' ? 'cm = (cm - 0.5) * 0.5714285714285714 + 0.5;' : ''}
+      float dens = 0.0;
+      for (int i = 0; i < 12; i++) {
+        float a = float(i) * 0.5235988;
+        vec2 dir = vec2(cos(a), sin(a));
+        float reach = u_asciiReach * (1.0 + u_asciiBias * max(-dir.x, 0.0));
+        for (int s = 0; s < 6; s++) {
+          float t = reach * (float(s) + 0.5) / 6.0;
+          vec2 sm = cm + dir * t;
+          float hit = step(0.01, texture(u_mask, vec2(sm.x, 1.0 - sm.y)).b) * step(0.0, sm.x) * step(sm.x, 1.0) * step(0.0, sm.y) * step(sm.y, 1.0);
+          dens = max(dens, hit * (1.0 - t / reach));
+        }
+      }
+      float hc = fract(sin(dot(cid, vec2(12.9898, 78.233))) * 43758.5453123);
+      int idx = int(clamp(dens * (1.0 - u_asciiScatter * hc) * 8.0, 0.0, 7.99));
+      int glyph = idx == 0 ? 0 : idx == 1 ? 4096 : idx == 2 ? 65600 : idx == 3 ? 332772 : idx == 4 ? 15255086 : idx == 5 ? 23385164 : idx == 6 ? 15252014 : 13199452;
+      vec2 pc = floor((fract(gl_FragCoord.xy / u_asciiCell) - 0.5) * vec2(-8.0, 8.0) + 2.5);
+      float ink = 0.0;
+      if (pc.x >= 0.0 && pc.x <= 4.0 && pc.y >= 0.0 && pc.y <= 4.0) ink = float((glyph >> int(pc.x + 5.0 * pc.y)) & 1);
+      float silA = step(0.01, m.b) * inFrame;
+      fragColor.rgb = mix(fragColor.rgb, u_asciiColor, ink * (1.0 - silA));
+    }
     ${shader === 'heat' ? 'fragColor.a = mix(fragColor.a, max(1.0 - inside, smoothstep(0.0, 0.35, img.r)), u_fuse);' : ''}
   }`
   const marker = 'fragColor = vec4(color, opacity);'
   const i = src.lastIndexOf(marker)
   const body = src.slice(0, i + marker.length) + tail + src.slice(i + marker.length)
-  return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor;')
+  return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform float u_aspect; uniform float u_scale; precision highp int;')
 }
 
 const rt = (size: number, depth = false, samples = 0) =>
@@ -320,6 +350,11 @@ const finalUniforms = (): Record<string, THREE.IUniform> => ({
   u_outline: { value: 0 },
   u_outlineW: { value: 0.008 },
   u_outlineColor: { value: new THREE.Vector3(1, 1, 1) },
+  u_asciiCell: { value: 12 },
+  u_asciiReach: { value: 0.05 },
+  u_asciiBias: { value: 3 },
+  u_asciiScatter: { value: 0.5 },
+  u_asciiColor: { value: new THREE.Vector3(1, 1, 1) },
   u_grain: { value: 0 },
   u_aspect: { value: 1 },
   u_scale: { value: 1 },
@@ -382,13 +417,17 @@ export type PaperCubeProps = {
   /** look controls: brightness multiplier and cube-body opacity */
   gain?: number
   alpha?: number
-  /** outline behind the silhouette: 'line' (constant width) or 'glow' (soft), in this colour */
-  outline?: 'off' | 'line' | 'glow'
+  /** outline behind the silhouette: 'line' (constant width) or 'glow' (soft) in this colour, or 'ascii' glyph cells; defaults to the version's */
+  outline?: 'off' | 'line' | 'glow' | 'ascii'
   outlineColor?: string
+  /** ascii outline overrides on top of the version's */
+  ascii?: Partial<AsciiParams>
   rubik?: React.RefObject<RubikHandle | null>
 }
 
-export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = false, autoInterval = 900, debug = 'off', gain = 1, alpha = 1, outline = 'off', outlineColor = '#ffffff', rubik }: PaperCubeProps) {
+export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = false, autoInterval = 900, debug = 'off', gain = 1, alpha = 1, outline: outlineProp, outlineColor = '#ffffff', ascii, rubik }: PaperCubeProps) {
+  const outline = outlineProp ?? V.outline ?? 'off'
+  const A: AsciiParams = { cell: 9, reach: 0.05, bias: 3, scatter: 0.5, color: '#ece8df', ...V.ascii, ...ascii }
   const SIZE = V.size
   const isHeat = V.shader === 'heat'
   const fieldMode = V.field === 'cube' ? 3 : 2
@@ -471,7 +510,12 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     u.u_fuse.value = V.fuse ? 1 : 0
     u.u_gain.value = gain
     u.u_alpha.value = alpha
-    u.u_outline.value = outline === 'line' ? 1 : outline === 'glow' ? 2 : 0
+    u.u_outline.value = outline === 'line' ? 1 : outline === 'glow' ? 2 : outline === 'ascii' ? 3 : 0
+    u.u_asciiCell.value = A.cell * gl.getPixelRatio()
+    u.u_asciiReach.value = A.reach
+    u.u_asciiBias.value = A.bias
+    u.u_asciiScatter.value = A.scatter
+    u.u_asciiColor.value.set(...new THREE.Color(A.color).toArray())
     u.u_outlineW.value = V.shader === 'heat' ? 0.0045 : 0.008 // heat samples the mask through its 57% window
     u.u_outlineColor.value.set(...new THREE.Color(outlineColor).toArray())
     if (Q.final2 && V.fuse) {
@@ -492,7 +536,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     Q.face.uniforms.uCapCos.value = V.capCos
     Q.face.uniforms.uSeamSym.value = V.seamSym ? 1 : 0
     Q.face.uniforms.uCamZ.value = V.camZ
-  }, [params, Q, V, gain, alpha, outline, outlineColor])
+  }, [params, Q, V, gain, alpha, outline, outlineColor, A.cell, A.reach, A.bias, A.scatter, A.color, gl])
 
   const pass = (mat: THREE.RawShaderMaterial, target: THREE.WebGLRenderTarget | null) => {
     Q.mesh.material = mat

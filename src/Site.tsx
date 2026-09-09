@@ -45,20 +45,20 @@ const SECTIONS: Section[] = [
 const HEAT_OF_SCHEME: Record<string, string> = { icemint: 'icemint', ice: 'icemint', mint: 'icemint', ember: 'ember', graphite: 'graphite', aura: 'default', paper: 'sepia' }
 
 /** cube versions worth comparing in place; key `v` cycles. Versions whose own preset is light get a dark one here. */
-const SITE_VERSIONS = ['v14', 'v1', 'v9', 'v4', 'v7', 'v2', 'v6']
+const SITE_VERSIONS = ['v15', 'v14', 'v1', 'v9', 'v4', 'v7', 'v2', 'v6']
 const SITE_PRESET: Record<string, string> = { v6: 'ice' }
-/** the site cube's own small theme toggle (v14): preset name -> label */
+/** the site cube's themes (v14 / v15), key g cycles; the on-screen toggle is gone since Aaron settled on mint grain */
 const SITE_THEMES: [string, string][] = [['ice grain', 'ice'], ['mint grain', 'mint'], ['icemint grain soft', 'icemint']]
 
-export function Site({ version: initial = 'v14', scheme = 'icemint', bg = '#07090c' }: { version?: string; scheme?: string; bg?: string }) {
+export function Site({ version: initial = 'v15', scheme = 'icemint', bg = '#07090c' }: { version?: string; scheme?: string; bg?: string }) {
   const [active, setActive] = useState(0)
-  const [version, setVersion] = useState(VERSION_OF(initial) ? initial : 'v14')
+  const [version, setVersion] = useState(VERSION_OF(initial) ? initial : 'v15')
   // a deep-linked version outside the curated cycle still cycles from itself
-  const cycle = useMemo(() => Array.from(new Set([VERSION_OF(initial) ? initial : 'v14', ...SITE_VERSIONS])), [initial])
+  const cycle = useMemo(() => Array.from(new Set([VERSION_OF(initial) ? initial : 'v15', ...SITE_VERSIONS])), [initial])
   const [open, setOpen] = useState<{ section: number; item: number } | null>(null)
   // layout A/B: sections in the corners, or deck only (the deck carries the blurb, panels do the rest)
   const [layout, setLayout] = useState<'corners' | 'deck'>('corners')
-  const [siteTheme, setSiteTheme] = useState(SITE_THEMES[2][0])
+  const [siteTheme, setSiteTheme] = useState(SITE_THEMES[1][0])
   const rubik = useRef<RubikHandle | null>(null)
   // review hook: the Playwright sweeps drive the site's own cube (App's __aar only reaches the lab cube)
   useEffect(() => { window.__aarSite = rubik }, [])
@@ -68,7 +68,7 @@ export function Site({ version: initial = 'v14', scheme = 'icemint', bg = '#0709
   // narrow screens are usually integrated GPUs: a 768 mask keeps the heat blurs cheap
   const PV = useMemo(() => ({ ...VERSION_OF(version)!, size: narrow ? 768 : 1024, bigDiv: narrow ? (4 as const) : (2 as const) }), [version, narrow])
   const params = useMemo(() => {
-    const want = version === 'v14' ? siteTheme : (SITE_PRESET[version] ?? (PV.shader === 'heat' && PV.preset === undefined ? HEAT_OF_SCHEME[scheme] : PV.preset))
+    const want = PV.themes ? siteTheme : (SITE_PRESET[version] ?? (PV.shader === 'heat' && PV.preset === undefined ? HEAT_OF_SCHEME[scheme] : PV.preset))
     const base = presetNamed(PV.shader, want).params
     // the page is the shader's background, so the scheme's bg is paper's colorBack
     // heat shows the mask through paper's 57% window, liquid the whole mask, so liquid needs a smaller scale on narrow screens
@@ -203,16 +203,6 @@ export function Site({ version: initial = 'v14', scheme = 'icemint', bg = '#0709
               </button>
             ))}
           </nav>
-          {version === 'v14' && (
-            <div className="site-theme" aria-label="cube theme">
-              {SITE_THEMES.map(([name, label]) => (
-                <button key={name} className={name === siteTheme ? 'on' : ''} onClick={() => setSiteTheme(name)}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-          <span className="site-ver">cube {version} · ← → deck · v cube · g grain · c colour · l layout · click an item</span>
         </div>
       </div>
     </>
