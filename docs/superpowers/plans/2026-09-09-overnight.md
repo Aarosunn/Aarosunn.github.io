@@ -34,3 +34,4 @@ Aaron's brief: "heat cube does not match the shaders at all, during the process 
 - 03:20 commit: site mock. Next: polish versions v16+ (custom palettes, noir liquid, dark smoke, slower speeds), site version switcher, final sheet
 - 03:36 commit: presets + v16-v19 + site cycler + review fixes. Next: more iteration rounds (box shapes with aarcube presets, cage variants, speed), then P4 wrap after 06:50
 - 03:40 commits: v20-v26 (cage rubik, GPU Poisson, per-cubie Poisson), site critique pass, glass panel. 26 versions, all 61fps RTX. Next: second review, spin/contour tune, report doc, wrap after 06:50
+- 03:50 commits: spin/contour, clickable items, wheel, scheme-driven palette, idle turns, cube slides for panel, portrait slot, v20/v24 in cycle, report draft. Waiting on second review; then hourly memory at ~04:40, wrap ≥06:50

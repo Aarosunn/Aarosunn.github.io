@@ -201,6 +201,10 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+.readout .note {
+  color: var(--text);
+  margin-bottom: 6px;
+}
 .readout {
   position: fixed;
   right: 28px;
@@ -208,6 +212,8 @@ button:focus-visible {
   display: grid;
   justify-items: end;
   color: var(--mute);
+  max-width: 44ch;
+  text-align: right;
   animation: rise 0.9s var(--ease) 1.2s both;
 }
 

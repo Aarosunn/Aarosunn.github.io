@@ -302,6 +302,7 @@ export default function App() {
           </div>
           <div className="readout">
             <span>{PV ? `${PV.shader === 'heat' ? 'heatmap' : PV.shader === 'liquid' ? 'liquid metal' : 'gem smoke'} on a ${heatShape ?? PV.shape}` : 'paper heatmap on a cube'}</span>
+            {PV && <span className="note">{PV.note}</span>}
             <span>drag to orbit</span>
             <span>keys p</span>
           </div>
