@@ -86,7 +86,7 @@ export const FLORAL_VERSIONS: FloralVersion[] = [
   { ...base, name: 'v15', kind: 'mesh', ruler: false, foliage: false, buds: false, pollen: false, wire: 0.12, fresnel: { power: 2.8, gain: 0.9, base: 0.015 }, irid: 0.25, blur: 2.5, dim: 0.55,
     scene: { flowers: [], ground: 'off', camDist: 4.6, place: [
       { flower: 'rose', at: [-0.42, 0.04, 0], scale: 0.8, rot: [-0.45, 0, 0.4], gain: 0.3, wire: 0.3 },
-      { flower: 'lotus', at: [0.42, 0.08, -0.2], scale: 0.8, rot: [0, 0.4, -0.3], gain: 0.3, wire: 0.4 },
+      { flower: 'lotus', at: [0.42, 0.08, -0.2], scale: 0.8, rot: [-0.6, 0.4, -0.3], gain: 0.3, wire: 0.4 },
       { flower: 'orchid', at: [0.02, -0.46, 0.35], scale: 0.58, gain: 1 },
     ] },
     note: 'v14 closer together: the lotus facing forward, up and to the right, the rose facing up and to the left, the orchid a touch bigger' },
