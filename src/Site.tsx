@@ -143,6 +143,7 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
       <Canvas key={version} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
         <PaperCube version={PV} params={params} spin={!reduced} spinSpeed={0.12} auto={!reduced} autoInterval={6500} rubik={rubik} />
       </Canvas>
+      {xray?.placement === 'bottom' && <BottomBed v={xray} seed={floralSeed} scheme={scheme} />}
       <div className="aura" />
       <div className="grain" />
       <div className={`ui site layout-${layout} ${open ? 'has-panel' : ''}`}>
@@ -189,7 +190,7 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
           </aside>
         )}
         <div className="site-base">
-          {xray ? (xray.kind === 'mesh' ? <XrayFlower3D v={xray} flower={flower} seed={floralSeed} className="floral xray" scheme={scheme} /> : <XrayFloral v={xray} seed={floralSeed} className="floral xray" scheme={scheme} />) : <Floral className="floral" seed={11 + 7 * Math.max(0, SCHEMES.findIndex((x) => x.name === scheme))} />}
+          {xray?.placement === 'bottom' ? null : xray ? (xray.kind === 'mesh' ? <XrayFlower3D v={xray} flower={flower} seed={floralSeed} className="floral xray" scheme={scheme} /> : <XrayFloral v={xray} seed={floralSeed} className="floral xray" scheme={scheme} />) : <Floral className="floral" seed={11 + 7 * Math.max(0, SCHEMES.findIndex((x) => x.name === scheme))} />}
           {layout === 'deck' && (
             <div className="deck-blurb">
               <h2>{SECTIONS[active].title}</h2>
@@ -221,4 +222,16 @@ declare global {
   interface Window {
     __aarSite: React.RefObject<RubikHandle | null>
   }
+}
+
+/** the flower bed as a page-wide strip along the bottom, sized to the window */
+function BottomBed({ v, seed, scheme }: { v: NonNullable<ReturnType<typeof FLORAL_OF>>; seed: number; scheme: string }) {
+  const [w, setW] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1440))
+  useEffect(() => {
+    const on = () => setW(window.innerWidth)
+    window.addEventListener('resize', on)
+    return () => window.removeEventListener('resize', on)
+  }, [])
+  const h = Math.round(Math.min(260, Math.max(160, w * 0.17)))
+  return <XrayFlower3D key={`${v.name}-${seed}-${w}`} v={v} seed={seed} width={w} height={h} scheme={scheme} className="floral-bottom" upright />
 }

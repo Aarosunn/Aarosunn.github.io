@@ -165,15 +165,18 @@ const hasTech = (v: FloralVersion) => v.labels || v.coords !== 'off' || v.frame 
 type Planted = { f: Flower; position: [number, number, number]; scale: number; gain: number }
 const GROUND = -1.35
 /** the scene: the version's flowers spread along x with a little depth, front ones larger, each rooted on the ground */
-function plant(v: FloralVersion, seed: number): Planted[] {
+function plant(v: FloralVersion, seed: number, spread = 8.6): Planted[] {
   const names = v.scene?.flowers ?? []
   const layers = v.scene?.layers ?? 1
   const rng = mulberry32(seed * 7907 + 11)
-  const n = names.length
+  // enough plants per layer to fill the width, the list repeating
+  const n = Math.max(names.length, Math.round((spread / 1.25) * (v.scene?.density ?? 1)))
+  const hm = v.scene?.height ?? 1
   const out: Planted[] = []
   // back layers first (small, far), each layer its own seed and a shuffled order, so kinds overlap across depth
   for (let l = 0; l < layers; l++) {
-    const order = [...names].sort(() => rng() - 0.5)
+    const shuffled = [...names].sort(() => rng() - 0.5)
+    const order = Array.from({ length: n }, (_, i) => shuffled[i % shuffled.length])
     const zc = layers === 1 ? 0 : -1.4 + (l / (layers - 1)) * 2.2
     const depth = layers === 1 ? 1 : l / (layers - 1) // 0 back .. 1 front
     order.forEach((name, i) => {
@@ -181,8 +184,8 @@ function plant(v: FloralVersion, seed: number): Planted[] {
       f.stem.computeBoundingBox()
       const baseY = f.stem.boundingBox!.min.y
       const z = zc + (rng() - 0.5) * 0.5
-      const scale = (0.36 + 0.4 * depth) * (0.85 + rng() * 0.3)
-      const x = -4.3 + (i + 0.5 + (l % 2) * 0.5) * (8.6 / n) + (rng() - 0.5) * 0.8
+      const scale = (0.36 + 0.4 * depth) * (0.85 + rng() * 0.3) * hm
+      const x = -spread / 2 + (i + 0.5 + (l % 2) * 0.5) * (spread / n) + (rng() - 0.5) * 0.8
       out.push({ f, position: [x, GROUND - baseY * scale, z], scale, gain: 0.55 + 0.45 * depth })
     })
   }
@@ -191,8 +194,8 @@ function plant(v: FloralVersion, seed: number): Planted[] {
 function Ground({ color }: { color: THREE.Color }) {
   const geo = useMemo(() => {
     const pts: number[] = []
-    for (let i = -10; i <= 10; i++) pts.push(i * 0.5, GROUND, -3, i * 0.5, GROUND, 2)
-    for (let j = 0; j <= 10; j++) pts.push(-5, GROUND, -3 + j * 0.5, 5, GROUND, -3 + j * 0.5)
+    for (let i = -30; i <= 30; i++) pts.push(i * 0.5, GROUND, -3, i * 0.5, GROUND, 2)
+    for (let j = 0; j <= 10; j++) pts.push(-15, GROUND, -3 + j * 0.5, 15, GROUND, -3 + j * 0.5)
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
     return g
@@ -212,7 +215,11 @@ export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, heig
   const spec = FLOWER_OF(flower)
   const f = useMemo(() => buildFlower(seed, spec, upright, v.buds !== false), [seed, spec, upright, v.buds])
   useEffect(() => () => f.dispose(), [f])
-  const planted = useMemo(() => (v.scene ? plant(v, seed) : []), [v, seed])
+  // the bed fills the box: its width in world units at the ground from the camera distance and the box's aspect
+  const strip = v.placement === 'bottom'
+  const camDist = strip ? 6.4 : 9.4
+  const spread = strip ? 2 * camDist * Math.tan((30 * Math.PI) / 360) * (width / height) * 0.95 : 8.6
+  const planted = useMemo(() => (v.scene ? plant(v, seed, spread) : []), [v, seed, spread])
   useEffect(() => () => planted.forEach((p) => p.f.dispose()), [planted])
   // colours from the scheme table (on the site this mounts before App has applied the CSS variables);
   // 'spectral' takes the flower's own palette, 'mono' the scheme's ghost blue / white
@@ -220,8 +227,8 @@ export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, heig
     const sc = SCHEMES.find((x) => x.name === scheme) ?? SCHEMES[0]
     const bright = new THREE.Color(sc.bright)
     if (v.tint === 'spectral') return { petal: new THREE.Color(spec.palette[0]), rim: new THREE.Color(spec.palette[1]), centre: new THREE.Color(spec.palette[2]), green: new THREE.Color(sc.b), bright }
-    return { petal: new THREE.Color(sc.a).lerp(bright, v.petalWhite ?? 0.45), rim: bright, centre: new THREE.Color(sc.b).lerp(bright, 0.3), green: new THREE.Color(sc.b), bright }
-  }, [scheme, v.tint, spec, v.petalWhite])
+    return { petal: new THREE.Color(sc.a).lerp(bright, v.petalWhite ?? 0.45), rim: new THREE.Color(sc.a).lerp(bright, v.rimWhite ?? 1), centre: new THREE.Color(sc.b).lerp(bright, 0.3), green: new THREE.Color(sc.b), bright }
+  }, [scheme, v.tint, spec, v.petalWhite, v.rimWhite])
   const [proj, setProj] = useState<Projected | null>(null)
   const tech: Tech | null = useMemo(() => {
     if (!proj || !hasTech(v)) return null
@@ -238,8 +245,8 @@ export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, heig
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const swatches = useMemo(() => readSwatches(v), [v.swatches, scheme])
   const scene = !!v.scene
-  const cam = { position: (scene ? [0, 1.1, 9.4] : [0, 0, upright ? 4.9 : 6.8]) as [number, number, number], fov: 30 }
-  const lookAt: [number, number, number] = [0, -0.25, 0]
+  const cam = { position: (scene ? [0, strip ? 1.0 : 1.1, camDist] : [0, 0, upright ? 4.9 : 6.8]) as [number, number, number], fov: 30 }
+  const lookAt: [number, number, number] = [0, strip ? 0.05 : -0.25, 0]
   const blur = v.blur ?? 0
   return (
     <div className={`xf3d ${className ?? ''}`} style={{ position: 'relative', width, height }}>

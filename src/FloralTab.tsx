@@ -31,8 +31,11 @@ export function FloralTab({ v, seed, flower, scheme, setVersion, setSeed, setFlo
           ))}
         </div>
       </div>
-      <div className="floral-stage">
-        {mesh ? <XrayFlower3D key={`${v.name}-${flower}-${seed}`} v={v} flower={flower} seed={seed} width={v.scene ? 1200 : 960} height={v.scene ? 520 : 600} scheme={scheme} upright /> : <XrayFloral v={v} seed={seed} width={XF_W * 2} height={XF_H * 2} scheme={scheme} />}
+      <div className={`floral-stage ${v.placement === 'bottom' ? 'floral-stage-page' : ''}`}>
+        {v.placement === 'bottom' ? (
+          // as on the site: a page-wide strip along the bottom
+          <XrayFlower3D key={`${v.name}-${seed}`} v={v} seed={seed} width={1360} height={240} scheme={scheme} upright />
+        ) : mesh ? <XrayFlower3D key={`${v.name}-${flower}-${seed}`} v={v} flower={flower} seed={seed} width={v.scene ? 1200 : 960} height={v.scene ? 520 : 600} scheme={scheme} upright /> : <XrayFloral v={v} seed={seed} width={XF_W * 2} height={XF_H * 2} scheme={scheme} />}
       </div>
       {!mesh && (
         <div className="floral-stage floral-stage-site">
