@@ -302,25 +302,30 @@ function finalFragment(shader: PaperShader) {
         for (int s = 0; s < 6; s++) {
           float t = reach * (float(s) + 0.5) / 6.0;
           vec2 sm = cm + dir * t;
-          float hit = step(0.01, texture(u_mask, vec2(sm.x, 1.0 - sm.y)).b) * step(0.0, sm.x) * step(sm.x, 1.0) * step(0.0, sm.y) * step(sm.y, 1.0);
+          float hit = step(0.01, texture(u_asciiMask, vec2(sm.x, 1.0 - sm.y)).b) * step(0.0, sm.x) * step(sm.x, 1.0) * step(0.0, sm.y) * step(sm.y, 1.0);
           dens = max(dens, hit * (1.0 - t / reach));
         }
       }
       float hc = fract(sin(dot(cid, vec2(12.9898, 78.233))) * 43758.5453123);
       int idx = int(clamp(dens * (1.0 - u_asciiScatter * hc) * 8.0, 0.0, 7.99));
-      int glyph = idx == 0 ? 0 : idx == 1 ? 4096 : idx == 2 ? 65600 : idx == 3 ? 332772 : idx == 4 ? 15255086 : idx == 5 ? 23385164 : idx == 6 ? 15252014 : 13199452;
-      vec2 pc = floor((fract(gl_FragCoord.xy / u_asciiCell) - 0.5) * vec2(-8.0, 8.0) + 2.5);
+      // 5x5 bitmaps: dots  . : * o & 8 @ (v15)   marks  . - ~ + x % #
+      int glyph = u_asciiGlyphs < 0.5
+        ? (idx == 0 ? 0 : idx == 1 ? 4096 : idx == 2 ? 65600 : idx == 3 ? 332772 : idx == 4 ? 15255086 : idx == 5 ? 23385164 : idx == 6 ? 15252014 : 13199452)
+        : (idx == 0 ? 0 : idx == 1 ? 4194304 : idx == 2 ? 14336 : idx == 3 ? 283712 : idx == 4 ? 4357252 : idx == 5 ? 18157905 : idx == 6 ? 27070835 : 11512810);
+      vec2 fc = fract(gl_FragCoord.xy / u_asciiCell);
+      // dots keep v15's decode (x mirrored, y up); marks are bit x + 5y with y down
+      vec2 pc = u_asciiGlyphs < 0.5 ? floor((fc - 0.5) * vec2(-8.0, 8.0) + 2.5) : floor(vec2(fc.x, 1.0 - fc.y) * 8.0 - 1.5);
       float ink = 0.0;
       if (pc.x >= 0.0 && pc.x <= 4.0 && pc.y >= 0.0 && pc.y <= 4.0) ink = float((glyph >> int(pc.x + 5.0 * pc.y)) & 1);
       float silA = step(0.01, m.b) * inFrame;
-      fragColor.rgb = mix(fragColor.rgb, u_asciiColor, ink * (1.0 - silA));
+      fragColor.rgb = mix(fragColor.rgb, mix(u_asciiColor2, u_asciiColor, dens), ink * (1.0 - silA));
     }
     ${shader === 'heat' ? 'fragColor.a = mix(fragColor.a, max(1.0 - inside, smoothstep(0.0, 0.35, img.r)), u_fuse);' : ''}
   }`
   const marker = 'fragColor = vec4(color, opacity);'
   const i = src.lastIndexOf(marker)
   const body = src.slice(0, i + marker.length) + tail + src.slice(i + marker.length)
-  return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform float u_aspect; uniform float u_scale; precision highp int;')
+  return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; precision highp int;')
 }
 
 const rt = (size: number, depth = false, samples = 0) =>
@@ -355,6 +360,9 @@ const finalUniforms = (): Record<string, THREE.IUniform> => ({
   u_asciiBias: { value: 3 },
   u_asciiScatter: { value: 0.5 },
   u_asciiColor: { value: new THREE.Vector3(1, 1, 1) },
+  u_asciiColor2: { value: new THREE.Vector3(1, 1, 1) },
+  u_asciiGlyphs: { value: 0 },
+  u_asciiMask: { value: null },
   u_grain: { value: 0 },
   u_aspect: { value: 1 },
   u_scale: { value: 1 },
@@ -446,6 +454,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       big: rt(SIZE / V.bigDiv),
       combined: rt(SIZE),
       maskE: rt(SIZE), // mask with occlusion-edge seams cut in (liquid / smoke)
+      still: rt(256, true, 4), // the un-turned cube's silhouette (a plain box on layer 1) for the still ascii outline
       // poisson: solved at 256 with float targets; max reduced by halving eight times
       pA: frt(256),
       pB: frt(256),
@@ -516,6 +525,8 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     u.u_asciiBias.value = A.bias
     u.u_asciiScatter.value = A.scatter
     u.u_asciiColor.value.set(...new THREE.Color(A.color).toArray())
+    u.u_asciiColor2.value.set(...new THREE.Color(A.color2 ?? A.color).toArray())
+    u.u_asciiGlyphs.value = A.glyphs === 'marks' ? 1 : 0
     u.u_outlineW.value = V.shader === 'heat' ? 0.0045 : 0.008 // heat samples the mask through its 57% window
     u.u_outlineColor.value.set(...new THREE.Color(outlineColor).toArray())
     if (Q.final2 && V.fuse) {
@@ -536,7 +547,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     Q.face.uniforms.uCapCos.value = V.capCos
     Q.face.uniforms.uSeamSym.value = V.seamSym ? 1 : 0
     Q.face.uniforms.uCamZ.value = V.camZ
-  }, [params, Q, V, gain, alpha, outline, outlineColor, A.cell, A.reach, A.bias, A.scatter, A.color, gl])
+  }, [params, Q, V, gain, alpha, outline, outlineColor, A.cell, A.reach, A.bias, A.scatter, A.color, A.color2, A.glyphs, gl])
 
   const pass = (mat: THREE.RawShaderMaterial, target: THREE.WebGLRenderTarget | null) => {
     Q.mesh.material = mat
@@ -565,9 +576,11 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     pass(Q.blur, dst)
   }
   // square render of the cube into a mask target: clear = (1, 0, 0) = seam / outside, no alpha, no shade
-  const renderMask = (target: THREE.WebGLRenderTarget, mode: number, idOut = false) => {
+  const renderMask = (target: THREE.WebGLRenderTarget, mode: number, idOut = false, layerMask = 1) => {
     Q.face.uniforms.uIdOut.value = idOut ? 1 : 0
     const cam = camera as THREE.PerspectiveCamera
+    const prevLayers = cam.layers.mask
+    cam.layers.mask = layerMask
     const aspect = cam.aspect
     cam.aspect = 1
     cam.updateProjectionMatrix()
@@ -579,6 +592,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     gl.clear()
     gl.render(maskScene.current, cam)
     gl.setClearColor(prevClear, prevAlpha)
+    cam.layers.mask = prevLayers
     cam.aspect = aspect
     cam.updateProjectionMatrix()
   }
@@ -593,6 +607,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
 
     // 1. mask, 2. their preprocess
     renderMask(R.mask, isHeat ? 0 : fieldMode, V.field === 'poisson')
+    if (outline === 'ascii' && A.still) renderMask(R.still, isHeat ? 0 : fieldMode, false, 2)
     // liquid / smoke: cut hairline seams at occlusion edges, then everything below reads maskE
     const M = isHeat ? R.mask : R.maskE
     if (!isHeat) {
@@ -659,6 +674,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     const u = Q.final.uniforms
     u.u_image.value = R.combined.texture
     u.u_mask.value = M.texture
+    u.u_asciiMask.value = (A.still ? R.still : M).texture
     u.u_time.value = state.clock.elapsedTime * speed + frame
     u.u_aspect.value = size.width / size.height
     u.u_resolution.value.set(size.width * gl.getPixelRatio(), size.height * gl.getPixelRatio())
@@ -690,6 +706,10 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       <scene ref={maskScene}>
         <group ref={root} rotation={[0.5, -0.7, 0]}>
           <RubikMask ref={rubik} gap={V.rubikGap} rounded={V.rubikRound} material={Q.face} auto={auto} autoInterval={autoInterval} />
+          {/* the un-turned cube's shape, layer 1 only: the still ascii outline measures from this */}
+          <mesh layers-mask={2} material={Q.face}>
+            <boxGeometry args={[3 * V.rubikGap, 3 * V.rubikGap, 3 * V.rubikGap]} />
+          </mesh>
         </group>
       </scene>
     </>

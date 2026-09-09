@@ -45,16 +45,16 @@ const SECTIONS: Section[] = [
 const HEAT_OF_SCHEME: Record<string, string> = { icemint: 'icemint', ice: 'icemint', mint: 'icemint', ember: 'ember', graphite: 'graphite', aura: 'default', paper: 'sepia' }
 
 /** cube versions worth comparing in place; key `v` cycles. Versions whose own preset is light get a dark one here. */
-const SITE_VERSIONS = ['v15', 'v14', 'v1', 'v9', 'v4', 'v7', 'v2', 'v6']
+const SITE_VERSIONS = ['v16', 'v15', 'v14', 'v1', 'v9', 'v4', 'v7', 'v2', 'v6']
 const SITE_PRESET: Record<string, string> = { v6: 'ice' }
 /** the site cube's themes (v14 / v15), key g cycles; the on-screen toggle is gone since Aaron settled on mint grain */
 const SITE_THEMES: [string, string][] = [['ice grain', 'ice'], ['mint grain', 'mint'], ['icemint grain soft', 'icemint']]
 
-export function Site({ version: initial = 'v15', scheme = 'icemint', bg = '#07090c' }: { version?: string; scheme?: string; bg?: string }) {
+export function Site({ version: initial = 'v16', scheme = 'icemint', bg = '#07090c' }: { version?: string; scheme?: string; bg?: string }) {
   const [active, setActive] = useState(0)
-  const [version, setVersion] = useState(VERSION_OF(initial) ? initial : 'v15')
+  const [version, setVersion] = useState(VERSION_OF(initial) ? initial : 'v16')
   // a deep-linked version outside the curated cycle still cycles from itself
-  const cycle = useMemo(() => Array.from(new Set([VERSION_OF(initial) ? initial : 'v15', ...SITE_VERSIONS])), [initial])
+  const cycle = useMemo(() => Array.from(new Set([VERSION_OF(initial) ? initial : 'v16', ...SITE_VERSIONS])), [initial])
   const [open, setOpen] = useState<{ section: number; item: number } | null>(null)
   // layout A/B: sections in the corners, or deck only (the deck carries the blurb, panels do the rest)
   const [layout, setLayout] = useState<'corners' | 'deck'>('corners')

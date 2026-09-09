@@ -56,7 +56,19 @@ export type PaperVersion = {
   ascii?: AsciiParams
   note: string
 }
-export type AsciiParams = { cell: number; reach: number; bias: number; scatter: number; color: string }
+export type AsciiParams = {
+  cell: number
+  reach: number
+  bias: number
+  scatter: number
+  /** glyph colour next to the cube, and (color2) the colour the far glyphs fade to */
+  color: string
+  color2?: string
+  /** measure the outline from the un-turned cube shape, so a turning layer does not drag the glyphs along */
+  still?: boolean
+  /** glyph ramp: 'dots' (. : * o & 8 @) or 'marks' (. - ~ + x % #) */
+  glyphs?: 'dots' | 'marks'
+}
 
 const base = {
   size: 1024,
@@ -175,6 +187,28 @@ export const PAPER_VERSIONS: PaperVersion[] = [
       { name: 'icemint grain', shader: 'liquid', preset: 'icemint grain soft' },
     ],
     note: "v14 mint grain with an off-white ascii outline: glyph cells hug the silhouette and trail off to the right (wind row sets the reach)",
+  },
+  {
+    ...liquid,
+    name: 'v16',
+    field: 'poisson',
+    poissonIters: 60,
+    seamSpace: 'cube',
+    rubikRound: 0.07,
+    seam: 0.03,
+    halo: false,
+    shade: 0.35,
+    preset: 'mint grain',
+    outline: 'ascii',
+    ascii: { cell: 9, reach: 0.022, bias: 8, scatter: 0.5, color: '#9de8d4', color2: '#f2f3f7', still: true, glyphs: 'marks' },
+    themes: [
+      { name: 'ice', shader: 'liquid', preset: 'ice' },
+      { name: 'ice grain', shader: 'liquid', preset: 'ice grain' },
+      { name: 'mint', shader: 'liquid', preset: 'mint' },
+      { name: 'mint grain', shader: 'liquid', preset: 'mint grain' },
+      { name: 'icemint grain', shader: 'liquid', preset: 'icemint grain soft' },
+    ],
+    note: "v15's ascii outline measured from the un-turned cube (a turning layer leaves it alone), thin on the top, left and bottom, the trail kept on the right, marks glyphs, mint next to the cube fading to white",
   },
 ]
 
