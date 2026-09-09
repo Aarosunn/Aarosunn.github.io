@@ -66,8 +66,16 @@ export type AsciiParams = {
   color2?: string
   /** measure the outline from the un-turned cube shape, so a turning layer does not drag the glyphs along */
   still?: boolean
-  /** glyph ramp: 'dots' (. : * o & 8 @) or 'marks' (. - ~ + x % #) */
-  glyphs?: 'dots' | 'marks'
+  /** glyph ramp: 'dots' (. : * o & 8 @), 'marks' (. - ~ + x % #) or 'code' (. ; / < = { #) */
+  glyphs?: 'dots' | 'marks' | 'code'
+  /** how much shorter the reach is straight up and down than sideways (0..1) */
+  squash?: number
+  /** ordered (Bayer) dither of the glyph level between neighbouring cells, in glyph steps */
+  dither?: number
+  /** far glyphs dim toward this fraction of their brightness (0 = no fade, 1 = fully faded at the tail's end) */
+  fade?: number
+  /** soft blob of the glyph colour under each cell, by density */
+  glow?: number
 }
 
 const base = {
@@ -209,6 +217,28 @@ export const PAPER_VERSIONS: PaperVersion[] = [
       { name: 'icemint grain', shader: 'liquid', preset: 'icemint grain soft' },
     ],
     note: "v15's ascii outline measured from the un-turned cube (a turning layer leaves it alone), thin on the top, left and bottom, the trail kept on the right, marks glyphs, mint next to the cube fading to white",
+  },
+  {
+    ...liquid,
+    name: 'v17',
+    field: 'poisson',
+    poissonIters: 60,
+    seamSpace: 'cube',
+    rubikRound: 0.07,
+    seam: 0.03,
+    halo: false,
+    shade: 0.35,
+    preset: 'mint grain',
+    outline: 'ascii',
+    ascii: { cell: 9, reach: 0.022, bias: 8, scatter: 0.2, color: '#9de8d4', color2: '#f2f3f7', still: true, glyphs: 'code', squash: 0.35, dither: 1.2, fade: 0.6, glow: 0.35 },
+    themes: [
+      { name: 'ice', shader: 'liquid', preset: 'ice' },
+      { name: 'ice grain', shader: 'liquid', preset: 'ice grain' },
+      { name: 'mint', shader: 'liquid', preset: 'mint' },
+      { name: 'mint grain', shader: 'liquid', preset: 'mint grain' },
+      { name: 'icemint grain', shader: 'liquid', preset: 'icemint grain soft' },
+    ],
+    note: "v16's outline thinner top and bottom, code glyphs . ; / < = { #, an ordered dither that fades with distance, a soft glow under each glyph",
   },
 ]
 

@@ -298,7 +298,7 @@ function finalFragment(shader: PaperShader) {
       for (int i = 0; i < 12; i++) {
         float a = float(i) * 0.5235988;
         vec2 dir = vec2(cos(a), sin(a));
-        float reach = u_asciiReach * (1.0 + u_asciiBias * max(-dir.x, 0.0));
+        float reach = u_asciiReach * (1.0 - u_asciiSquash * abs(dir.y)) * (1.0 + u_asciiBias * max(-dir.x, 0.0));
         for (int s = 0; s < 6; s++) {
           float t = reach * (float(s) + 0.5) / 6.0;
           vec2 sm = cm + dir * t;
@@ -307,18 +307,29 @@ function finalFragment(shader: PaperShader) {
         }
       }
       float hc = fract(sin(dot(cid, vec2(12.9898, 78.233))) * 43758.5453123);
-      int idx = int(clamp(dens * (1.0 - u_asciiScatter * hc) * 8.0, 0.0, 7.99));
-      // 5x5 bitmaps: dots  . : * o & 8 @ (v15)   marks  . - ~ + x % #
+      // ordered dither: a 4x4 Bayer threshold per cell shifts the glyph level between neighbours
+      ivec2 bi = ivec2(mod(cid, 4.0));
+      int bx = bi.x ^ bi.y;
+      float bayer = float(((bi.y & 1) << 3) | ((bx & 1) << 2) | ((bi.y & 2) << 0) | ((bx & 2) >> 1)) / 16.0;
+      float level = dens * (1.0 - u_asciiScatter * hc) * 8.0 + (bayer - 0.5) * u_asciiDither;
+      int idx = int(clamp(level, 0.0, 7.99));
+      // 5x5 bitmaps: dots  . : * o & 8 @ (v15)   marks  . - ~ + x % #   code  . ; / < = { #
       int glyph = u_asciiGlyphs < 0.5
         ? (idx == 0 ? 0 : idx == 1 ? 4096 : idx == 2 ? 65600 : idx == 3 ? 332772 : idx == 4 ? 15255086 : idx == 5 ? 23385164 : idx == 6 ? 15252014 : 13199452)
-        : (idx == 0 ? 0 : idx == 1 ? 4194304 : idx == 2 ? 14336 : idx == 3 ? 283712 : idx == 4 ? 4357252 : idx == 5 ? 18157905 : idx == 6 ? 27070835 : 11512810);
+        : u_asciiGlyphs < 1.5
+        ? (idx == 0 ? 0 : idx == 1 ? 4194304 : idx == 2 ? 14336 : idx == 3 ? 283712 : idx == 4 ? 4357252 : idx == 5 ? 18157905 : idx == 6 ? 27070835 : 11512810)
+        : (idx == 0 ? 0 : idx == 1 ? 4194304 : idx == 2 ? 2232324 : idx == 3 ? 1118480 : idx == 4 ? 8521864 : idx == 5 ? 1016800 : idx == 6 ? 12720268 : 11512810);
       vec2 fc = fract(gl_FragCoord.xy / u_asciiCell);
       // dots keep v15's decode (x mirrored, y up); marks are bit x + 5y with y down
       vec2 pc = u_asciiGlyphs < 0.5 ? floor((fc - 0.5) * vec2(-8.0, 8.0) + 2.5) : floor(vec2(fc.x, 1.0 - fc.y) * 8.0 - 1.5);
       float ink = 0.0;
       if (pc.x >= 0.0 && pc.x <= 4.0 && pc.y >= 0.0 && pc.y <= 4.0) ink = float((glyph >> int(pc.x + 5.0 * pc.y)) & 1);
       float silA = step(0.01, m.b) * inFrame;
-      fragColor.rgb = mix(fragColor.rgb, mix(u_asciiColor2, u_asciiColor, dens), ink * (1.0 - silA));
+      vec3 gcol = mix(u_asciiColor2, u_asciiColor, dens);
+      // glow: a soft blob of the glyph colour under the cell, by density; then the glyph, dimmer the farther out
+      float blob = smoothstep(0.9, 0.0, length(fc - 0.5) * 2.0);
+      fragColor.rgb = mix(fragColor.rgb, gcol, u_asciiGlow * dens * blob * step(0.5, level) * (1.0 - silA));
+      fragColor.rgb = mix(fragColor.rgb, gcol, ink * mix(1.0, dens, u_asciiFade) * (1.0 - silA));
     }
     ${shader === 'heat' ? 'fragColor.a = mix(fragColor.a, max(1.0 - inside, smoothstep(0.0, 0.35, img.r)), u_fuse);' : ''}
   }`
@@ -327,7 +338,7 @@ function finalFragment(shader: PaperShader) {
   const body = src.slice(0, i + marker.length) + tail + src.slice(i + marker.length)
   // heatmap's fragment never declares u_resolution; the ascii outline needs it
   const res = body.includes('uniform vec2 u_resolution') ? '' : ' uniform vec2 u_resolution;'
-  return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; precision highp int;')
+  return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform float u_asciiSquash; uniform float u_asciiDither; uniform float u_asciiFade; uniform float u_asciiGlow; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; precision highp int;')
 }
 
 const rt = (size: number, depth = false, samples = 0) =>
@@ -364,6 +375,10 @@ const finalUniforms = (): Record<string, THREE.IUniform> => ({
   u_asciiColor: { value: new THREE.Vector3(1, 1, 1) },
   u_asciiColor2: { value: new THREE.Vector3(1, 1, 1) },
   u_asciiGlyphs: { value: 0 },
+  u_asciiSquash: { value: 0 },
+  u_asciiDither: { value: 0 },
+  u_asciiFade: { value: 0 },
+  u_asciiGlow: { value: 0 },
   u_asciiMask: { value: null },
   u_grain: { value: 0 },
   u_aspect: { value: 1 },
@@ -528,7 +543,11 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     u.u_asciiScatter.value = A.scatter
     u.u_asciiColor.value.set(...new THREE.Color(A.color).toArray())
     u.u_asciiColor2.value.set(...new THREE.Color(A.color2 ?? A.color).toArray())
-    u.u_asciiGlyphs.value = A.glyphs === 'marks' ? 1 : 0
+    u.u_asciiGlyphs.value = A.glyphs === 'marks' ? 1 : A.glyphs === 'code' ? 2 : 0
+    u.u_asciiSquash.value = A.squash ?? 0
+    u.u_asciiDither.value = A.dither ?? 0
+    u.u_asciiFade.value = A.fade ?? 0
+    u.u_asciiGlow.value = A.glow ?? 0
     u.u_outlineW.value = V.shader === 'heat' ? 0.0045 : 0.008 // heat samples the mask through its 57% window
     u.u_outlineColor.value.set(...new THREE.Color(outlineColor).toArray())
     if (Q.final2 && V.fuse) {
@@ -549,7 +568,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     Q.face.uniforms.uCapCos.value = V.capCos
     Q.face.uniforms.uSeamSym.value = V.seamSym ? 1 : 0
     Q.face.uniforms.uCamZ.value = V.camZ
-  }, [params, Q, V, gain, alpha, outline, outlineColor, A.cell, A.reach, A.bias, A.scatter, A.color, A.color2, A.glyphs, gl])
+  }, [params, Q, V, gain, alpha, outline, outlineColor, A.cell, A.reach, A.bias, A.scatter, A.color, A.color2, A.glyphs, A.squash, A.dither, A.fade, A.glow, gl])
 
   const pass = (mat: THREE.RawShaderMaterial, target: THREE.WebGLRenderTarget | null) => {
     Q.mesh.material = mat
