@@ -73,7 +73,8 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'p') setTab((t) => TABS[(TABS.indexOf(t) + 1) % TABS.length])
       if (e.key === 'c') setSi((i) => (i + 1) % SCHEMES.length)
-      if (ALG_KEYS[e.key]) rubik.current?.run(ALGS[ALG_KEYS[e.key]])
+      const alg = ALG_KEYS[e.key.toLowerCase()]
+      if (alg) rubik.current?.run(ALGS[alg])
     }
     window.addEventListener('keydown', onKey)
     window.__aar = {

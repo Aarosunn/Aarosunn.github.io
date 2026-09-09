@@ -92,7 +92,7 @@ export function Site({ version: initial = 'v16', scheme = 'icemint', bg = '#0709
     if (e.key === 'ArrowRight') step(active + 1)
     if (e.key === 'ArrowLeft') step(active - 1)
     if (e.key === 'x') setLayout((l) => (l === 'corners' ? 'deck' : 'corners'))
-    const alg = ALG_KEYS[e.key]
+    const alg = ALG_KEYS[e.key.toLowerCase()] // caps lock must not matter
     if (alg) rubik.current?.run(ALGS[alg])
     if (e.key === 'g') setSiteTheme((t) => SITE_THEMES[(SITE_THEMES.findIndex(([n]) => n === t) + 1) % SITE_THEMES.length][0])
     if (e.key === 'v') setVersion((v) => cycle[(cycle.indexOf(v) + 1) % cycle.length])

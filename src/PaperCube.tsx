@@ -325,7 +325,9 @@ function finalFragment(shader: PaperShader) {
   const marker = 'fragColor = vec4(color, opacity);'
   const i = src.lastIndexOf(marker)
   const body = src.slice(0, i + marker.length) + tail + src.slice(i + marker.length)
-  return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; precision highp int;')
+  // heatmap's fragment never declares u_resolution; the ascii outline needs it
+  const res = body.includes('uniform vec2 u_resolution') ? '' : ' uniform vec2 u_resolution;'
+  return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; precision highp int;')
 }
 
 const rt = (size: number, depth = false, samples = 0) =>
