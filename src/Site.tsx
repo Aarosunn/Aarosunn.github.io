@@ -81,16 +81,32 @@ export function Site({ version: initial = 'v10' }: { version?: string }) {
     const n = Number(e.key)
     if (n >= 1 && n <= SECTIONS.length) step(n - 1)
   }
+  const stepRef = useRef(step)
+  stepRef.current = step
   useEffect(() => {
     const f = (e: KeyboardEvent) => onKey.current(e)
+    // no scrolling page: the wheel walks the deck, one step per gesture
+    let last = 0
+    const w = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) < 24 || performance.now() - last < 900) return
+      last = performance.now()
+      stepRef.current(activeRef.current + (e.deltaY > 0 ? 1 : -1))
+    }
     window.addEventListener('keydown', f)
-    return () => window.removeEventListener('keydown', f)
+    window.addEventListener('wheel', w, { passive: true })
+    return () => {
+      window.removeEventListener('keydown', f)
+      window.removeEventListener('wheel', w)
+    }
   }, [])
+  const activeRef = useRef(active)
+  activeRef.current = active
+  const reduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
   return (
     <>
       <Canvas key={version} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
-        <PaperCube version={PV} params={params} spin spinSpeed={0.12} rubik={rubik} />
+        <PaperCube version={PV} params={params} spin={!reduced} spinSpeed={0.12} rubik={rubik} />
       </Canvas>
       <div className="aura" />
       <div className="grain" />
