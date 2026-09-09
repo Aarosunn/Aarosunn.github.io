@@ -123,6 +123,26 @@ export const PAPER_VERSIONS: PaperVersion[] = [
     themes: ['default', 'backdrop', 'heatmap', 'heatmap grain', 'ice', 'mint', 'icemint', 'icemint grain'].map((name) => ({ name, shader: 'liquid' as const, preset: name })),
     note: "v11, pixel for pixel at rest, with its face mapping rebuilt in cube-space axes so nothing drifts after turns",
   },
+  {
+    ...liquid,
+    name: 'v14',
+    field: 'poisson',
+    poissonIters: 60,
+    seamSpace: 'cube',
+    rubikRound: 0.07,
+    seam: 0.03,
+    halo: false,
+    shade: 0.35,
+    preset: 'ice',
+    themes: [
+      { name: 'ice', shader: 'liquid', preset: 'ice' },
+      { name: 'ice grain', shader: 'liquid', preset: 'ice grain' },
+      { name: 'mint', shader: 'liquid', preset: 'mint' },
+      { name: 'mint grain', shader: 'liquid', preset: 'mint grain' },
+      { name: 'icemint grain', shader: 'liquid', preset: 'icemint grain soft' },
+    ],
+    note: "v13's cube with the keepers: ice, mint, their grain versions, and icemint grain with its brightest stop toned down; outline row draws a line or glow behind the silhouette",
+  },
 ]
 
 /** paper tab: the shaders on a plain-looking cube (whole-face plates hide the cubies until a layer turns) */

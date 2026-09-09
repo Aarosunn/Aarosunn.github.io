@@ -13,6 +13,7 @@ const TABS: Tab[] = ['site', 'shader', 'paper']
 const LABEL: Record<Tab, string> = { site: 'site', shader: 'shader cube', paper: 'paper shaders' }
 const SHADER_NAME = { heat: 'heatmap', liquid: 'liquid metal', smoke: 'gem smoke' }
 const GAINS = [0.7, 0.85, 1, 1.2, 1.4]
+const OUTLINES = ['off', 'line', 'glow'] as const
 const ALPHAS = [0.5, 0.7, 0.85, 1]
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
   const [debug, setDebug] = useState<PaperDebug>('off')
   const [gain, setGain] = useState(1)
   const [alpha, setAlpha] = useState(1)
+  const [outline, setOutline] = useState<(typeof OUTLINES)[number]>('off')
   // review hook: merge arbitrary params over the theme (scripts iterate looks without editing presets)
   const [override, setOverride] = useState<Record<string, unknown>>({})
   const [vOverride, setVOverride] = useState<Partial<PaperVersion>>({})
@@ -74,6 +76,7 @@ export default function App() {
       setShaderDebug: setDebug,
       setShaderLook: (g: number, a: number) => { setGain(g); setAlpha(a) },
       setShaderOverride: setOverride,
+      setShaderOutline: setOutline,
       setShaderVersionOverride: setVOverride,
       paperTurn: (...args: Parameters<RubikHandle['turn']>) => rubik.current?.turn(...args) ?? Promise.resolve(),
       paperPositions: () => rubik.current?.positions() ?? [],
@@ -115,7 +118,7 @@ export default function App() {
   return (
     <>
       <Canvas key={version + (theme?.name ?? '')} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
-        <PaperCube version={PV} params={params} spin={spin} auto={auto} debug={debug} gain={gain} alpha={alpha} rubik={rubik} />
+        <PaperCube version={PV} params={params} spin={spin} auto={auto} debug={debug} gain={gain} alpha={alpha} outline={outline} outlineColor={s.accent} rubik={rubik} />
       </Canvas>
       <div className="ui">
         <div className="wordmark">aarcube</div>
@@ -125,6 +128,7 @@ export default function App() {
           <Row label={base.themes ? 'theme' : 'preset'} items={choices} on={choice} pick={(n) => setPresetIx(choices.indexOf(n))} />
           <Row label="brightness" items={GAINS.map(String)} on={String(gain)} pick={(n) => setGain(Number(n))} />
           <Row label="opacity" items={ALPHAS.map(String)} on={String(alpha)} pick={(n) => setAlpha(Number(n))} />
+          <Row label="outline" items={[...OUTLINES]} on={outline} pick={setOutline} />
           <div className="row">
             <span className="k">motion</span>
             <button className={spin ? 'on' : ''} onClick={() => setSpin((v) => !v)}>
@@ -172,6 +176,7 @@ declare global {
       setShaderDebug: (v: PaperDebug) => void
       setShaderLook: (gain: number, alpha: number) => void
       setShaderOverride: (o: Record<string, unknown>) => void
+      setShaderOutline: (o: 'off' | 'line' | 'glow') => void
       setShaderVersionOverride: (o: Partial<PaperVersion>) => void
       paperTurn: RubikHandle['turn']
       paperPositions: () => number[][]

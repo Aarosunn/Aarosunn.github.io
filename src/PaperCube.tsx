@@ -130,20 +130,24 @@ const COPY = /* glsl */ `
 `
 // cubie faces
 const FACE_VERT = /* glsl */ `
-  in vec3 position; in vec3 normal; in vec2 uv; out vec3 vN; out vec2 vUv; out vec3 vLocal; out vec3 vLocalN; out vec3 vCube; out vec3 vCubeN; out vec3 vCubieC;
+  in vec3 position; in vec3 normal; in vec2 uv; out vec3 vN; out vec2 vUv; out vec3 vLocal; out vec3 vLocalN; out vec3 vCube; out vec3 vCubeN; out vec3 vShift; out vec3 vCap;
   uniform mat4 modelViewMatrix; uniform mat4 projectionMatrix; uniform mat3 normalMatrix; uniform mat4 modelMatrix; uniform mat4 uRootInv;
   void main() {
     vN = normalMatrix * normal; vUv = uv; vLocal = position; vLocalN = normal;
     mat4 toCube = uRootInv * modelMatrix;
     vCube = (toCube * vec4(position, 1.0)).xyz;
-    vCubieC = (toCube * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+    // the v11 mapping's cube-space constants brought into this cubie's own frame (rotation only, no scale):
+    // the +0.07 plate shift along cube +x+y+z, and the cube z axis (the extrusion's cap axis)
+    mat3 R = mat3(toCube);
+    vShift = transpose(R) * vec3(0.07);
+    vCap = transpose(R) * vec3(0.0, 0.0, 1.0);
     vCubeN = mat3(toCube) * normal;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `
 const FACE_FRAG = /* glsl */ `
   precision highp float;
-  in vec3 vN; in vec2 vUv; in vec3 vLocal; in vec3 vLocalN; in vec3 vCube; in vec3 vCubeN; in vec3 vCubieC; out vec4 o;
+  in vec3 vN; in vec2 vUv; in vec3 vLocal; in vec3 vLocalN; in vec3 vCube; in vec3 vCubeN; in vec3 vShift; in vec3 vCap; out vec4 o;
   uniform float mode;   // 0 heat, 2 plate per cubie face, 3 plate per whole cube face (cube space)
   uniform float k;      // plate sharpness
   uniform float uHalf;  // cube half extent in cube space (mode 3)
@@ -155,12 +159,19 @@ const FACE_FRAG = /* glsl */ `
   float plate(vec2 p) { float b = (1.0 - p.x * p.x) * (1.0 - p.y * p.y); return 1.0 - pow(clamp(b, 0.0, 1.0), k); }
   // the two coordinates across the face this fragment lies on (dominant local normal axis), -.5..+.5
   vec2 across(vec3 pos, vec3 n) { vec3 a = abs(n); return a.x > a.y && a.x > a.z ? pos.yz : a.y > a.z ? pos.xz : pos.xy; }
-  // the extrusion's rule: caps are the z faces, everything else (walls and every bevel strip) is a wall keyed by x or y
-  vec2 acrossExtrude(vec3 pos, vec3 n) { vec3 a = abs(n); return a.z > uCapCos ? pos.xy : a.x > a.y ? pos.yz : pos.xz; }
+  // the extrusion's rule in the cubie's own frame: the face is the cap axis (cube z, carried in as vCap) when the
+  // normal sits on it beyond capCos, else the dominant of the other two; return the two coordinates across it
+  vec2 acrossRigid(vec3 pos, vec3 n, vec3 cap) {
+    vec3 a = abs(normalize(n));
+    vec3 c = abs(cap);
+    float onCap = step(uCapCos, dot(a, c));
+    vec3 w = mix(a * (1.0 - c), c, onCap);
+    return w.x >= w.y && w.x >= w.z ? pos.yz : w.y >= w.z ? pos.xz : pos.xy;
+  }
   void main() {
     float l = 0.35 + 0.65 * max(dot(normalize(vN), normalize(vec3(0.35, 0.8, 0.6))), 0.0);
     // face coordinates -.5..+.5
-    vec2 f = uSeamUv > 1.5 ? acrossExtrude(vCube - vCubieC, normalize(vCubeN)) - 0.07 : uSeamUv > 0.5 ? vUv - 0.5 : across(vLocal, vLocalN);
+    vec2 f = uSeamUv > 1.5 ? acrossRigid(vLocal - vShift, vLocalN, vCap) : uSeamUv > 0.5 ? vUv - 0.5 : across(vLocal, vLocalN);
     float e = 0.5 - max(abs(f.x), abs(f.y));
     float seam = uSeam > 0.0 ? 1.0 - smoothstep(uSeam * 0.6, uSeam, e) : 0.0;
     if (mode < 1.0) {
@@ -210,9 +221,11 @@ function finalFragment(shader: PaperShader) {
     fragColor.rgb *= mix(1.0, shade, u_shade * inside);
     ${shader === 'heat' ? '' : `
     // colour ramp: the effect's luminance through a palette (heatmap / icemint), with optional static grain
+    float grainN = u_grain * 0.35 * (fract(sin(dot(v_imageUV * 1000.0, vec2(12.9898, 78.233))) * 43758.5453123) - 0.5);
+    if (u_rampCount < 0.5) fragColor.rgb *= mix(1.0, 1.0 + grainN, inside);
     if (u_rampCount > 0.5) {
       float l = dot(fragColor.rgb, vec3(0.299, 0.587, 0.114));
-      l += u_grain * 0.35 * (fract(sin(dot(v_imageUV * 1000.0, vec2(12.9898, 78.233))) * 43758.5453123) - 0.5);
+      l += grainN;
       l = pow(clamp(l, 0.0, 1.0), abs(u_rampGamma));
       if (u_rampGamma < 0.0) l = 1.0 - l;
       l = mix(u_rampFloor, 1.0, l); // floor: the darkest chrome still lands on a visible stop, not the page colour
@@ -227,12 +240,28 @@ function finalFragment(shader: PaperShader) {
     // look controls, cube body only: brightness scales it, opacity fades it toward the page
     fragColor.rgb = mix(fragColor.rgb, fragColor.rgb * u_gain, inside);
     fragColor.rgb = mix(u_colorBack.rgb, fragColor.rgb, mix(1.0, u_alpha, inside));
+    // outline behind the silhouette: 1 = a line of constant width, 2 = a soft glow; drawn where the pixel is
+    // outside the cube but within reach of it (mask B = lambert > 0 inside, seams included, 0 outside)
+    if (u_outline > 0.5) {
+      float sil = step(0.01, m.b) * inFrame;
+      float near = 0.0;
+      for (int i = 0; i < 16; i++) {
+        float a = float(i) * 0.392699;
+        vec2 dir = vec2(cos(a), sin(a));
+        float n1 = step(0.01, texture(u_mask, vec2(mUV.x, 1.0 - mUV.y) + dir * u_outlineW).b);
+        float n2 = step(0.01, texture(u_mask, vec2(mUV.x, 1.0 - mUV.y) + dir * u_outlineW * 2.2).b);
+        float n3 = step(0.01, texture(u_mask, vec2(mUV.x, 1.0 - mUV.y) + dir * u_outlineW * 3.6).b);
+        near = max(near, u_outline > 1.5 ? max(n1, max(n2 * 0.55, n3 * 0.25)) : n1);
+      }
+      float ring = (1.0 - sil) * near;
+      fragColor.rgb = mix(fragColor.rgb, u_outlineColor, ring);
+    }
     ${shader === 'heat' ? 'fragColor.a = mix(fragColor.a, max(1.0 - inside, smoothstep(0.0, 0.35, img.r)), u_fuse);' : ''}
   }`
   const marker = 'fragColor = vec4(color, opacity);'
   const i = src.lastIndexOf(marker)
   const body = src.slice(0, i + marker.length) + tail + src.slice(i + marker.length)
-  return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain;')
+  return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor;')
 }
 
 const rt = (size: number, depth = false, samples = 0) =>
@@ -259,6 +288,9 @@ const finalUniforms = (): Record<string, THREE.IUniform> => ({
   u_rampCount: { value: 0 },
   u_rampGamma: { value: 1 },
   u_rampFloor: { value: 0 },
+  u_outline: { value: 0 },
+  u_outlineW: { value: 0.008 },
+  u_outlineColor: { value: new THREE.Vector3(1, 1, 1) },
   u_grain: { value: 0 },
   u_aspect: { value: 1 },
   u_scale: { value: 1 },
@@ -321,10 +353,13 @@ export type PaperCubeProps = {
   /** look controls: brightness multiplier and cube-body opacity */
   gain?: number
   alpha?: number
+  /** outline behind the silhouette: 'line' (constant width) or 'glow' (soft), in this colour */
+  outline?: 'off' | 'line' | 'glow'
+  outlineColor?: string
   rubik?: React.RefObject<RubikHandle | null>
 }
 
-export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = false, autoInterval = 900, debug = 'off', gain = 1, alpha = 1, rubik }: PaperCubeProps) {
+export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = false, autoInterval = 900, debug = 'off', gain = 1, alpha = 1, outline = 'off', outlineColor = '#ffffff', rubik }: PaperCubeProps) {
   const SIZE = V.size
   const isHeat = V.shader === 'heat'
   const fieldMode = V.field === 'cube' ? 3 : 2
@@ -404,6 +439,9 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     u.u_fuse.value = V.fuse ? 1 : 0
     u.u_gain.value = gain
     u.u_alpha.value = alpha
+    u.u_outline.value = outline === 'line' ? 1 : outline === 'glow' ? 2 : 0
+    u.u_outlineW.value = V.shader === 'heat' ? 0.0045 : 0.008 // heat samples the mask through its 57% window
+    u.u_outlineColor.value.set(...new THREE.Color(outlineColor).toArray())
     if (Q.final2 && V.fuse) {
       const u2 = Q.final2.uniforms
       applyParams(u2, presetNamed(V.fuse, V.fusePreset).params)
@@ -420,7 +458,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     Q.face.uniforms.uSeam.value = V.seam
     Q.face.uniforms.uSeamUv.value = V.seamSpace === 'geometry' ? 0 : V.seamSpace === 'cube' ? 2 : 1
     Q.face.uniforms.uCapCos.value = V.capCos
-  }, [params, Q, V, gain, alpha])
+  }, [params, Q, V, gain, alpha, outline, outlineColor])
 
   const pass = (mat: THREE.RawShaderMaterial, target: THREE.WebGLRenderTarget | null) => {
     Q.mesh.material = mat

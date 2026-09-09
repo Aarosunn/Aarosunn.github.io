@@ -189,3 +189,8 @@ Aaron: "v13 still looks different to v11, v11 has more rounded corners, use play
 ## Vanishing faces on the ramped themes (15:00)
 
 Aaron's screenshot: cubie faces reduced to bright discs. Reproduced with paper's `frame` time offset (now a param: `u_time = clock × speed + frame`): at some phases the chrome band is dark across a face, the icemint / heatmap ramp maps that to its first stop, which is the page's navy, and the face disappears leaving the dispersion rings. `rampFloor` remaps the luminance into [floor, 1] before the ramp: icemint themes .2, heatmap .12. Same phases now keep a visible navy face with the grid intact. Applies to v11 and v13 alike (shared presets), so the two stay pixel-identical.
+
+## v14 + mid-turn squash fixed (15:40)
+
+v14 = v13's cube with Aaron's keepers: ice, ice grain, mint, mint grain (grain now also applies to untinted themes as luminance noise), and icemint grain with its brightest stop toned to #d6ebe4 (`icemint grain soft`, other stops untouched). `outline` row (off / line / glow): the final pass samples the mask's lambert channel around each outside pixel (16 directions, 1–3 radii) and paints the scheme accent behind the silhouette, seams excluded.
+Aaron's mid-turn screenshot (elliptical discs on the turning slice) was the cube-space mapping projecting tilted faces onto cube axes. `seamSpace: 'cube'` now stays rigid in each cubie's own frame and only carries the cube-space constants across: the +0.07 plate shift and the cap axis are rotated into the cubie frame per vertex (`vShift`, `vCap`), so a turning slice keeps square plates, the offset rotates continuously, and rest frames remain pixel-identical to v11 (re-verified, 0.35–0.55 / 255).
