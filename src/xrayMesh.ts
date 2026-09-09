@@ -82,7 +82,7 @@ export type Flower = {
 }
 
 /** `upright`: bloom at the top, stem down (the tab); otherwise the wide base composition */
-export function buildFlower(seed: number, spec: FlowerSpec, upright = true, withBud = true, stemMul = 1): Flower {
+export function buildFlower(seed: number, spec: FlowerSpec, upright = true, withBud = true, stemMul = 1, withCentre = true): Flower {
   const rng = mulberry32(seed * 104729 + 7 + spec.name.length * 131)
   const geos: THREE.BufferGeometry[] = []
   const bloomCentre = upright ? new THREE.Vector3(0, spec.bell ? 0.9 : 0.45, 0) : new THREE.Vector3(-1.25, 0.55, 0)
@@ -127,21 +127,22 @@ export function buildFlower(seed: number, spec: FlowerSpec, upright = true, with
   const dots: THREE.Vector3[] = [], filaments: THREE.Vector3[] = []
   let dotR = 0.02
   const c0 = new THREE.Vector3(0, 0, 0.04).applyMatrix4(bloomM)
-  if (spec.centre === 'cluster')
+  const centre = withCentre ? spec.centre : 'none'
+  if (centre === 'cluster')
     for (let i = 0; i < 56; i++) {
       const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * 0.22
       const p = new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, 0.12 + (0.22 - r) * 0.9 + rng() * 0.05).applyMatrix4(bloomM)
       dots.push(p)
       filaments.push(c0, p)
     }
-  if (spec.centre === 'disc') {
+  if (centre === 'disc') {
     dotR = 0.016
     for (let i = 0; i < 140; i++) {
       const a = i * golden, r = Math.sqrt(i / 140) * 0.24
       dots.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, 0.03 + (0.24 - r) * 0.25).applyMatrix4(bloomM))
     }
   }
-  if (spec.centre === 'long') {
+  if (centre === 'long') {
     dotR = 0.035
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2 + 0.3

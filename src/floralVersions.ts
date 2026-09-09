@@ -44,7 +44,9 @@ export type FloralVersion = {
   scheme?: string
   /** mesh: several flowers rooted on a ground plane instead of one upright flower */
   /** density: plants per world unit of width relative to the default; height: plant scale multiplier */
-  scene?: { flowers: string[]; ground: 'grid' | 'off'; layers?: number; density?: number; height?: number }
+  scene?: { flowers: string[]; ground: 'grid' | 'off'; layers?: number; density?: number; height?: number; spread?: number; camDist?: number }
+  /** mesh: draw the stamens / pollen (default true) */
+  pollen?: boolean
   /** mesh, mono tint: how far the petal rim leans from the scheme's `a` toward white (default 1 = white rims) */
   rimWhite?: number
   /** where the site shows it: the base row (default) or a full-width strip along the bottom of the page */
@@ -68,6 +70,7 @@ export const FLORAL_VERSIONS: FloralVersion[] = [
   // flower assets: no technical layer, the bloom is the subject, stem and leaves soft
   { ...base, name: 'v9', kind: 'mesh', ruler: false, wire: 0.12, fresnel: { power: 2.8, gain: 0.9, base: 0.015 }, irid: 0.25, blur: 2.5, dim: 0.55, centreGlow: 0.9, note: 'ghost: the scheme\'s white-blue x-ray on any flower type, a little sheen, stem and leaves blurred and dimmed' },
   { ...base, name: 'v10', kind: 'mesh', tint: 'spectral', ruler: false, wire: 0.1, fresnel: { power: 2.6, gain: 1.0, base: 0.02 }, irid: 0.6, blur: 2.5, dim: 0.5, centreGlow: 0.7, note: 'iridescent: each flower\'s own palette with a thin-film sheen and a warm glowing centre, stem and leaves soft' },
+  { ...base, name: 'v13', kind: 'mesh', ruler: false, scene: { flowers: ['lotus', 'rose', 'orchid'], ground: 'off', layers: 1, spread: 4.4, camDist: 6.2 }, buds: false, pollen: false, wire: 0.12, fresnel: { power: 2.8, gain: 0.9, base: 0.015 }, irid: 0.25, blur: 2.5, dim: 0.55, note: 'a small group: lotus, rose and orchid in the ghost look of v9, no pollen, no buds, no ground' },
   { ...base, name: 'v12', kind: 'mesh', ruler: false, scheme: 'mint', placement: 'bottom', scene: { flowers: ['peony', 'tulip', 'poppy', 'rose', 'lotus'], ground: 'grid', layers: 3, density: 0.55, height: 0.7 }, buds: false, wire: 0.07, fresnel: { power: 3.2, gain: 0.32, base: 0.004 }, irid: 0.2, blur: 2.2, dim: 0.45, centreGlow: 0.3, petalWhite: 0.1, rimWhite: 0.55, note: 'the bed along the bottom of the page: peony, tulip, poppy, rose, lotus in three layers across the full width, dimmer and less glowy, the mint kept' },
   { ...base, name: 'v11', kind: 'mesh', ruler: false, scheme: 'mint', scene: { flowers: ['peony', 'tulip', 'poppy', 'rose', 'bell', 'lotus', 'iris'], ground: 'grid', layers: 3 }, buds: false, wire: 0.12, fresnel: { power: 2.8, gain: 0.7, base: 0.01 }, irid: 0.2, blur: 2.2, dim: 0.55, centreGlow: 0.8, petalWhite: 0.2, note: 'on the ground: seven kinds of flower planted in three overlapping depth layers on a faint wire ground, the mint scheme\'s ghost x-ray, foliage soft, no buds' },
 ]

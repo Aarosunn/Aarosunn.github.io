@@ -169,8 +169,8 @@ function plant(v: FloralVersion, seed: number, spread = 8.6): Planted[] {
   const names = v.scene?.flowers ?? []
   const layers = v.scene?.layers ?? 1
   const rng = mulberry32(seed * 7907 + 11)
-  // enough plants per layer to fill the width, the list repeating
-  const n = Math.max(names.length, Math.round((spread / 1.25) * (v.scene?.density ?? 1)))
+  // enough plants per layer to fill the width, the list repeating; a scene with its own spread plants its list once
+  const n = v.scene?.spread ? names.length : Math.max(names.length, Math.round((spread / 1.25) * (v.scene?.density ?? 1)))
   const hm = v.scene?.height ?? 1
   const out: Planted[] = []
   // back layers first (small, far), each layer its own seed and a shuffled order, so kinds overlap across depth
@@ -180,7 +180,7 @@ function plant(v: FloralVersion, seed: number, spread = 8.6): Planted[] {
     const zc = layers === 1 ? 0 : -1.4 + (l / (layers - 1)) * 2.2
     const depth = layers === 1 ? 1 : l / (layers - 1) // 0 back .. 1 front
     order.forEach((name, i) => {
-      const f = buildFlower(seed + i * 17 + l * 101, FLOWER_OF(name), true, v.buds !== false, 0.65 + rng() * 0.7)
+      const f = buildFlower(seed + i * 17 + l * 101, FLOWER_OF(name), true, v.buds !== false, 0.65 + rng() * 0.7, v.pollen !== false)
       f.stem.computeBoundingBox()
       const baseY = f.stem.boundingBox!.min.y
       const z = zc + (rng() - 0.5) * 0.5
@@ -213,12 +213,12 @@ function Look({ at }: { at: [number, number, number] }) {
 export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, height = XF_H, className, scheme: pageScheme, upright = false }: { v: FloralVersion; flower?: string; seed?: number; width?: number; height?: number; className?: string; scheme?: string; upright?: boolean }) {
   const scheme = v.scheme ?? pageScheme
   const spec = FLOWER_OF(flower)
-  const f = useMemo(() => buildFlower(seed, spec, upright, v.buds !== false), [seed, spec, upright, v.buds])
+  const f = useMemo(() => buildFlower(seed, spec, upright, v.buds !== false, 1, v.pollen !== false), [seed, spec, upright, v.buds, v.pollen])
   useEffect(() => () => f.dispose(), [f])
   // the bed fills the box: its width in world units at the ground from the camera distance and the box's aspect
   const strip = v.placement === 'bottom'
-  const camDist = strip ? 6.4 : 9.4
-  const spread = strip ? 2 * camDist * Math.tan((30 * Math.PI) / 360) * (width / height) * 0.95 : 8.6
+  const camDist = strip ? 6.4 : v.scene?.camDist ?? 9.4
+  const spread = strip ? 2 * camDist * Math.tan((30 * Math.PI) / 360) * (width / height) * 0.95 : v.scene?.spread ?? 8.6
   const planted = useMemo(() => (v.scene ? plant(v, seed, spread) : []), [v, seed, spread])
   useEffect(() => () => planted.forEach((p) => p.f.dispose()), [planted])
   // colours from the scheme table (on the site this mounts before App has applied the CSS variables);
