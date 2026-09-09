@@ -44,8 +44,9 @@ for (const v of versions) {
     await shot(`${v}-turn2after`, 200)
     for (let i = 0; i < 12; i++) await page.evaluate(() => window.__aar.paperTurn())
     const pos = await page.evaluate(() => window.__aar.paperPositions())
-    const ok = new Set(pos.map((p) => p.join(','))).size === 27 && pos.every((p) => p.every((c) => Number.isInteger(c) && Math.abs(c) <= 1))
-    console.log(v, 'integrity after 12 turns:', ok ? 'ok' : 'BROKEN ' + JSON.stringify(pos))
+    const errs = await page.evaluate(() => [window.__aar.paperOrientationError(), window.__aar.paperPlacementError()])
+    const ok = new Set(pos.map((p) => p.join(','))).size === 27 && pos.every((p) => p.every((c) => Number.isInteger(c) && Math.abs(c) <= 1)) && errs[0] < 1e-6 && errs[1] < 1e-6
+    console.log(v, 'integrity after 12 turns:', ok ? 'ok' : 'BROKEN ' + JSON.stringify({ pos, errs }))
     await shot(`${v}-turn3later`, 200)
   }
   const fps = await page.evaluate(() => new Promise((r) => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 < 1000) requestAnimationFrame(f); else r(n) }; requestAnimationFrame(f) }))

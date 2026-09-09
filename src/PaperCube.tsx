@@ -111,10 +111,10 @@ const COPY = /* glsl */ `
 `
 // cubie faces
 const FACE_VERT = /* glsl */ `
-  in vec3 position; in vec3 normal; in vec2 uv; out vec3 vN; out vec2 vUv; out vec3 vCube; out vec3 vCubeN;
+  in vec3 position; in vec3 normal; out vec3 vN; out vec3 vLocal; out vec3 vLocalN; out vec3 vCube; out vec3 vCubeN;
   uniform mat4 modelViewMatrix; uniform mat4 projectionMatrix; uniform mat3 normalMatrix; uniform mat4 modelMatrix; uniform mat4 uRootInv;
   void main() {
-    vN = normalMatrix * normal; vUv = uv;
+    vN = normalMatrix * normal; vLocal = position; vLocalN = normal;
     mat4 toCube = uRootInv * modelMatrix;
     vCube = (toCube * vec4(position, 1.0)).xyz;
     vCubeN = mat3(toCube) * normal;
@@ -123,21 +123,25 @@ const FACE_VERT = /* glsl */ `
 `
 const FACE_FRAG = /* glsl */ `
   precision highp float;
-  in vec3 vN; in vec2 vUv; in vec3 vCube; in vec3 vCubeN; out vec4 o;
+  in vec3 vN; in vec3 vLocal; in vec3 vLocalN; in vec3 vCube; in vec3 vCubeN; out vec4 o;
   uniform float mode;   // 0 heat, 2 plate per cubie face, 3 plate per whole cube face (cube space)
   uniform float k;      // plate sharpness
   uniform float uHalf;  // cube half extent in cube space (mode 3)
-  uniform float uSeam;  // hairline along each cubie face border, in uv units
+  uniform float uSeam;  // hairline along each cubie face border, in cubie units (cubie = 1)
   float plate(vec2 p) { float b = (1.0 - p.x * p.x) * (1.0 - p.y * p.y); return 1.0 - pow(clamp(b, 0.0, 1.0), k); }
+  // the two coordinates across the face this fragment lies on (dominant local normal axis), -.5..+.5
+  vec2 across(vec3 pos, vec3 n) { vec3 a = abs(n); return a.x > a.y && a.x > a.z ? pos.yz : a.y > a.z ? pos.xz : pos.xy; }
   void main() {
     float l = 0.35 + 0.65 * max(dot(normalize(vN), normalize(vec3(0.35, 0.8, 0.6))), 0.0);
-    float e = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+    // seams and plates come from geometry, not uv: a rounded (extruded) cubie has different uv scales per face
+    vec2 f = across(vLocal, vLocalN);
+    float e = 0.5 - max(abs(f.x), abs(f.y));
     float seam = uSeam > 0.0 ? 1.0 - smoothstep(uSeam * 0.6, uSeam, e) : 0.0;
     if (mode < 1.0) {
       o = vec4(seam, l, 1.0, 1.0);
     } else if (mode < 2.5) {
       // seams become holes in the alpha, so a Poisson field sees every cubie face as its own shape
-      o = vec4(plate(2.0 * vUv - 1.0), 1.0 - seam, l, 1.0);
+      o = vec4(plate(2.0 * f), 1.0 - seam, l, 1.0);
     } else {
       // the whole cube face this fragment lies on, in cube space: coords perpendicular to the dominant normal axis
       vec3 n = abs(normalize(vCubeN));
@@ -193,8 +197,8 @@ function finalFragment(shader: PaperShader) {
       }
       fragColor.rgb = mix(fragColor.rgb, g.rgb, inside);
     }`}
-    // look controls: brightness on the whole effect, opacity fades the cube body toward the page
-    fragColor.rgb *= u_gain;
+    // look controls, cube body only: brightness scales it, opacity fades it toward the page
+    fragColor.rgb = mix(fragColor.rgb, fragColor.rgb * u_gain, inside);
     fragColor.rgb = mix(u_colorBack.rgb, fragColor.rgb, mix(1.0, u_alpha, inside));
     ${shader === 'heat' ? 'fragColor.a = mix(fragColor.a, max(1.0 - inside, smoothstep(0.0, 0.35, img.r)), u_fuse);' : ''}
   }`

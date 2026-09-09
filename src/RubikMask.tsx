@@ -13,6 +13,10 @@ export type RubikHandle = {
   positions: () => number[][]
   /** largest deviation of any cubie's rotation matrix element from {-1, 0, 1} (0 = every cubie sits on an exact quarter turn) */
   orientationError: () => number
+  /** largest distance between a cubie mesh and its grid slot (parent must be the root, not the pivot) */
+  placementError: () => number
+  /** debug: per-cubie logical slot, mesh position, parent ok */
+  dump: () => { pos: number[]; mesh: number[]; parentOk: boolean }[]
   busy: () => boolean
 }
 type Cubie = { mesh: THREE.Mesh; pos: THREE.Vector3 }
@@ -67,7 +71,14 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
         const slice = cubies.current.filter((c) => Math.round(c.pos[ax]) === ly)
         const pv = pivot.current
         pv.rotation.set(0, 0, 0)
-        slice.forEach((c) => pv.attach(c.mesh))
+        // attach() reparents through cached matrices: recompose ours first, or a turn started before the
+        // next render (the previous turn's snap has not been rendered yet) reparents a stale transform
+        pv.updateMatrix()
+        pv.updateMatrixWorld(true)
+        slice.forEach((c) => {
+          c.mesh.updateMatrix()
+          pv.attach(c.mesh)
+        })
         return new Promise<void>((res) => {
           pending.current = res
           gsap.to(pv.rotation, {
@@ -77,11 +88,14 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
             onComplete: () => {
               if (!alive.current) return
               const rot = new THREE.Vector3(ax === 'x' ? 1 : 0, ax === 'y' ? 1 : 0, ax === 'z' ? 1 : 0)
+              pv.updateMatrixWorld(true)
               slice.forEach((c) => {
                 root.current.attach(c.mesh)
                 c.pos.applyAxisAngle(rot, (d * Math.PI) / 2).round()
                 c.mesh.position.copy(c.pos).multiplyScalar(gap)
                 snapMesh(c.mesh)
+                c.mesh.updateMatrix()
+                c.mesh.updateMatrixWorld(true)
               })
               busy.current = false
               pending.current = null
@@ -100,6 +114,9 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
         turn,
         positions: () => cubies.current.map((c) => c.pos.toArray()),
         orientationError: () => Math.max(0, ...cubies.current.map((c) => orientationError(c.mesh))),
+        dump: () => cubies.current.map((c) => ({ pos: c.pos.toArray(), mesh: c.mesh.position.toArray().map((n) => +n.toFixed(3)), parentOk: c.mesh.parent === root.current })),
+        placementError: () =>
+          Math.max(0, ...cubies.current.map((c) => (c.mesh.parent === root.current ? c.mesh.position.distanceTo(c.pos.clone().multiplyScalar(gap)) : 9))),
         busy: () => busy.current,
       }),
       [turn],

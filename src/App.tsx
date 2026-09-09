@@ -76,6 +76,8 @@ export default function App() {
       paperTurn: (...args: Parameters<RubikHandle['turn']>) => rubik.current?.turn(...args) ?? Promise.resolve(),
       paperPositions: () => rubik.current?.positions() ?? [],
       paperOrientationError: () => rubik.current?.orientationError() ?? 0,
+      paperPlacementError: () => rubik.current?.placementError() ?? 0,
+      paperDump: () => rubik.current?.dump() ?? [],
       paperBusy: () => rubik.current?.busy() ?? false,
     }
     return () => window.removeEventListener('keydown', onKey)
@@ -171,6 +173,8 @@ declare global {
       paperTurn: RubikHandle['turn']
       paperPositions: () => number[][]
       paperOrientationError: () => number
+      paperPlacementError: () => number
+      paperDump: () => { pos: number[]; mesh: number[]; parentOk: boolean }[]
       paperBusy: () => boolean
     }
   }
