@@ -335,7 +335,7 @@ button:focus-visible {
 /* sections: no boxes; hierarchy by type only. Active = bright title + accent tick. */
 .sec {
   align-self: center;
-  max-width: 300px;
+  max-width: 340px;
   cursor: pointer;
   opacity: 0.42;
   transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
@@ -446,6 +446,13 @@ button:focus-visible {
   color: var(--bright);
   outline: none;
 }
+
+/* the cube slides toward the free side while a panel is open */
+canvas {
+  transition: transform 0.7s var(--ease);
+}
+body:has(.site.has-panel .panel-left) canvas { transform: translateX(clamp(60px, 9vw, 130px)); }
+body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -9vw, -60px)); }
 
 /* glass detail panel beside the cube: the cube's glow is the light behind the glass */
 .panel {
