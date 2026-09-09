@@ -26,6 +26,8 @@ export type PaperVersion = {
   poissonIters: number
   /** rubik: cubie spacing (1 = touching) */
   rubikGap: number
+  /** rubik: cubie corner radius (0 = sharp) */
+  rubikRound: number
   /** liquid/smoke face field sharpness: field = 1 - (bx*by)^k */
   fieldK: number
   /** heat blur radii in paper's 1750px canvas units */
@@ -51,6 +53,7 @@ const base = {
   shade: 0,
   field: 'face' as const,
   rubikGap: 1,
+  rubikRound: 0,
   poissonIters: 30,
   fieldK: 0.75,
   blur: { contour: 5, inner: 18, big: 150 },
@@ -94,6 +97,8 @@ export const PAPER_VERSIONS: PaperVersion[] = [
   { ...base, name: 'v30', shader: 'smoke', shape: 'rubik', field: 'poisson', seam: 0.04, camZ: 11, shade: 0.3, preset: 'icemint', note: 'gem smoke Rubik\'s per cubie with its outer plume kept, icemint on dark' },
   { ...base, name: 'v31', shader: 'heat', shape: 'rubik', rubikGap: 1.03, seam: 0.035, camZ: 20, preset: 'icemint', bigDiv: 4, note: 'v16 with the big blur at quarter res: same look, cheaper on integrated GPUs' },
   { ...base, name: 'v32', shader: 'heat', shape: 'rubik', rubikGap: 1.03, seam: 0.035, camZ: 20, polarity: 'inverted', halo: false, shade: 0.5, preset: 'icemint', note: 'inverted polarity (the old v2 idea through the new pipeline): the band sweeps the faces, seams dark' },
+  { ...base, name: 'v33', shader: 'heat', shape: 'rubik', rubikGap: 1.03, rubikRound: 0.08, seam: 0.035, camZ: 20, preset: 'icemint', note: 'rounded cubies (r .08): the bevel widens the painted seam into pillowed tiles with broad glowing gaps' },
+  { ...base, name: 'v34', shader: 'heat', shape: 'rubik', rubikGap: 1.03, rubikRound: 0.06, seam: 0.012, camZ: 20, preset: 'icemint', note: 'rounded cubies with a hairline seam: softer corners, thin glow' },
 ]
 
 export const VERSION_OF = (name: string) => PAPER_VERSIONS.find((v) => v.name === name)

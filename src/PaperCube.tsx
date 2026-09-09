@@ -547,7 +547,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpe
               <primitive object={Q.face} attach="material" />
             </mesh>
           )}
-          {shape === 'rubik' && <RubikMask ref={rubik} gap={V.rubikGap} material={Q.face} auto={auto} autoInterval={autoInterval} />}
+          {shape === 'rubik' && <RubikMask ref={rubik} gap={V.rubikGap} rounded={V.rubikRound} material={Q.face} auto={auto} autoInterval={autoInterval} />}
           {shape === 'cage' && (
             <mesh>
               <boxGeometry args={[1, 1, 1]} />

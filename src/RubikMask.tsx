@@ -5,6 +5,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import gsap from 'gsap'
+import { RoundedBox } from '@react-three/drei'
 
 export type Axis = 'x' | 'y' | 'z'
 export type RubikHandle = {
@@ -16,8 +17,8 @@ type Cubie = { mesh: THREE.Mesh; pos: THREE.Vector3 }
 const AXES: Axis[] = ['x', 'y', 'z']
 const snap = (r: number) => Math.round(r / (Math.PI / 2)) * (Math.PI / 2)
 
-export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.Material; auto: boolean; autoInterval?: number; onTurn?: () => void }>(
-  function RubikMask({ gap, material, auto, autoInterval = 900, onTurn }, ref) {
+export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.Material; auto: boolean; autoInterval?: number; rounded?: number; onTurn?: () => void }>(
+  function RubikMask({ gap, material, auto, autoInterval = 900, rounded = 0, onTurn }, ref) {
     const root = useRef<THREE.Group>(null!)
     const pivot = useRef<THREE.Group>(null!)
     const cubies = useRef<Cubie[]>([])
@@ -99,18 +100,32 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
     return (
       <group ref={root}>
         <group ref={pivot} />
-        {cells.map((p, i) => (
-          <mesh
-            key={i}
-            position={[p.x * gap, p.y * gap, p.z * gap]}
-            material={material}
-            ref={(m) => {
-              if (m) cubies.current[i] = { mesh: m, pos: p.clone() }
-            }}
-          >
-            <boxGeometry args={[1, 1, 1]} />
-          </mesh>
-        ))}
+        {cells.map((p, i) =>
+          rounded > 0 ? (
+            <RoundedBox
+              key={i}
+              args={[1, 1, 1]}
+              radius={rounded}
+              smoothness={3}
+              position={[p.x * gap, p.y * gap, p.z * gap]}
+              material={material}
+              ref={(m: THREE.Mesh | null) => {
+                if (m) cubies.current[i] = { mesh: m, pos: p.clone() }
+              }}
+            />
+          ) : (
+            <mesh
+              key={i}
+              position={[p.x * gap, p.y * gap, p.z * gap]}
+              material={material}
+              ref={(m) => {
+                if (m) cubies.current[i] = { mesh: m, pos: p.clone() }
+              }}
+            >
+              <boxGeometry args={[1, 1, 1]} />
+            </mesh>
+          ),
+        )}
       </group>
     )
   },
