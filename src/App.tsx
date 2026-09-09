@@ -152,7 +152,9 @@ type Tab = 'site' | 'cube' | 'heatcube' | 'paper'
 const TABS: Tab[] = ['site', 'cube', 'heatcube', 'paper']
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('site')
+  // ?tab=&c=&v= let a specific state be linked for review
+  const q = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
+  const [tab, setTab] = useState<Tab>((TABS as string[]).includes(q.get('tab') ?? '') ? (q.get('tab') as Tab) : 'site')
   const [heatPreset, setHeatPreset] = useState(0)
   const [heatSpin, setHeatSpin] = useState(true)
   const [heatHollow, setHeatHollow] = useState(false)
@@ -161,7 +163,7 @@ export default function App() {
   const [heatShape, setHeatShape] = useState<PaperShape | null>(null)
   const [heatAuto, setHeatAuto] = useState(false)
   const rubik = useRef<RubikHandle | null>(null)
-  const [si, setSi] = useState(0)
+  const [si, setSi] = useState(Math.max(0, SCHEMES.findIndex((x) => x.name === q.get('c'))))
   const [shape, setShape] = useState<Shape>('solid')
   const [set, setSet] = useState<Set>('v2')
   const [variant, setVariant] = useState<AnyVariant>('chrome')
@@ -254,7 +256,7 @@ export default function App() {
   if (tab === 'site')
     return (
       <>
-        <Site scheme={s.name} bg={s.bg} />
+        <Site scheme={s.name} bg={s.bg} version={q.get('v') ?? undefined} />
         <div className="site-tabs">{tabs}</div>
       </>
     )

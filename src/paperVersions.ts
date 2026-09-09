@@ -93,6 +93,7 @@ export const PAPER_VERSIONS: PaperVersion[] = [
   { ...base, name: 'v29', shader: 'heat', shape: 'box', seam: 0.012, camZ: 7, fuse: 'liquid', fusePreset: 'noir slow', shade: 0.3, note: 'fusion on the plain box: paper heat rim over noir liquid metal' },
   { ...base, name: 'v30', shader: 'smoke', shape: 'rubik', field: 'poisson', seam: 0.04, camZ: 11, shade: 0.3, preset: 'icemint', note: 'gem smoke Rubik\'s per cubie with its outer plume kept, icemint on dark' },
   { ...base, name: 'v31', shader: 'heat', shape: 'rubik', rubikGap: 1.03, seam: 0.035, camZ: 20, preset: 'icemint', bigDiv: 4, note: 'v16 with the big blur at quarter res: same look, cheaper on integrated GPUs' },
+  { ...base, name: 'v32', shader: 'heat', shape: 'rubik', rubikGap: 1.03, seam: 0.035, camZ: 20, polarity: 'inverted', halo: false, shade: 0.5, preset: 'icemint', note: 'inverted polarity (the old v2 idea through the new pipeline): the band sweeps the faces, seams dark' },
 ]
 
 export const VERSION_OF = (name: string) => PAPER_VERSIONS.find((v) => v.name === name)

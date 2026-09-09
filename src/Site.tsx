@@ -55,7 +55,7 @@ const SITE_PRESET: Record<string, string> = { v24: 'ice' }
 
 export function Site({ version: initial = 'v10', scheme = 'icemint', bg = '#07090c' }: { version?: string; scheme?: string; bg?: string }) {
   const [active, setActive] = useState(0)
-  const [version, setVersion] = useState(initial)
+  const [version, setVersion] = useState(VERSION_OF(initial) ? initial : 'v10')
   const [open, setOpen] = useState<{ section: number; item: number } | null>(null)
   const rubik = useRef<RubikHandle | null>(null)
   // the lab's v10 at its own camera (blur radii are frame-relative, so the cube stays crisp);
@@ -179,7 +179,7 @@ export function Site({ version: initial = 'v10', scheme = 'icemint', bg = '#0709
               </button>
             ))}
           </nav>
-          <span className="site-ver">cube {version} · v to cycle</span>
+          <span className="site-ver">cube {version} · ← → deck · v cube · c colour · click an item</span>
         </div>
       </div>
     </>
