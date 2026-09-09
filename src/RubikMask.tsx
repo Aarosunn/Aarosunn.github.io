@@ -1,6 +1,6 @@
 /**
  * A Rubik's cube for the mask scene of PaperCube: 27 cubies sharing one mask material, quarter-turn
- * layer animation (same pivot-attach scheme as Cube.tsx), integrity-checkable positions.
+ * layer animation (pivot-attach quarter turns), integrity-checkable positions.
  */
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import * as THREE from 'three'

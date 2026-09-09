@@ -149,3 +149,7 @@ Liquid metal on rounded cubies with per-cubie Poisson (seams cut the alpha): 27 
 ## Site layout A/B (04:40)
 
 Key `l` toggles `corners` (four sections around the cube) and `deck` (cube alone; the active section's title, blurb and items sit above the deck, panels do the rest; floral fades to 16%). One of the morning decisions is now a live comparison. `.site-head`/`.site-base` are pinned to rows 1 and 4 so an empty middle never pulls the base up. Floral seed follows the scheme.
+
+## Morning cull (2026-09-09 11:00)
+
+Aaron: condense, no decision fatigue. Deleted the cube tab (`Cube.tsx`, `materials/`, bloom, postprocessing dependency, its scripts) and `HeatCube.tsx` (old v1/v2); the shader cube tab replaces it, renamed. Kept 14 versions, renumbered: old v10 v11 v12 v13 v14 v17 v18 v19 v23 v24 v27 v31 v34 v35 → v1–v14. Every survivor is a Rubik's cube, so PaperCube lost the box / rounded / octa / cage shapes, `EdgeBars`, the blurred-silhouette field, `polarity`, `seamValue`; one preset table (`PRESETS_OF`, `presetNamed`) replaces the three copies; grain / diagonal presets dropped. All 14 at 61 fps, integrity ok; build 357 kB gzip (was 407). `__aar` hooks renamed `setShader*`.

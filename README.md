@@ -7,17 +7,19 @@ npm install
 npx vite --port 5173
 ```
 
-Tabs (key `p`): **site** (the mock portfolio), **cube** (material lab v1–v4), **heat cube** (the shader cube, 31 versions), **paper shaders** (the official components, ground truth).
+Tabs (key `p`, or `?tab=`): **site** (the mock portfolio), **shader cube** (the cube lab, 14 versions), **paper shaders** (the official components, ground truth).
 
-Site keys: arrows / 1–4 / wheel / swipe step the deck, click an item for a panel, `v` cycles the cube version, `c` the colour scheme.
+Site keys: arrows / 1–4 / wheel / swipe step the deck, click an item for a panel, `v` cycles the cube version, `c` the colour scheme, `l` the layout. `/?v=v11&c=ember` links a state.
 
 Verification (needs the dev server; uses the NVIDIA GPU via PRIME):
 
 ```
-node scripts/papercube-shoot.mjs            # every shader-cube version: frames, orbits, turn integrity, fps
-node scripts/papercube-shoot.mjs v10 --igpu # integrated GPU numbers
+node scripts/papercube-shoot.mjs            # every version: frames, orbits, turn integrity, fps
+node scripts/papercube-shoot.mjs v1 --igpu  # integrated GPU numbers
 node scripts/site-shoot.mjs                 # the site at 1440 / 1024 / 420
+node scripts/site-fps.mjs                   # site fps, RTX vs integrated
+node scripts/site-video.mjs                 # 30 s tour -> shots/site/tour.webm
 node scripts/sheet.mjs out.png a.png b.png  # contact sheet
 ```
 
-Read `docs/overnight-report.md` first, then `docs/superpowers/specs/2026-09-09-aarcube-design.md` (a section per decision).
+`docs/overnight-report.md` is the design report; `docs/superpowers/specs/2026-09-09-aarcube-design.md` has a section per decision.

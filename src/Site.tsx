@@ -1,24 +1,17 @@
 /**
- * Mock of the portfolio page: the shader cube in the middle (heatmap on the Rubik's cube, v10),
+ * Mock of the portfolio page: the shader cube in the middle (heatmap on the Rubik's cube, v1),
  * four sections around it stepped like a deck (arrow keys / click / 1-4), the x-ray floral at the base.
  * Copy is placeholder. Every deck step turns one layer of the cube.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { gemSmokePresets, heatmapPresets, liquidMetalPresets } from '@paper-design/shaders-react'
-import { PAPER_PRESETS } from './paperPresets'
 import { PaperCube } from './PaperCube'
-import { VERSION_OF, type PaperShader } from './paperVersions'
+import { VERSION_OF } from './paperVersions'
+import { presetNamed } from './paperPresets'
 import { SCHEMES } from './schemes'
 import type { RubikHandle } from './RubikMask'
 import { Floral } from './Floral'
 import { AsciiPortrait } from './Ascii'
-
-const PRESETS_OF: Record<PaperShader, { name: string; params: object }[]> = {
-  heat: [...heatmapPresets, ...PAPER_PRESETS.heat],
-  liquid: [...liquidMetalPresets, ...PAPER_PRESETS.liquid],
-  smoke: [...gemSmokePresets, ...PAPER_PRESETS.smoke],
-}
 
 type Section = { id: string; title: string; blurb: string; items: string[] }
 const SECTIONS: Section[] = [
@@ -52,27 +45,26 @@ const SECTIONS: Section[] = [
 const HEAT_OF_SCHEME: Record<string, string> = { icemint: 'icemint', ice: 'icemint', mint: 'icemint', ember: 'ember', graphite: 'graphite', aura: 'default', paper: 'sepia' }
 
 /** cube versions worth comparing in place; key `v` cycles. Versions whose own preset is light get a dark one here. */
-const SITE_VERSIONS = ['v10', 'v16', 'v34', 'v19', 'v20', 'v27', 'v13', 'v18', 'v24', 'v17']
-const SITE_PRESET: Record<string, string> = { v24: 'ice' }
+const SITE_VERSIONS = ['v1', 'v13', 'v8', 'v11', 'v4', 'v7', 'v10', 'v6']
+const SITE_PRESET: Record<string, string> = { v10: 'ice' }
 
-export function Site({ version: initial = 'v10', scheme = 'icemint', bg = '#07090c' }: { version?: string; scheme?: string; bg?: string }) {
+export function Site({ version: initial = 'v1', scheme = 'icemint', bg = '#07090c' }: { version?: string; scheme?: string; bg?: string }) {
   const [active, setActive] = useState(0)
-  const [version, setVersion] = useState(VERSION_OF(initial) ? initial : 'v10')
+  const [version, setVersion] = useState(VERSION_OF(initial) ? initial : 'v1')
   // a deep-linked version outside the curated cycle still cycles from itself
-  const cycle = useMemo(() => Array.from(new Set([VERSION_OF(initial) ? initial : 'v10', ...SITE_VERSIONS])), [initial])
+  const cycle = useMemo(() => Array.from(new Set([VERSION_OF(initial) ? initial : 'v1', ...SITE_VERSIONS])), [initial])
   const [open, setOpen] = useState<{ section: number; item: number } | null>(null)
   // layout A/B: sections in the corners, or deck only (the deck carries the blurb, panels do the rest)
   const [layout, setLayout] = useState<'corners' | 'deck'>('corners')
   const rubik = useRef<RubikHandle | null>(null)
-  // the lab's v10 at its own camera (blur radii are frame-relative, so the cube stays crisp);
+  // the lab's v1 at its own camera (blur radii are frame-relative, so the cube stays crisp);
   // paper's `scale` shrinks the whole image on screen so the sections breathe
   const narrow = typeof window !== 'undefined' && window.innerWidth < 900
   // narrow screens are usually integrated GPUs: a 768 mask keeps the heat blurs cheap
   const PV = useMemo(() => ({ ...VERSION_OF(version)!, size: narrow ? 768 : 1024, bigDiv: narrow ? (4 as const) : (2 as const) }), [version, narrow])
   const params = useMemo(() => {
-    const presets = PRESETS_OF[PV.shader]
     const want = SITE_PRESET[version] ?? (PV.shader === 'heat' && PV.preset === undefined ? HEAT_OF_SCHEME[scheme] : PV.preset)
-    const base = (presets.find((p) => p.name.toLowerCase() === want) ?? presets[0]).params as Record<string, unknown>
+    const base = presetNamed(PV.shader, want).params
     // the page is the shader's background, so the scheme's bg is paper's colorBack
     return { ...base, ...(PV.shader === 'heat' ? { outerGlow: 0.42, contour: 0.75 } : {}), colorBack: bg, scale: (narrow ? 0.7 : 0.85) * (base.scale as number) }
   }, [PV, narrow, scheme, version, bg])

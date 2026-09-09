@@ -1,5 +1,5 @@
 // Shoot the shader-cube tab: every PaperCube version fresh-mounted, spinning frames, orbit drags,
-// debug channels. Usage: node scripts/papercube-shoot.mjs [v3 v5 ...] [--presets] [--shapes]
+// debug channels. Usage: node scripts/papercube-shoot.mjs [v1 v5 ...] [--presets] [--igpu]
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 const args = process.argv.slice(2)
@@ -14,11 +14,11 @@ page.on('pageerror', (e) => console.error('pageerror', e.message))
 page.on('console', (m) => m.type() === 'error' && !m.text().includes('404') && console.error('console', m.text().slice(0, 400)))
 await page.goto('http://localhost:5173/')
 await page.waitForFunction(() => window.__aar)
-await page.evaluate(() => window.__aar.setTab('heatcube'))
-const versions = only.length ? only : await page.evaluate(() => [...document.querySelectorAll('.controls .row')][0] && [...document.querySelectorAll('.controls .row button')].map((b) => b.textContent).filter((t) => /^v\d+$/.test(t)).filter((t) => t !== 'v1' && t !== 'v2'))
+await page.evaluate(() => window.__aar.setTab('shader'))
+const versions = only.length ? only : await page.evaluate(() => [...document.querySelectorAll('.controls .row')][0] && [...document.querySelectorAll('.controls .row button')].map((b) => b.textContent).filter((t) => /^v\d+$/.test(t)))
 const shot = async (name, ms = 300) => { await page.waitForTimeout(ms); await page.screenshot({ path: `shots/papercube/${name}.png` }) }
 for (const v of versions) {
-  await page.evaluate((v) => { window.__aar.setHeatVersion(v); window.__aar.setHeatShape(null); window.__aar.setHeatDebug('off') }, v)
+  await page.evaluate((v) => { window.__aar.setShaderVersion(v); window.__aar.setShaderDebug('off') }, v)
   await shot(`${v}-0`, 1200)
   await shot(`${v}-1`, 700)
   await shot(`${v}-2`, 700)
@@ -27,20 +27,16 @@ for (const v of versions) {
     await page.mouse.move(720 + d[0], 450 + d[1], { steps: 12 }); await page.mouse.up()
     await shot(`${v}-orbit${i}`, 400)
   }
-  for (const d of ['mask', 'combined']) { await page.evaluate((d) => window.__aar.setHeatDebug(d), d); await shot(`${v}-${d}`) }
-  await page.evaluate(() => window.__aar.setHeatDebug('off'))
+  for (const d of ['mask', 'combined']) { await page.evaluate((d) => window.__aar.setShaderDebug(d), d); await shot(`${v}-${d}`) }
+  await page.evaluate(() => window.__aar.setShaderDebug('off'))
   if (flags.has('--presets')) {
     const n = await page.evaluate(() => [...document.querySelectorAll('.controls .row')][1].querySelectorAll('button').length)
-    for (let i = 1; i < n; i++) { await page.evaluate((i) => window.__aar.setHeatPreset(i), i); await shot(`${v}-preset${i}`, 600) }
-    await page.evaluate(() => window.__aar.setHeatPreset(0))
-  }
-  if (flags.has('--shapes')) {
-    for (const s of ['rounded', 'octa', 'cage']) { await page.evaluate((s) => window.__aar.setHeatShape(s), s); await shot(`${v}-${s}`, 600) }
-    await page.evaluate(() => window.__aar.setHeatShape(null))
+    for (let i = 1; i < n; i++) { await page.evaluate((i) => window.__aar.setShaderPreset(i), i); await shot(`${v}-preset${i}`, 600) }
+    await page.evaluate(() => window.__aar.setShaderPreset(0))
   }
   // rubik: turn continuity + integrity
   if (await page.evaluate(() => window.__aar.paperPositions().length === 27)) {
-    await page.evaluate(() => window.__aar.setHeatDebug('off'))
+    await page.evaluate(() => window.__aar.setShaderDebug('off'))
     await shot(`${v}-turn0before`, 300)
     const p = page.evaluate(() => window.__aar.paperTurn('y', 1, 1))
     await shot(`${v}-turn1mid`, 260)

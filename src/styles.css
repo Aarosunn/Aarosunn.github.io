@@ -101,61 +101,6 @@ canvas {
   animation: rise 0.9s var(--ease) 0.5s both;
 }
 
-/* Grey placeholders for undecided things. */
-.slot {
-  border: 1px dashed var(--line);
-  background: color-mix(in srgb, var(--bg2) 60%, transparent);
-  color: var(--mute);
-  padding: 10px 12px;
-  align-self: center;
-  animation: rise 0.9s var(--ease) both;
-}
-.slot-about {
-  grid-area: 1 / 1;
-  justify-self: end;
-  align-self: end;
-  margin: 0 40px 24px 0;
-  width: 160px;
-  height: 56px;
-  animation-delay: 0.7s;
-}
-.slot-code {
-  grid-area: 1 / 3;
-  justify-self: start;
-  align-self: end;
-  margin: 0 0 24px 40px;
-  width: 160px;
-  height: 56px;
-  animation-delay: 0.8s;
-}
-.slot-hardware {
-  grid-area: 3 / 3;
-  justify-self: start;
-  align-self: start;
-  margin: 24px 0 0 40px;
-  width: 160px;
-  height: 56px;
-  animation-delay: 0.9s;
-}
-.slot-creatives {
-  grid-area: 3 / 1;
-  justify-self: end;
-  align-self: start;
-  margin: 24px 40px 0 0;
-  width: 160px;
-  height: 56px;
-  animation-delay: 1s;
-}
-.slot-floral {
-  position: fixed;
-  left: 50%;
-  bottom: 28px;
-  transform: translateX(-50%);
-  width: min(560px, 60vw);
-  height: 72px;
-  opacity: 0.6;
-  animation-delay: 1.1s;
-}
 
 .controls {
   position: fixed;
@@ -231,7 +176,7 @@ button:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .aura,
   .wordmark,
-  .slot,
+
   .controls,
   .readout {
     animation: none;
@@ -242,9 +187,6 @@ button:focus-visible {
   .ui {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
-  }
-  .slot:not(.slot-floral) {
-    display: none;
   }
   .controls {
     top: auto;
