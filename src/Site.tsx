@@ -9,6 +9,7 @@ import { gemSmokePresets, heatmapPresets, liquidMetalPresets } from '@paper-desi
 import { PAPER_PRESETS } from './paperPresets'
 import { PaperCube } from './PaperCube'
 import { VERSION_OF, type PaperShader } from './paperVersions'
+import { SCHEMES } from './schemes'
 import type { RubikHandle } from './RubikMask'
 import { Floral } from './Floral'
 import { AsciiPortrait } from './Ascii'
@@ -57,6 +58,8 @@ const SITE_PRESET: Record<string, string> = { v24: 'ice' }
 export function Site({ version: initial = 'v10', scheme = 'icemint', bg = '#07090c' }: { version?: string; scheme?: string; bg?: string }) {
   const [active, setActive] = useState(0)
   const [version, setVersion] = useState(VERSION_OF(initial) ? initial : 'v10')
+  // a deep-linked version outside the curated cycle still cycles from itself
+  const cycle = useMemo(() => Array.from(new Set([VERSION_OF(initial) ? initial : 'v10', ...SITE_VERSIONS])), [initial])
   const [open, setOpen] = useState<{ section: number; item: number } | null>(null)
   // layout A/B: sections in the corners, or deck only (the deck carries the blurb, panels do the rest)
   const [layout, setLayout] = useState<'corners' | 'deck'>('corners')
@@ -88,7 +91,7 @@ export function Site({ version: initial = 'v10', scheme = 'icemint', bg = '#0709
     if (e.key === 'ArrowRight') step(active + 1)
     if (e.key === 'ArrowLeft') step(active - 1)
     if (e.key === 'l') setLayout((l) => (l === 'corners' ? 'deck' : 'corners'))
-    if (e.key === 'v') setVersion((v) => SITE_VERSIONS[(SITE_VERSIONS.indexOf(v) + 1) % SITE_VERSIONS.length])
+    if (e.key === 'v') setVersion((v) => cycle[(cycle.indexOf(v) + 1) % cycle.length])
     const n = Number(e.key)
     if (n >= 1 && n <= SECTIONS.length) step(n - 1)
   }
@@ -178,7 +181,7 @@ export function Site({ version: initial = 'v10', scheme = 'icemint', bg = '#0709
           </aside>
         )}
         <div className="site-base">
-          <Floral className="floral" seed={11 + 7 * Math.max(0, ['icemint', 'ice', 'aura', 'ember', 'graphite', 'mint', 'paper'].indexOf(scheme))} />
+          <Floral className="floral" seed={11 + 7 * Math.max(0, SCHEMES.findIndex((x) => x.name === scheme))} />
           {layout === 'deck' && (
             <div className="deck-blurb">
               <h2>{SECTIONS[active].title}</h2>

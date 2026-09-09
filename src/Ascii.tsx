@@ -88,7 +88,6 @@ export function AsciiPortrait({
     canvas.height = Math.round(cssH * dpr)
     ctx.scale(dpr, dpr)
 
-    const resolvedColor = getComputedStyle(canvas).color || color
     ctx.font = `${glyphH}px "Geist Mono", ui-monospace, monospace`
     ctx.textBaseline = 'top'
 
@@ -97,6 +96,8 @@ export function AsciiPortrait({
     let lastFrame = 0
 
     const draw = (tSeconds: number) => {
+      // resolved per frame (15 fps) so a scheme change recolours the glyphs
+      const resolvedColor = getComputedStyle(canvas).color || color
       const rand = mulberry32(seed) // deterministic noise per frame, same field each pass
       // slow breathing scale: ±2% over ~5s
       const breath = 1 + 0.02 * Math.sin((tSeconds * Math.PI * 2) / 5)
