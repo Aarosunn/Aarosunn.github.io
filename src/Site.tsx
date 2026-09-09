@@ -12,6 +12,7 @@ import { SCHEMES } from './schemes'
 import { ALGS, type RubikHandle } from './RubikMask'
 import { Floral } from './Floral'
 import { XrayFloral } from './XrayFloral'
+import { XrayFlower3D } from './XrayFlower3D'
 import { FLORAL_OF } from './floralVersions'
 import { AsciiPortrait } from './Ascii'
 
@@ -188,7 +189,7 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
           </aside>
         )}
         <div className="site-base">
-          {xray ? <XrayFloral v={xray} seed={floralSeed} className="floral xray" scheme={scheme} /> : <Floral className="floral" seed={11 + 7 * Math.max(0, SCHEMES.findIndex((x) => x.name === scheme))} />}
+          {xray ? (xray.kind === 'mesh' ? <XrayFlower3D v={xray} seed={floralSeed} className="floral xray" scheme={scheme} /> : <XrayFloral v={xray} seed={floralSeed} className="floral xray" scheme={scheme} />) : <Floral className="floral" seed={11 + 7 * Math.max(0, SCHEMES.findIndex((x) => x.name === scheme))} />}
           {layout === 'deck' && (
             <div className="deck-blurb">
               <h2>{SECTIONS[active].title}</h2>

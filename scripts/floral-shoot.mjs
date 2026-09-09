@@ -9,14 +9,14 @@ page.on('console', (m) => m.type() === 'error' && !m.text().includes('404') && c
 await page.goto('http://localhost:5173/?tab=floral')
 await page.waitForFunction(() => window.__aar)
 await page.waitForTimeout(800)
-const versions = ['v1', 'v2', 'v3', 'v4', 'v5']
+const versions = process.env.V ? process.env.V.split(',') : ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8']
 for (const v of versions) for (const seed of v === 'v2' ? [3, 1, 5] : [3]) {
   await page.evaluate(([v, s]) => { window.__aar.setFloralVersion(v); window.__aar.setFloralSeed(s) }, [v, seed])
-  await page.waitForTimeout(400)
+  await page.waitForTimeout(900)
   const el = await page.$('.floral-stage')
   await el.screenshot({ path: `shots/floral/${v}-s${seed}.png` })
 }
-for (const v of ['v2', 'v5']) {
+for (const v of ['v2', 'v7']) {
   await page.goto(`http://localhost:5173/?floral=${v}`)
   await page.waitForFunction(() => window.__aar)
   await page.waitForTimeout(2500)

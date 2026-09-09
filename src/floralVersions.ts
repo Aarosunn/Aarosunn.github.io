@@ -28,6 +28,11 @@ export type FloralVersion = {
   swatches: boolean
   measures: boolean
   specks: number
+  /** 'mesh': the procedural flower mesh with the fresnel x-ray shader (XrayFlower3D); default the SVG plant */
+  kind?: 'svg' | 'mesh'
+  /** mesh: wire pass intensity (0 = off) and the fresnel curve */
+  wire?: number
+  fresnel?: { power: number; gain: number; base: number }
   note: string
 }
 
@@ -39,6 +44,9 @@ export const FLORAL_VERSIONS: FloralVersion[] = [
   { ...base, name: 'v3', tint: 'spectral', petals: 9, tilt: 0.7, glow: 0.7, labels: true, measures: true, note: 'spectral: iridescent petals (hue rotated per petal), measure lines and ticks down the stem, a few callouts' },
   { ...base, name: 'v4', silhouette: true, body: 0.22, rim: 0.85, frame: 'parts', swatches: true, labels: true, note: 'specimen: solid off-white stem and leaves under x-ray petals, hex swatches along the top, square frames with corner marks on the parts' },
   { ...base, name: 'v5', labels: true, coords: 'live', frame: 'parts', arcs: true, specks: 60, glow: 0.6, note: 'scanner: v2 with live x / y readouts that tick, dashed arcs between anchors, tracking frames on petals, specks' },
+  { ...base, name: 'v6', kind: 'mesh', wire: 0.14, fresnel: { power: 3.0, gain: 0.85, base: 0.012 }, note: 'mesh x-ray: the procedural flower rendered with a fresnel shader on additive blending, faces see-through, rims and edge-on geometry bright, a wire pass over it' },
+  { ...base, name: 'v7', kind: 'mesh', wire: 0.14, fresnel: { power: 3.0, gain: 0.85, base: 0.012 }, labels: true, coords: 'static', frame: 'bloom', note: 'mesh blueprint: v6 with callouts, the bloom frame and coordinates projected from the 3D anchors' },
+  { ...base, name: 'v8', kind: 'mesh', wire: 0.2, fresnel: { power: 3.4, gain: 1.0, base: 0.01 }, labels: true, coords: 'live', frame: 'parts', arcs: true, specks: 60, note: 'mesh scanner: denser wire, sharper fresnel, live readouts, arcs, part frames, specks' },
 ]
 
 export const FLORAL_OF = (name: string) => FLORAL_VERSIONS.find((v) => v.name === name)

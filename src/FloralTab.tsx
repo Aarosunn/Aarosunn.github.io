@@ -1,5 +1,6 @@
 /** floral tab: the x-ray technical floral at review size, one version at a time, a few seeds */
 import { XrayFloral, XF_H, XF_W } from './XrayFloral'
+import { XrayFlower3D } from './XrayFlower3D'
 import { FLORAL_VERSIONS, type FloralVersion } from './floralVersions'
 
 const SEEDS = [1, 2, 3, 4, 5, 6]
@@ -21,10 +22,10 @@ export function FloralTab({ v, seed, scheme, setVersion, setSeed }: { v: FloralV
         </div>
       </div>
       <div className="floral-stage">
-        <XrayFloral v={v} seed={seed} width={XF_W * 2} height={XF_H * 2} scheme={scheme} />
+        {v.kind === 'mesh' ? <XrayFlower3D key={`${v.name}-${seed}-2`} v={v} seed={seed} width={XF_W * 2} height={XF_H * 2} scheme={scheme} /> : <XrayFloral v={v} seed={seed} width={XF_W * 2} height={XF_H * 2} scheme={scheme} />}
       </div>
       <div className="floral-stage floral-stage-site">
-        <XrayFloral v={v} seed={seed} width={XF_W} height={XF_H} scheme={scheme} className="floral xray" />
+        {v.kind === 'mesh' ? <XrayFlower3D key={`${v.name}-${seed}-1`} v={v} seed={seed} width={XF_W} height={XF_H} scheme={scheme} className="floral xray" /> : <XrayFloral v={v} seed={seed} width={XF_W} height={XF_H} scheme={scheme} className="floral xray" />}
       </div>
       <div className="readout">
         <span className="note">{v.note}</span>

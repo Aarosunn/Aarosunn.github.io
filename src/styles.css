@@ -374,7 +374,10 @@ button:focus-visible {
 .floral.xray {
   height: 140px;
   opacity: 0.9;
+  position: relative;
 }
+/* the mesh floral's own canvas sits in its box, not fixed over the page like the cube's */
+.xf3d canvas { position: absolute !important; inset: 0; transform: none !important; }
 /* floral tab */
 .floral-tab { display: grid; gap: 18px; justify-items: center; padding: 8px 0 40px; }
 .floral-tab .controls { justify-self: start; }
