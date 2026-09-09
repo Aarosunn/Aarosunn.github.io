@@ -8,8 +8,10 @@ const out = 'shots'
 mkdirSync(out, { recursive: true })
 
 // Full Chromium (new headless) so the real GPU renders; the headless shell falls back to SwiftShader at ~2 fps.
+// PRIME offload: render on the discrete GPU (the integrated Iris Xe is slow and noisy).
 const browser = await chromium.launch({
   channel: 'chromium',
+  env: { ...process.env, __NV_PRIME_RENDER_OFFLOAD: '1', __GLX_VENDOR_LIBRARY_NAME: 'nvidia' },
   args: ['--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--use-gl=angle', '--use-angle=gl'],
 })
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })

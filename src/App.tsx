@@ -69,12 +69,19 @@ function liquidTexture(a: string, b: string) {
   const ctx = canvas.getContext('2d')!
   const img = ctx.createImageData(W, H)
   const ca = new THREE.Color(a), cb = new THREE.Color(b)
-  const c1 = [0.98, 0.98, 1].map((v, i) => v * 0.92 + [ca.r, ca.g, ca.b][i] * 0.08)
-  const c2 = [0.08, 0.08, 0.1].map((v, i) => v * 0.9 + [cb.r, cb.g, cb.b][i] * 0.1)
-  const rep = 2, softness = 0.1, shiftR = 0.3, shiftB = 0.3
+  const mix = (x: number, y: number, t: number) => x + (y - x) * t
+  const sst = (lo: number, hi: number, x: number) => {
+    const t = Math.min(Math.max((x - lo) / (hi - lo), 0), 1)
+    return t * t * (3 - 2 * t)
+  }
+  const rep = 2, softness = 0.1, shiftR = 0.55, shiftB = 0.55
   const fract = (x: number) => x - Math.floor(x)
   for (let y = 0; y < H; y++) {
     const lat = y / H
+    // metal reads as metal when the sky is bright and the ground is dark: a graded body, not flat white
+    const body = mix(0.97, 0.42, sst(0.35, 1, lat))
+    const c1 = [body, body, body * 1.02].map((v, i) => v * 0.93 + [ca.r, ca.g, ca.b][i] * 0.07)
+    const c2 = [0.03, 0.03, 0.045].map((v, i) => v * 0.9 + [cb.r, cb.g, cb.b][i] * 0.1)
     const bump = 1 - Math.abs(lat - 0.5) * 1.6
     const w = [0.12 * (1 - 0.4 * bump), 0.07 * (1 + 0.4 * bump), 0]
     w[2] = 1 - w[0] - w[1]
@@ -166,7 +173,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const bloom = { heat: [1.2, 0.7], chrome: [0.25, 0.95], smoke: [0.3, 0.9] }[variant]
+  const bloom = { heat: [1.6, 0.5], chrome: [0.2, 0.95], smoke: [0.3, 0.9] }[variant]
 
   return (
     <>

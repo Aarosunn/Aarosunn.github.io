@@ -4,7 +4,7 @@ import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
 import { makeMaterial, type Variant } from './materials/v1'
-import { makeV2, type Palette, type V2Material } from './materials/v2'
+import { makeShared, makeV2, type Palette, type V2Material } from './materials/v2'
 
 export type Shape = 'classic' | 'solid'
 export type Set = 'v1' | 'v2'
@@ -46,12 +46,13 @@ export function Cube({ shape, set, variant, palette, auto, float, onTurn, handle
   const { gap, radius } = SHAPE[shape]
 
   // v1: one shared material, as shipped. v2: one per cubie so rest-space uniforms can differ.
+  const shared = useMemo(makeShared, [])
   const mats = useMemo<THREE.Material[]>(
     () =>
       set === 'v1'
         ? [makeMaterial(variant, palette.a, palette.b, palette.bg)]
-        : Array.from({ length: 27 }, () => makeV2(variant, palette, gap + 0.5)),
-    [set, variant, palette, gap],
+        : Array.from({ length: 27 }, () => makeV2(variant, palette, gap + 0.5, shared)),
+    [set, variant, palette, gap, shared],
   )
   useEffect(() => () => mats.forEach((m) => m.dispose()), [mats])
 
@@ -140,10 +141,11 @@ export function Cube({ shape, set, variant, palette, auto, float, onTurn, handle
   useFrame((s, dt) => {
     root.current.rotation.y += dt * 0.12
     root.current.position.y = float ? Math.sin(s.clock.elapsedTime * 0.7) * 0.06 : 0
-    for (const m of mats) {
-      const u = (m as THREE.ShaderMaterial).uniforms ?? (m as V2Material).u
-      if (u?.uTime) u.uTime.value = s.clock.elapsedTime
-    }
+    root.current.updateMatrixWorld()
+    shared.uTime.value = s.clock.elapsedTime
+    shared.uRootInv.value.copy(root.current.matrixWorld).invert()
+    const v1 = (mats[0] as THREE.ShaderMaterial).uniforms
+    if (v1) v1.uTime.value = s.clock.elapsedTime
   })
 
   const coords = useMemo(() => {
