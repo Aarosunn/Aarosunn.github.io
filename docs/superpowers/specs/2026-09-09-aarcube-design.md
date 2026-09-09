@@ -27,3 +27,11 @@ Rule: UI is greyscale, hue is emitted by the cube (shaders), not painted in CSS.
 - Six schemes as CSS vars + shader uniforms: ice, aura, ember, graphite, mint, paper.
 - Grey dashed slots for undecided things. Readout shows real data.
 - `node scripts/shoot.mjs` screenshots every scheme x material on the real GPU and asserts cube integrity after 12 turns.
+
+## Lab, second pass (2026-09-09, later)
+Both iterations coexist, switchable in the UI and via keys `s` (shape) / `v` (set):
+- **shape** `classic` = first iteration exactly (rounded r=0.09, gap 1.06). `solid` = rounded r=0.045, touching; the bevels are the seams.
+- **set** `v1` = first three materials, untouched (`src/materials/v1.ts`). `v2` = paper.design trio rebuilt on `MeshPhysicalMaterial` (`src/materials/v2.ts`): heat = emissive injection on a dark clearcoat body; smoke = diffuse injection on a clearcoat stone, brighter dome; chrome = mirror metal reflecting a baked equirect of paper's stripe function (`liquidTexture` in App), animated by rotating the environment.
+- v2 patterns use per-cubie rest-space uniforms (`uRot`/`uPos`, one material per cubie) so the skin rides with a turning slice. Never define surface patterns in root space again.
+- `float` toggle restores the old bob, default off. `icemint` scheme added (ice top-left, mint bottom-right).
+- `node scripts/shoot.mjs [--all]` shoots set x shape x material on icemint + paper (all schemes with `--all`) and asserts integrity for both sets.

@@ -1,13 +1,24 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
-import { makeMaterial, type Palette, type Variant } from './materials'
+import { makeMaterial, type Variant } from './materials/v1'
+import { makeV2, type Palette, type V2Material } from './materials/v2'
 
-const SIZE = 1 // touching; seams are drawn in-shader, coplanar interior faces are back-face culled
+export type Shape = 'classic' | 'solid'
+export type Set = 'v1' | 'v2'
+export const SHAPES: Shape[] = ['classic', 'solid']
+export const SETS: Set[] = ['v1', 'v2']
+
+// classic = first iteration exactly: rounded, gapped. solid = rounded corners, touching; the bevels are the seams.
+const SHAPE = {
+  classic: { gap: 1.06, radius: 0.09 },
+  solid: { gap: 1.0, radius: 0.045 },
+}
+
 const AXES = ['x', 'y', 'z'] as const
 type Axis = (typeof AXES)[number]
-
 type Cubie = { mesh: THREE.Mesh; pos: THREE.Vector3 }
 
 export type CubeHandle = {
@@ -17,23 +28,46 @@ export type CubeHandle = {
 }
 
 type Props = {
+  shape: Shape
+  set: Set
   variant: Variant
   palette: Palette
   auto: boolean
+  float: boolean
   onTurn: () => void
   handle: React.MutableRefObject<CubeHandle | null>
 }
 
-const BOX = new THREE.BoxGeometry(SIZE, SIZE, SIZE)
-
-export function Cube({ variant, palette, auto, onTurn, handle }: Props) {
+export function Cube({ shape, set, variant, palette, auto, float, onTurn, handle }: Props) {
   const root = useRef<THREE.Group>(null!)
   const pivot = useRef<THREE.Group>(null!)
   const cubies = useRef<Cubie[]>([])
   const busy = useRef(false)
-  const material = useMemo(() => makeMaterial(variant, palette), [variant, palette])
+  const { gap, radius } = SHAPE[shape]
 
-  useEffect(() => () => material.dispose(), [material])
+  // v1: one shared material, as shipped. v2: one per cubie so rest-space uniforms can differ.
+  const mats = useMemo<THREE.Material[]>(
+    () =>
+      set === 'v1'
+        ? [makeMaterial(variant, palette.a, palette.b, palette.bg)]
+        : Array.from({ length: 27 }, () => makeV2(variant, palette, gap + 0.5)),
+    [set, variant, palette, gap],
+  )
+  useEffect(() => () => mats.forEach((m) => m.dispose()), [mats])
+
+  // Push each cubie's snapped orientation + slot into its v2 material.
+  const syncRest = useMemo(
+    () => () => {
+      if (set !== 'v2') return
+      cubies.current.forEach((c, i) => {
+        const u = (mats[i] as V2Material).u
+        u.uRot.value.setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(c.mesh.quaternion))
+        u.uPos.value.copy(c.pos).multiplyScalar(gap)
+      })
+    },
+    [set, mats, gap],
+  )
+  useEffect(syncRest, [syncRest])
 
   const turn = useMemo<CubeHandle['turn']>(
     () => (axis, layer, dir) => {
@@ -56,11 +90,12 @@ export function Cube({ variant, palette, auto, onTurn, handle }: Props) {
             slice.forEach((c) => {
               root.current.attach(c.mesh)
               c.pos.applyAxisAngle(rot, (d * Math.PI) / 2).round()
-              c.mesh.position.copy(c.pos)
+              c.mesh.position.copy(c.pos).multiplyScalar(gap)
               // snap rotation to exact quarter turns so error never accumulates
               const e = c.mesh.rotation
               e.set(snap(e.x), snap(e.y), snap(e.z))
             })
+            syncRest()
             busy.current = false
             onTurn()
             res()
@@ -68,7 +103,7 @@ export function Cube({ variant, palette, auto, onTurn, handle }: Props) {
         })
       })
     },
-    [onTurn],
+    [onTurn, gap, syncRest],
   )
 
   useEffect(() => {
@@ -104,9 +139,11 @@ export function Cube({ variant, palette, auto, onTurn, handle }: Props) {
 
   useFrame((s, dt) => {
     root.current.rotation.y += dt * 0.12
-    root.current.updateMatrixWorld()
-    material.uniforms.uTime.value = s.clock.elapsedTime
-    material.uniforms.uRootInv.value.copy(root.current.matrixWorld).invert()
+    root.current.position.y = float ? Math.sin(s.clock.elapsedTime * 0.7) * 0.06 : 0
+    for (const m of mats) {
+      const u = (m as THREE.ShaderMaterial).uniforms ?? (m as V2Material).u
+      if (u?.uTime) u.uTime.value = s.clock.elapsedTime
+    }
   })
 
   const coords = useMemo(() => {
@@ -119,11 +156,13 @@ export function Cube({ variant, palette, auto, onTurn, handle }: Props) {
     <group ref={root} rotation={[0.45, -0.6, 0]}>
       <group ref={pivot} />
       {coords.map((p, i) => (
-        <mesh
-          key={i}
-          geometry={BOX}
-          material={material}
-          position={p}
+        <RoundedBox
+          key={`${shape}-${i}`}
+          args={[1, 1, 1]}
+          radius={radius}
+          smoothness={4}
+          position={p.clone().multiplyScalar(gap)}
+          material={mats[i % mats.length]}
           ref={(m: THREE.Mesh | null) => {
             if (m) cubies.current[i] = { mesh: m, pos: p.clone() }
           }}
