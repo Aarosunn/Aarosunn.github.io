@@ -78,3 +78,10 @@ Aaron on v1: gaps between the sides, low quality, no background. v2: 1024 MSAA m
 - Final pass clips to the mask frame (`inFrame`) so an object that spills past the square mask no longer smears via clamp-to-edge.
 - Camera: heat maps the mask through paper's central-57% window and scale .75, so the object must be ~2.3× farther than it looks (rubik camZ 20); liquid/smoke (scale .6) camZ 11.
 - v10 heat rubik (halo), v11 liquid rubik cube-plates, v12 smoke rubik cube-plates no halo, v13 heat rubik no halo, v14 liquid rubik cubie-plates, v15 smoke rubik cubie-plates. All 61 fps, integrity ok. v10/v13 are the strongest: the heatmap language on the actual Rubik's cube.
+
+## Site mock (P3, 03:20)
+
+`src/Site.tsx` + `.site*` CSS: default tab. The shader cube (v10, heatmap on the Rubik's) centre; four sections About / Code / Hardware / Creatives in the corners with placeholder copy, no boxes (hierarchy by type: Unbounded 300 titles, mono body, accent tick on the active one); deck stepping = arrows, 1–4, click, or the deck at the base; every step turns one layer of the cube. `src/Floral.tsx` (procedural x-ray floral, seeded, sonnet-written) sits above the deck. Lab tabs top-right, dimmed.
+- The cube keeps v10's camera so the heat blurs stay crisp (radii are frame-relative); paper's `scale` (.5 desktop / .42 narrow) shrinks the image on screen instead. `outerGlow` .42 so the halo lights the page without drowning the copy.
+- Grid: head / two section rows / base, so sections never collide; ≤900px: only the active section, scrim over the lower half, lab tabs hidden.
+- `scripts/site-shoot.mjs`: 1440 / 1024 / 420, deck steps mid-turn.

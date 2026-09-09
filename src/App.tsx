@@ -8,6 +8,7 @@ import { SCHEMES, type Scheme } from './schemes'
 import { Paper } from './Paper'
 import { HeatCube, type HeatDebug, type HeatVersion } from './HeatCube'
 import { PaperCube } from './PaperCube'
+import { Site } from './Site'
 import type { RubikHandle } from './RubikMask'
 import { PAPER_VERSIONS, VERSION_OF, type PaperShader, type PaperShape } from './paperVersions'
 import { gemSmokePresets, heatmapPresets, liquidMetalPresets } from '@paper-design/shaders-react'
@@ -141,11 +142,11 @@ function LiquidEnv({ s, graded, slow = false }: { s: Scheme; graded: boolean; sl
   return <Environment map={tex} />
 }
 
-type Tab = 'cube' | 'heatcube' | 'paper'
-const TABS: Tab[] = ['cube', 'heatcube', 'paper']
+type Tab = 'site' | 'cube' | 'heatcube' | 'paper'
+const TABS: Tab[] = ['site', 'cube', 'heatcube', 'paper']
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('cube')
+  const [tab, setTab] = useState<Tab>('site')
   const [heatPreset, setHeatPreset] = useState(0)
   const [heatSpin, setHeatSpin] = useState(true)
   const [heatHollow, setHeatHollow] = useState(false)
@@ -229,6 +230,9 @@ export default function App() {
 
   const tabs = (
     <div className="tabs">
+      <button className={tab === 'site' ? 'on' : ''} onClick={() => setTab('site')}>
+        site
+      </button>
       <button className={tab === 'cube' ? 'on' : ''} onClick={() => setTab('cube')}>
         cube
       </button>
@@ -240,6 +244,14 @@ export default function App() {
       </button>
     </div>
   )
+
+  if (tab === 'site')
+    return (
+      <>
+        <Site />
+        <div className="site-tabs">{tabs}</div>
+      </>
+    )
 
   if (tab === 'heatcube') {
     const PV = VERSION_OF(heatVersion)

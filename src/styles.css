@@ -306,3 +306,163 @@ button:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- site mock: cube centre, four sections stepped like a deck, floral at the base ---------- */
+.site {
+  grid-template-columns: minmax(220px, 1fr) minmax(320px, 40vw) minmax(220px, 1fr);
+  grid-template-rows: auto 1fr 1fr auto;
+  padding: 28px 40px 24px;
+  row-gap: 12px;
+}
+.site-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 28px;
+}
+.site-head .wordmark {
+  position: static;
+  animation: none;
+}
+.site-intro {
+  color: var(--mute);
+  max-width: 44ch;
+  animation: rise 0.9s var(--ease) 0.4s both;
+}
+
+/* sections: no boxes; hierarchy by type only. Active = bright title + accent tick. */
+.sec {
+  align-self: center;
+  max-width: 300px;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
+  animation: rise 0.9s var(--ease) both;
+}
+.sec:hover {
+  opacity: 0.8;
+}
+.sec.on {
+  opacity: 1;
+}
+.sec h2 {
+  font: 300 22px/1.1 var(--display);
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin-bottom: 8px;
+  position: relative;
+  transition: color 0.4s var(--ease);
+}
+.sec.on h2 {
+  color: var(--bright);
+}
+.sec.on h2::before {
+  content: '';
+  position: absolute;
+  left: -16px;
+  top: 0.55em;
+  width: 8px;
+  height: 1px;
+  background: var(--accent);
+}
+.sec p {
+  color: var(--mute);
+  margin-bottom: 10px;
+  max-width: 34ch;
+}
+.sec ul {
+  list-style: none;
+  display: grid;
+  gap: 3px;
+  color: var(--text);
+}
+.sec li::before {
+  content: '·';
+  color: var(--mute);
+  margin-right: 8px;
+}
+.sec-about { grid-area: 2 / 1; justify-self: start; align-self: start; margin-top: 6vh; animation-delay: 0.5s; }
+.sec-code { grid-area: 2 / 3; justify-self: end; align-self: start; margin-top: 6vh; text-align: right; animation-delay: 0.6s; }
+.sec-hardware { grid-area: 3 / 3; justify-self: end; align-self: end; margin-bottom: 4vh; text-align: right; animation-delay: 0.7s; }
+.sec-creatives { grid-area: 3 / 1; justify-self: start; align-self: end; margin-bottom: 4vh; animation-delay: 0.8s; }
+.sec-code h2::before, .sec-hardware h2::before { left: auto; right: -16px; }
+.sec-code li::before, .sec-hardware li::before { content: none; }
+.sec-code li::after, .sec-hardware li::after { content: '·'; color: var(--mute); margin-left: 8px; }
+
+.site-base {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  animation: rise 1s var(--ease) 0.9s both;
+}
+.floral {
+  width: min(640px, 70vw);
+  height: 110px;
+  color: var(--text);
+  opacity: 0.42;
+  pointer-events: none;
+}
+.deck {
+  display: flex;
+  gap: 18px;
+}
+.deck button {
+  border: 0;
+  padding: 6px 2px;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  color: var(--mute);
+}
+.deck button i {
+  display: block;
+  width: 28px;
+  height: 1px;
+  background: var(--line);
+  transition: background 0.3s, transform 0.3s var(--ease);
+}
+.deck button.on {
+  color: var(--bright);
+}
+.deck button.on i {
+  background: var(--accent);
+  transform: scaleX(1.4);
+}
+.deck button:hover i {
+  background: var(--mute);
+}
+
+@media (max-width: 900px) {
+  .site {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto auto;
+    padding: 20px 20px 16px;
+  }
+  .sec { display: none; }
+  .sec.on { display: block; grid-area: 3 / 1; justify-self: start; align-self: end; text-align: left; margin: 0 0 8px 16px; max-width: none; }
+  .sec.on h2::before { left: -16px; right: auto; }
+  .sec.on li::after { content: none; }
+  .sec.on li::before { content: '·'; }
+  .site-base { grid-area: 4 / 1; }
+  .site-intro { display: none; }
+  .site-tabs { display: none; }
+  /* scrim so the copy stays legible over the cube */
+  .site::after {
+    content: '';
+    position: fixed;
+    inset: 50% 0 0;
+    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--bg) 85%, transparent) 45%);
+    pointer-events: none;
+    z-index: -1;
+  }
+}
+/* lab tabs live top-right on the site mock, out of the header's way */
+.site-tabs .tabs {
+  left: auto;
+  right: 40px;
+  opacity: 0.6;
+}
+.site-tabs .tabs:hover {
+  opacity: 1;
+}

@@ -17,8 +17,8 @@ Aaron's brief: "heat cube does not match the shaders at all, during the process 
 - [x] shape variants (box / rounded / cage / octahedron), preset play
 
 ## P2 Rubik's cube as mask (cube tab)
-- [ ] v5 silhouette family: heat / liquid / smoke
-- [ ] seams from cubie edges, turn continuity before/mid/after, 12-turn integrity
+- [x] v5 silhouette family: heat / liquid / smoke
+- [x] seams from cubie edges, turn continuity before/mid/after, 12-turn integrity
 
 ## P3 mock site tab
 - [ ] xray floral SVG bottom, 4 section placeholders, deck-step nav stub, cube centre
@@ -29,4 +29,5 @@ Aaron's brief: "heat cube does not match the shaders at all, during the process 
 
 ## Log
 - 02:50 start
-- 03:58 commit: PaperCube v3-v9, all three shaders on 3D at 61fps. Next: Rubik's mask (P2)
+- 03:05 commit: PaperCube v3-v9, all three shaders on 3D at 61fps. Next: Rubik's mask (P2)
+- 03:12 commit: v10-v15 Rubik's mask, v10 heat rubik is the hero. Next: mock site (P3)
