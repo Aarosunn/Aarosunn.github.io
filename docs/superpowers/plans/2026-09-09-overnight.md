@@ -1,4 +1,4 @@
-# Overnight run: paper shaders → 3D → Rubik's → mock site
+# Overnight run: paper shaders → 3D → Rubik's → mock site (FINISHED 07:05)
 
 Start: 2026-09-09 02:50 EDT. Minimum end: 06:50 EDT. Models: sonnet for bounded ports/reviews, opus for judgement, no haiku.
 Rules: every iteration = new version, nothing deleted; tsc → shoot → judge PNGs → commit → tick here.
@@ -25,7 +25,7 @@ Aaron's brief: "heat cube does not match the shaders at all, during the process 
 - [x] 3 viewports screenshot
 
 ## P4 wrap
-- [ ] contact sheet of all versions, spec, memory, cron deleted, summary
+- [x] contact sheet of all versions, spec, memory, cron deleted, summary
 
 ## Log
 - 02:50 start
@@ -40,3 +40,4 @@ Aaron's brief: "heat cube does not match the shaders at all, during the process 
 - 04:25 commits: review-3 fixes, URL params, v32, ASCII portrait, palette sheet, panel emerges from cube. 32 versions. Next: idle checks via cron; wrap ≥06:50
 - 04:40 commits: v33-v35 rounded cubies, layout A/B (key l), report/README. 35 versions. Remaining: final reshoot + sheet-all, memory, cron delete, summary at ≥06:50
 - 05:10 review-4 fixes, final reshoot + sheet-all v3-v35 done, tour re-recorded, site fps on iGPU 52-60. Only the wrap remains (≥06:50)
+- 07:05 FINISHED. 4h15m of work, 48 commits, 35 shader-cube versions, site mock, 4 reviews applied, build passes. Read docs/overnight-report.md.
