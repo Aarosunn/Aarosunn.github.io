@@ -70,6 +70,7 @@ export type Flower = {
   bloomM: THREE.Matrix4
   bloomCentre: THREE.Vector3
   stem: THREE.BufferGeometry
+  stemTop: THREE.BufferGeometry
   branch?: THREE.BufferGeometry
   leaves: Placed[]
   bud?: Placed
@@ -81,7 +82,7 @@ export type Flower = {
 }
 
 /** `upright`: bloom at the top, stem down (the tab); otherwise the wide base composition */
-export function buildFlower(seed: number, spec: FlowerSpec, upright = true): Flower {
+export function buildFlower(seed: number, spec: FlowerSpec, upright = true, withBud = true, stemMul = 1): Flower {
   const rng = mulberry32(seed * 104729 + 7 + spec.name.length * 131)
   const geos: THREE.BufferGeometry[] = []
   const bloomCentre = upright ? new THREE.Vector3(0, spec.bell ? 0.9 : 0.45, 0) : new THREE.Vector3(-1.25, 0.55, 0)
@@ -153,14 +154,19 @@ export function buildFlower(seed: number, spec: FlowerSpec, upright = true): Flo
     filaments.push(c0, pistil)
   }
   // stem: from behind the bloom down to the base
-  const base = upright ? new THREE.Vector3(spec.stem.lean * 1.4 + (rng() - 0.5) * 0.2, bloomCentre.y - spec.stem.len, 0) : new THREE.Vector3(0.95 + rng() * 0.3, -1.95, 0)
+  const stemLen = spec.stem.len * stemMul
+  const base = upright ? new THREE.Vector3(spec.stem.lean * 1.4 + (rng() - 0.5) * 0.2, bloomCentre.y - stemLen, 0) : new THREE.Vector3(0.95 + rng() * 0.3, -1.95, 0)
   const p0 = new THREE.Vector3(0, 0, spec.bell ? 0 : -0.12).applyMatrix4(bloomM)
   const sway = spec.stem.lean
   const curve = spec.bell
-    ? new THREE.CatmullRomCurve3([p0, new THREE.Vector3(p0.x + 0.35, p0.y + 0.1, 0), new THREE.Vector3(p0.x + 0.45, p0.y - 0.6, 0), new THREE.Vector3(base.x + 0.1, base.y + spec.stem.len * 0.35, 0.05), base])
-    : new THREE.CatmullRomCurve3([p0, new THREE.Vector3(p0.x - sway * 0.6, p0.y - spec.stem.len * 0.3, -0.05), new THREE.Vector3(base.x - sway * 0.8, base.y + spec.stem.len * 0.35, 0.05), base])
+    ? new THREE.CatmullRomCurve3([p0, new THREE.Vector3(p0.x + 0.35, p0.y + 0.1, 0), new THREE.Vector3(p0.x + 0.45, p0.y - 0.6, 0), new THREE.Vector3(base.x + 0.1, base.y + stemLen * 0.35, 0.05), base])
+    : new THREE.CatmullRomCurve3([p0, new THREE.Vector3(p0.x - sway * 0.6, p0.y - stemLen * 0.3, -0.05), new THREE.Vector3(base.x - sway * 0.8, base.y + stemLen * 0.35, 0.05), base])
   const stem = new THREE.TubeGeometry(curve, 72, spec.stem.width, 12, false)
   geos.push(stem)
+  // the top of the stem again, for the crisp canvas: the bloom visibly sits on its stem through the blur
+  const topPts = Array.from({ length: 12 }, (_, i) => curve.getPoint((i / 11) * 0.2))
+  const stemTop = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(topPts), 16, spec.stem.width, 10, false)
+  geos.push(stemTop)
   const leaves: Placed[] = []
   const ts = spec.leaves.low ? [0.82, 0.92, 0.7] : [0.45, 0.66, 0.84]
   for (let i = 0; i < spec.leaves.n; i++) {
@@ -174,7 +180,7 @@ export function buildFlower(seed: number, spec: FlowerSpec, upright = true): Flo
     leaves.push({ geometry: g, matrix: m, tip: new THREE.Vector3(1, 0, 0.15).applyMatrix4(m) })
   }
   let branch: THREE.BufferGeometry | undefined, bud: Placed | undefined
-  if (spec.bud) {
+  if (spec.bud && withBud) {
     const bp = curve.getPoint(0.36)
     const budPos = new THREE.Vector3(bp.x + (upright ? 0.55 : 1.1) + rng() * 0.2, bp.y + 0.55 + rng() * 0.2, 0.1)
     const bc = new THREE.CatmullRomCurve3([bp, new THREE.Vector3((bp.x + budPos.x) / 2 + 0.1, bp.y + 0.1, 0.05), budPos])
@@ -194,5 +200,5 @@ export function buildFlower(seed: number, spec: FlowerSpec, upright = true): Flo
     const m = new THREE.Matrix4().compose(budPos, new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), bc.getTangent(1).normalize()), new THREE.Vector3(1, 1, 1))
     bud = { geometry: bg, matrix: m, tip: new THREE.Vector3(0, 0.52, 0).applyMatrix4(m) }
   }
-  return { spec, bloom, bloomM, bloomCentre, stem, branch, leaves, bud, dots, dotR, filaments, dispose: () => geos.forEach((g) => g.dispose()) }
+  return { spec, bloom, bloomM, bloomCentre, stem, stemTop, branch, leaves, bud, dots, dotR, filaments, dispose: () => geos.forEach((g) => g.dispose()) }
 }
