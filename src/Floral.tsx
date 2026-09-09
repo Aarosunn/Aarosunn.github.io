@@ -8,10 +8,10 @@ interface FloralProps {
   className?: string;
 }
 
-type Pt = [number, number];
+export type Pt = [number, number];
 
 // mulberry32: tiny deterministic PRNG so a given seed always draws the same plant.
-function mulberry32(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) | 0;
@@ -27,7 +27,7 @@ const pt = (a: Pt, b: Pt, t: number): Pt => [lerp(a[0], b[0], t), lerp(a[1], b[1
 const fmt = (p: Pt): string => `${r1(p[0])} ${r1(p[1])}`;
 
 // Cubic bezier point evaluation, used to sample leaf-attach points along a stem.
-function bezierAt(p0: Pt, p1: Pt, p2: Pt, p3: Pt, t: number): Pt {
+export function bezierAt(p0: Pt, p1: Pt, p2: Pt, p3: Pt, t: number): Pt {
   const mt = 1 - t;
   const x = mt ** 3 * p0[0] + 3 * mt ** 2 * t * p1[0] + 3 * mt * t ** 2 * p2[0] + t ** 3 * p3[0];
   const y = mt ** 3 * p0[1] + 3 * mt ** 2 * t * p1[1] + 3 * mt * t ** 2 * p2[1] + t ** 3 * p3[1];
@@ -43,7 +43,7 @@ function quadSplit(p0: Pt, c: Pt, p2: Pt, s: number): { nearC: Pt; mid: Pt; farC
 }
 
 // Build a curving stem from base outward at `leanDeg` from vertical (0 = straight up).
-function stem(rng: () => number, base: Pt, leanDeg: number, len: number): { p0: Pt; p1: Pt; p2: Pt; p3: Pt } {
+export function stem(rng: () => number, base: Pt, leanDeg: number, len: number): { p0: Pt; p1: Pt; p2: Pt; p3: Pt } {
   const theta = (leanDeg * Math.PI) / 180;
   const dx = Math.sin(theta);
   const dy = -Math.cos(theta);
@@ -54,7 +54,7 @@ function stem(rng: () => number, base: Pt, leanDeg: number, len: number): { p0: 
   return { p0: base, p1, p2, p3 };
 }
 
-interface LeafArt {
+export interface LeafArt {
   outline: string;
   ghost: string;
   midrib: string;
@@ -66,7 +66,7 @@ interface LeafArt {
 
 // A fuller lanceolate leaf: two cubic beziers per side (base->widest, widest->tip),
 // widest point ~40% along, tip gently pointed, base slightly rounded outward.
-function leaf(
+export function leaf(
   rng: () => number,
   base: Pt,
   angleDeg: number,

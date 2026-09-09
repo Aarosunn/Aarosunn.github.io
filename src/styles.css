@@ -371,6 +371,21 @@ button:focus-visible {
   opacity: 0.26;
   pointer-events: none;
 }
+.floral.xray {
+  height: 140px;
+  opacity: 0.9;
+}
+/* floral tab */
+.floral-tab { display: grid; gap: 18px; justify-items: center; padding: 8px 0 40px; }
+.floral-tab .controls { justify-self: start; }
+.floral-stage { padding: 16px 24px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); }
+.floral-stage-site { padding: 8px 24px; }
+.floral-tab .readout { position: static; display: grid; gap: 4px; justify-items: center; color: var(--mute); }
+.xf-blink { animation: xf-blink 4s steps(1) infinite; }
+@keyframes xf-blink { 0%, 88%, 100% { opacity: 1; } 90%, 93% { opacity: 0.15; } 91% { opacity: 0.8; } }
+.xf-dash { animation: xf-dash 9s linear infinite; }
+@keyframes xf-dash { to { stroke-dashoffset: -50; } }
+@media (prefers-reduced-motion: reduce) { .xf-blink, .xf-dash { animation: none; } }
 .deck {
   display: flex;
   gap: 18px;

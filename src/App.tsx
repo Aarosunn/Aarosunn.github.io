@@ -8,10 +8,12 @@ import { ALGS, type RubikHandle } from './RubikMask'
 import { ALG_KEYS } from './Site'
 import { PAPER_VERSIONS, VERSION_OF, withTheme, type PaperVersion } from './paperVersions'
 import { PRESETS_OF, presetNamed } from './paperPresets'
+import { FloralTab } from './FloralTab'
+import { FLORAL_OF, FLORAL_VERSIONS } from './floralVersions'
 
-type Tab = 'site' | 'shader' | 'paper'
-const TABS: Tab[] = ['site', 'shader', 'paper']
-const LABEL: Record<Tab, string> = { site: 'site', shader: 'shader cube', paper: 'paper shaders' }
+type Tab = 'site' | 'shader' | 'paper' | 'floral'
+const TABS: Tab[] = ['site', 'shader', 'paper', 'floral']
+const LABEL: Record<Tab, string> = { site: 'site', shader: 'shader cube', paper: 'paper shaders', floral: 'floral' }
 const SHADER_NAME = { heat: 'heatmap', liquid: 'liquid metal', smoke: 'gem smoke' }
 const GAINS = [0.7, 0.85, 1, 1.2, 1.4]
 const OUTLINES = ['off', 'line', 'glow', 'ascii'] as const
@@ -35,6 +37,8 @@ export default function App() {
   const [outline, setOutline] = useState<(typeof OUTLINES)[number] | undefined>(undefined)
   const [wind, setWind] = useState('version')
   const [cell, setCell] = useState<number | undefined>(undefined)
+  const [floral, setFloral] = useState(FLORAL_VERSIONS[FLORAL_VERSIONS.length - 1].name)
+  const [floralSeed, setFloralSeed] = useState(3)
   // review hook: merge arbitrary params over the theme (scripts iterate looks without editing presets)
   const [override, setOverride] = useState<Record<string, unknown>>({})
   const [vOverride, setVOverride] = useState<Partial<PaperVersion>>({})
@@ -90,6 +94,8 @@ export default function App() {
       setShaderOutline: setOutline,
       setShaderWind: setWind,
       setShaderCell: setCell,
+      setFloralVersion: setFloral,
+      setFloralSeed: setFloralSeed,
       setShaderVersionOverride: setVOverride,
       paperTurn: (...args: Parameters<RubikHandle['turn']>) => rubik.current?.turn(...args) ?? Promise.resolve(),
       paperRun: (alg: string, duration?: number) => rubik.current?.run(alg, duration) ?? Promise.resolve(),
@@ -116,9 +122,18 @@ export default function App() {
   if (tab === 'site')
     return (
       <>
-        <Site scheme={s.name} bg={s.bg} version={q.get('v') ?? undefined} />
+        <Site scheme={s.name} bg={s.bg} version={q.get('v') ?? undefined} floral={q.get('floral') ?? undefined} floralSeed={Number(q.get('seed') ?? 3)} />
         <div className="site-tabs">{tabs}</div>
       </>
+    )
+
+  if (tab === 'floral')
+    return (
+      <div className="ui paper-ui">
+        <div className="wordmark">aarcube</div>
+        {tabs}
+        <FloralTab v={FLORAL_OF(floral) ?? FLORAL_VERSIONS[0]} seed={floralSeed} scheme={s.name} setVersion={setFloral} setSeed={setFloralSeed} />
+      </div>
     )
 
   if (tab === 'paper')
@@ -196,6 +211,8 @@ declare global {
       setShaderOutline: (o: 'off' | 'line' | 'glow' | 'ascii') => void
       setShaderWind: (w: string) => void
       setShaderCell: (c: number) => void
+      setFloralVersion: (v: string) => void
+      setFloralSeed: (s: number) => void
       setShaderVersionOverride: (o: Partial<PaperVersion>) => void
       paperTurn: RubikHandle['turn']
       paperRun: (alg: string, duration?: number) => Promise<void>

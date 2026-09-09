@@ -21,6 +21,7 @@ node scripts/site-sweep.mjs                 # site cube: every layer turn per th
 node scripts/site-rec.mjs --secs 20          # site cube: a recording per theme split into frames -> shots/site-rec
 node scripts/ascii-shoot.mjs                # v15 ascii outline per wind preset, then the site -> shots/ascii
 node scripts/blank-frames.mjs --secs 30       # per-frame canvas readback: counts blank rendered frames (screenshot blanks are capture artifacts)
+node scripts/floral-shoot.mjs               # floral tab: every x-ray floral version + site previews -> shots/floral
 node scripts/site-fps.mjs                   # site fps, RTX vs integrated
 node scripts/site-video.mjs                 # 30 s tour -> shots/site/tour.webm
 node scripts/sheet.mjs out.png a.png b.png  # contact sheet
