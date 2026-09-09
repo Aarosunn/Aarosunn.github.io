@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { Environment, Lightformer } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { Cube, type CubeHandle } from './Cube'
@@ -62,7 +61,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const bloom = variant === 'heat' ? 1.1 : variant === 'chrome' ? 0.2 : 0.4
+  const bloom = { heat: [1.2, 0.7], chrome: [0.25, 0.95], smoke: [0.3, 0.9] }[variant]
 
   return (
     <>
@@ -72,22 +71,9 @@ export default function App() {
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
       >
         <color attach="background" args={[s.bg]} />
-        <Cube variant={variant} a={s.a} b={s.b} bg={s.bg} auto={auto} onTurn={onTurn} handle={cube} />
-        <Environment resolution={256}>
-          {/* soft grey dome = silver body; strips = liquid-metal banding; scheme colours tint the horizon */}
-          <mesh scale={60}>
-            <sphereGeometry args={[1, 32, 16]} />
-            <meshBasicMaterial color="#2b2e35" side={THREE.BackSide} />
-          </mesh>
-          <Lightformer form="ring" intensity={2.5} position={[0, 8, -6]} scale={9} />
-          <Lightformer intensity={2} position={[0, 4, 8]} scale={[12, 1.2, 1]} />
-          <Lightformer intensity={1.5} position={[-8, 0, 2]} rotation-y={Math.PI / 2} scale={[10, 0.7, 1]} />
-          <Lightformer intensity={1.5} position={[8, -1, 0]} rotation-y={-Math.PI / 2} scale={[10, 0.5, 1]} />
-          <Lightformer intensity={2} color={s.a} position={[0, -7, 2]} scale={[12, 2, 1]} />
-          <Lightformer intensity={1.2} color={s.b} position={[5, 5, -3]} scale={[4, 4, 1]} />
-        </Environment>
+        <Cube variant={variant} palette={s} auto={auto} onTurn={onTurn} handle={cube} />
         <EffectComposer>
-          <Bloom mipmapBlur intensity={bloom} luminanceThreshold={0.75} luminanceSmoothing={0.3} />
+          <Bloom mipmapBlur intensity={bloom[0]} luminanceThreshold={bloom[1]} luminanceSmoothing={0.3} />
         </EffectComposer>
         <Fps onFps={setFps} />
       </Canvas>

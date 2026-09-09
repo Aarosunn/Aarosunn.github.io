@@ -17,6 +17,19 @@ export type Scheme = {
 
 export const SCHEMES: Scheme[] = [
   {
+    // ice top-left, mint glow bottom-right
+    name: 'icemint',
+    bg: '#07090c',
+    bg2: '#0e1216',
+    line: '#28303a',
+    mute: '#6b7c85',
+    text: '#c9d2d8',
+    bright: '#f2f5f7',
+    accent: '#8fb8ff',
+    a: '#8fb8ff',
+    b: '#9de8d4',
+  },
+  {
     name: 'ice',
     bg: '#07080c',
     bg2: '#0e1017',

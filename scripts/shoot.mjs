@@ -25,7 +25,7 @@ const gpu = await page.evaluate(() => {
 })
 console.log(`renderer: ${gpu}\n${fps}`)
 
-const schemes = ['ice', 'aura', 'ember', 'graphite', 'mint', 'paper']
+const schemes = ['icemint', 'ice', 'aura', 'ember', 'graphite', 'mint', 'paper']
 const variants = ['heat', 'chrome', 'smoke']
 for (const v of variants) {
   await page.evaluate((v) => window.__aar.setVariant(v), v)
@@ -40,7 +40,7 @@ for (const v of variants) {
 
 // Turn check: mid-turn frames + integrity after 12 turns.
 await page.evaluate(() => {
-  window.__aar.setScheme('ice')
+  window.__aar.setScheme('icemint')
   window.__aar.setVariant('chrome')
 })
 await page.waitForTimeout(600)
