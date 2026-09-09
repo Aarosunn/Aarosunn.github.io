@@ -17,7 +17,13 @@ import { FLOWER_OF, buildFlower, type Flower } from './xrayMesh'
 
 const VERT = /* glsl */ `
   varying vec3 vN; varying vec3 vV; varying vec3 vP;
-  void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vP = position; gl_Position = projectionMatrix * mv; }
+  void main() {
+    vec4 p = vec4(position, 1.0); vec3 n = normal;
+    #ifdef USE_INSTANCING
+      p = instanceMatrix * p; n = mat3(instanceMatrix) * n;
+    #endif
+    vec4 mv = modelViewMatrix * p; vN = normalize(normalMatrix * n); vV = normalize(-mv.xyz); vP = p.xyz; gl_Position = projectionMatrix * mv;
+  }
 `
 // fresnel: faces dark (see-through under additive blending), grazing angles bright; body colour to rim colour
 // along the fresnel; a thin-film sheen rolls the hue with the view angle
@@ -50,30 +56,28 @@ type Colors = { petal: THREE.Color; rim: THREE.Color; centre: THREE.Color; green
 type Projected = { anchors: { name: string; p: Pt }[]; tips: Pt[]; leaves: Pt[][]; bud: Pt[]; centre: Pt; R: number }
 
 function Bloom({ f, v, colors, onProject }: { f: Flower; v: FloralVersion; colors: Colors; onProject?: (p: Projected) => void }) {
-  const { camera, size, invalidate } = useThree()
+  const { camera, size } = useThree()
   const fr = v.fresnel ?? { power: 3, gain: 0.85, base: 0.012 }
   const wire = v.wire ?? 0.14
   const irid = v.irid ?? 0
   const mats = useMemo(
     () => ({
-      petal: xray(colors.petal, colors.rim, fr, irid),
-      petalWire: xray(colors.petal, colors.rim, { power: fr.power, gain: wire * 0.6, base: wire * 0.5 }, irid * 0.5, true),
-      dot: new THREE.MeshBasicMaterial({ color: colors.centre, transparent: true, opacity: 0.5 * (v.centreGlow ?? 1), blending: THREE.AdditiveBlending, depthWrite: false }),
-      dotHalo: new THREE.MeshBasicMaterial({ color: colors.centre, transparent: true, opacity: (f.dots.length > 40 ? 0.03 : 0.08) * (v.centreGlow ?? 1), blending: THREE.AdditiveBlending, depthWrite: false }),
-      filament: new THREE.LineBasicMaterial({ color: colors.centre, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }),
+      // inner layers dimmer: many petals stack under additive blending, or the core goes white
+      petal: [0, 1, 2, 3].map((l) => xray(colors.petal, colors.rim, { power: fr.power, gain: fr.gain * (1 - 0.28 * l), base: fr.base / (1 + 2 * l) }, irid)),
+      petalWire: [0, 1, 2, 3].map((l) => xray(colors.petal, colors.rim, { power: fr.power, gain: (wire * 0.6) / (1 + 0.6 * l), base: (wire * 0.5) / (1 + 0.6 * l) }, irid * 0.5, true)),
+      // stamens in the same x-ray as the petals: small translucent rings, not solid discs
+      dot: xray(colors.centre, colors.rim, { power: 1.6, gain: 0.9 * (v.centreGlow ?? 1), base: 0.04 * (v.centreGlow ?? 1) }, irid * 0.5),
+      filament: new THREE.LineBasicMaterial({ color: colors.centre, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }),
     }),
-    [colors, fr.power, fr.gain, fr.base, wire, irid, v.centreGlow, f.dots.length],
+    [colors, fr.power, fr.gain, fr.base, wire, irid, v.centreGlow],
   )
-  useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats])
+  useEffect(() => () => Object.values(mats).flat().forEach((m) => m.dispose()), [mats])
   const dots = useRef<THREE.InstancedMesh>(null!)
-  const halos = useRef<THREE.InstancedMesh>(null!)
   useEffect(() => {
     const m = new THREE.Matrix4()
-    f.dots.forEach((p, i) => { m.makeTranslation(p.x, p.y, p.z); dots.current?.setMatrixAt(i, m); halos.current?.setMatrixAt(i, m) })
+    f.dots.forEach((p, i) => { m.makeTranslation(p.x, p.y, p.z); dots.current?.setMatrixAt(i, m) })
     if (dots.current) dots.current.instanceMatrix.needsUpdate = true
-    if (halos.current) halos.current.instanceMatrix.needsUpdate = true
-    invalidate() // frameloop is on demand: the first frame went out before these matrices existed
-  }, [f, invalidate])
+  }, [f])
   const filaments = useMemo(() => {
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.Float32BufferAttribute(f.filaments.flatMap((p) => [p.x, p.y, p.z]), 3))
@@ -104,19 +108,14 @@ function Bloom({ f, v, colors, onProject }: { f: Flower; v: FloralVersion; color
     <group>
       {f.bloom.map((p, i) => (
         <group key={i} matrixAutoUpdate={false} matrix={p.matrix}>
-          <mesh geometry={p.geometry} material={mats.petal} />
-          {wire > 0 && <mesh geometry={p.geometry} material={mats.petalWire} />}
+          <mesh geometry={p.geometry} material={mats.petal[p.layer ?? 0]} />
+          {wire > 0 && <mesh geometry={p.geometry} material={mats.petalWire[p.layer ?? 0]} />}
         </group>
       ))}
       {f.dots.length > 0 && (
-        <>
-          <instancedMesh ref={dots} args={[undefined, undefined, f.dots.length]} material={mats.dot}>
-            <sphereGeometry args={[f.dotR, 6, 6]} />
-          </instancedMesh>
-          <instancedMesh ref={halos} args={[undefined, undefined, f.dots.length]} material={mats.dotHalo}>
-            <sphereGeometry args={[f.dotR * 3.2, 8, 8]} />
-          </instancedMesh>
-        </>
+        <instancedMesh ref={dots} args={[undefined, undefined, f.dots.length]} material={mats.dot}>
+          <sphereGeometry args={[f.dotR * 1.3, 10, 8]} />
+        </instancedMesh>
       )}
       {f.filaments.length > 0 && <lineSegments geometry={filaments} material={mats.filament} />}
     </group>
@@ -130,8 +129,8 @@ function Foliage({ f, v, colors }: { f: Flower; v: FloralVersion; colors: Colors
     () => ({
       green: xray(colors.green, colors.green.clone().lerp(colors.bright, 0.5), { power: fr.power * 0.9, gain: fr.gain * 0.9, base: fr.base * 1.5 }, 0),
       greenWire: xray(colors.green, colors.green, { power: fr.power, gain: wire * 0.8, base: wire * 0.7 }, 0, true),
-      bud: xray(colors.petal, colors.rim, fr, v.irid ?? 0),
-      budWire: xray(colors.petal, colors.rim, { power: fr.power, gain: wire * 0.6, base: wire * 0.5 }, 0, true),
+      bud: xray(colors.petal.clone().lerp(colors.green, 0.35), colors.rim, { power: fr.power * 0.8, gain: fr.gain * 1.3, base: fr.base * 2 }, v.irid ?? 0),
+      budWire: xray(colors.green.clone().lerp(colors.bright, 0.3), colors.rim, { power: fr.power, gain: wire * 1.2, base: wire * 0.9 }, 0, true),
     }),
     [colors, fr.power, fr.gain, fr.base, wire, v.irid],
   )
@@ -190,10 +189,10 @@ export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, heig
   const blur = v.blur ?? 0
   return (
     <div className={`xf3d ${className ?? ''}`} style={{ position: 'relative', width, height }}>
-      <Canvas dpr={[1, 2]} camera={cam} gl={{ antialias: true, alpha: true }} style={{ position: 'absolute', inset: 0, filter: blur > 0 ? `blur(${blur}px)` : undefined, opacity: v.dim ?? 1 }} frameloop="demand">
+      <Canvas dpr={[1, 2]} camera={cam} gl={{ antialias: true, alpha: true }} style={{ position: 'absolute', inset: 0, filter: blur > 0 ? `blur(${blur}px)` : undefined, opacity: v.dim ?? 1 }} frameloop="always">
         <Foliage f={f} v={v} colors={colors} />
       </Canvas>
-      <Canvas dpr={[1, 2]} camera={cam} gl={{ antialias: true, alpha: true }} style={{ position: 'absolute', inset: 0 }} frameloop="demand">
+      <Canvas dpr={[1, 2]} camera={cam} gl={{ antialias: true, alpha: true }} style={{ position: 'absolute', inset: 0 }} frameloop="always">
         <Bloom f={f} v={v} colors={colors} onProject={hasTech(v) ? setProj : undefined} />
       </Canvas>
       {tech && (

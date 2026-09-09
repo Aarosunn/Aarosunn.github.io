@@ -62,7 +62,8 @@ export function petalGeometry(L: number, W: number, curl: number, cup: number, r
 /** a lanceolate leaf along +x, folded down the midrib */
 export const leafGeometry = (L: number, W: number, phase: number) => petalGeometry(L, W, 0.15, -0.35, 0.05, 0, phase, 32, 8)
 
-export type Placed = { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4; tip: THREE.Vector3 }
+/** `layer`: 0 outer .. 3 inner, so dense blooms can fade their inner petals */
+export type Placed = { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4; tip: THREE.Vector3; layer?: number }
 export type Flower = {
   spec: FlowerSpec
   bloom: Placed[]
@@ -101,7 +102,7 @@ export function buildFlower(seed: number, spec: FlowerSpec, upright = true): Flo
       geos.push(g)
       const m = new THREE.Matrix4().makeRotationZ(a).multiply(new THREE.Matrix4().makeRotationY(-rise)).premultiply(new THREE.Matrix4().makeTranslation(0, 0, ring * 0.05 - (r.spiral ? k * 0.25 : 0)))
       m.premultiply(bloomM)
-      bloom.push({ geometry: g, matrix: m, tip: new THREE.Vector3(L, 0, r.curl * L).applyMatrix4(m) })
+      bloom.push({ geometry: g, matrix: m, tip: new THREE.Vector3(L, 0, r.curl * L).applyMatrix4(m), layer: Math.min(3, r.spiral ? Math.floor((1 - k) * 3.99) : ring) })
     }
   })
   if (spec.bell) {
@@ -179,10 +180,19 @@ export function buildFlower(seed: number, spec: FlowerSpec, upright = true): Flo
     const bc = new THREE.CatmullRomCurve3([bp, new THREE.Vector3((bp.x + budPos.x) / 2 + 0.1, bp.y + 0.1, 0.05), budPos])
     branch = new THREE.TubeGeometry(bc, 24, spec.stem.width * 0.6, 8, false)
     geos.push(branch)
-    const bg = new THREE.LatheGeometry([new THREE.Vector2(0, 0), new THREE.Vector2(0.12, 0.08), new THREE.Vector2(0.16, 0.24), new THREE.Vector2(0.1, 0.4), new THREE.Vector2(0.01, 0.48)], 18)
+    // a closed bud: smooth teardrop with five sepal ridges, pointed tip
+    const prof = [0, 0.05, 0.12, 0.2, 0.28, 0.36, 0.43, 0.48, 0.52].map((y) => new THREE.Vector2(0.005 + 0.17 * Math.sin(Math.pow(y / 0.52, 0.85) * Math.PI) * (1 - 0.15 * y), y))
+    const bg = new THREE.LatheGeometry(prof, 48)
+    const bp2 = bg.attributes.position as THREE.BufferAttribute
+    for (let i = 0; i < bp2.count; i++) {
+      const x = bp2.getX(i), y = bp2.getY(i), z = bp2.getZ(i)
+      const ridge = 1 + 0.1 * Math.cos(Math.atan2(z, x) * 5) * Math.sin((y / 0.52) * Math.PI)
+      bp2.setXYZ(i, x * ridge, y, z * ridge)
+    }
+    bg.computeVertexNormals()
     geos.push(bg)
     const m = new THREE.Matrix4().compose(budPos, new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), bc.getTangent(1).normalize()), new THREE.Vector3(1, 1, 1))
-    bud = { geometry: bg, matrix: m, tip: new THREE.Vector3(0, 0.48, 0).applyMatrix4(m) }
+    bud = { geometry: bg, matrix: m, tip: new THREE.Vector3(0, 0.52, 0).applyMatrix4(m) }
   }
   return { spec, bloom, bloomM, bloomCentre, stem, branch, leaves, bud, dots, dotR, filaments, dispose: () => geos.forEach((g) => g.dispose()) }
 }
