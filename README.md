@@ -7,9 +7,9 @@ npm install
 npx vite --port 5173
 ```
 
-Tabs (key `p`, or `?tab=`): **site** (the mock portfolio), **shader cube** (the cube lab, 14 versions), **paper shaders** (the official components, ground truth).
+Tabs (key `p`, or `?tab=`): **site** (the mock portfolio), **shader cube** (the Rubik's lab, 10 versions), **paper shaders** (the official components, plus the shaders on a plain cube).
 
-Site keys: arrows / 1–4 / wheel / swipe step the deck, click an item for a panel, `v` cycles the cube version, `c` the colour scheme, `l` the layout. `/?v=v11&c=ember` links a state.
+Site keys: arrows / 1–4 / wheel / swipe step the deck, click an item for a panel, `v` cycles the cube version, `c` the colour scheme, `l` the layout. `/?v=v7&c=ember` links a state.
 
 Verification (needs the dev server; uses the NVIDIA GPU via PRIME):
 

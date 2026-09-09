@@ -153,3 +153,7 @@ Key `l` toggles `corners` (four sections around the cube) and `deck` (cube alone
 ## Morning cull (2026-09-09 11:00)
 
 Aaron: condense, no decision fatigue. Deleted the cube tab (`Cube.tsx`, `materials/`, bloom, postprocessing dependency, its scripts) and `HeatCube.tsx` (old v1/v2); the shader cube tab replaces it, renamed. Kept 14 versions, renumbered: old v10 v11 v12 v13 v14 v17 v18 v19 v23 v24 v27 v31 v34 v35 → v1–v14. Every survivor is a Rubik's cube, so PaperCube lost the box / rounded / octa / cage shapes, `EdgeBars`, the blurred-silhouette field, `polarity`, `seamValue`; one preset table (`PRESETS_OF`, `presetNamed`) replaces the three copies; grain / diagonal presets dropped. All 14 at 61 fps, integrity ok; build 357 kB gzip (was 407). `__aar` hooks renamed `setShader*`.
+
+## Paper-tab cube demos, second renumber (11:15)
+
+The four whole-face-plate versions (old v11 v12 v17 v18) read as plain shader cubes, so they moved to the paper tab as `CUBE_DEMOS` (512 mask, camZ 8, spinning, a turn every 4 s) under the official panels. Shader cube keeps 10: v1 heat hero · v2 heat no halo · v3 liquid cubie plates · v4 heat icemint hairline no halo · v5 liquid silhouette Poisson · v6 liquid per-cubie Poisson · v7 fusion · v8 heat icemint quarter-res · v9 rounded hairline · v10 liquid rounded Poisson. Site cycle v1 v9 v4 v7 v2 v6.

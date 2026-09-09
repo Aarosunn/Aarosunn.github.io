@@ -7,4 +7,4 @@ const fps = async (igpu, w, h, v = 'v1') => {
   const n = await p.evaluate(() => new Promise((r) => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 < 2000) requestAnimationFrame(f); else r(n / 2) }; requestAnimationFrame(f) }))
   await b.close(); return n
 }
-for (const [w, h] of [[1440, 900], [420, 820]]) for (const v of ['v1', 'v12', 'v10']) console.log(`${w}x${h} ${v}: rtx ${await fps(false, w, h, v)} fps, igpu ${await fps(true, w, h, v)} fps`)
+for (const [w, h] of [[1440, 900], [420, 820]]) for (const v of ['v1', 'v8', 'v6']) console.log(`${w}x${h} ${v}: rtx ${await fps(false, w, h, v)} fps, igpu ${await fps(true, w, h, v)} fps`)

@@ -1,9 +1,10 @@
 /**
- * Pure recreation of paper.design's three logo animations, no cube: the official
- * @paper-design/shaders-react components with the site's own presets (Apache 2.0).
- * Each panel mirrors the page at https://shaders.paper.design/<name>.
+ * Ground truth and the plain-cube demos: paper.design's three logo animations with the site's own presets
+ * (official @paper-design/shaders-react components, Apache 2.0; each panel mirrors https://shaders.paper.design/<name>),
+ * then the same shaders on a plain cube through the PaperCube pipeline (whole-face plates; a layer turn reveals the cubies).
  */
 import { useState } from 'react'
+import { Canvas } from '@react-three/fiber'
 import {
   GemSmoke,
   Heatmap,
@@ -12,6 +13,9 @@ import {
   heatmapPresets,
   liquidMetalPresets,
 } from '@paper-design/shaders-react'
+import { PaperCube } from './PaperCube'
+import { CUBE_DEMOS, type PaperVersion } from './paperVersions'
+import { presetNamed } from './paperPresets'
 
 type Panel = {
   name: string
@@ -53,12 +57,35 @@ function PaperPanel({ name, url, presets, Comp, image }: Panel) {
   )
 }
 
+function CubeDemo({ version }: { version: PaperVersion }) {
+  return (
+    <section className="paper-panel">
+      <header>
+        <h2>{version.name}</h2>
+        <span>{version.note}</span>
+      </header>
+      <div className="paper-canvas">
+        <Canvas dpr={[1, 1.5]} camera={{ position: [0, 0, version.camZ], fov: 30 }} gl={{ antialias: true }}>
+          <PaperCube version={version} params={presetNamed(version.shader, version.preset).params} spin spinSpeed={0.2} auto autoInterval={4000} />
+        </Canvas>
+      </div>
+    </section>
+  )
+}
+
 export function Paper() {
   return (
-    <div className="paper">
-      {PANELS.map((p) => (
-        <PaperPanel key={p.name} {...p} />
-      ))}
-    </div>
+    <>
+      <div className="paper">
+        {PANELS.map((p) => (
+          <PaperPanel key={p.name} {...p} />
+        ))}
+      </div>
+      <div className="paper paper-cubes">
+        {CUBE_DEMOS.map((v) => (
+          <CubeDemo key={v.name} version={v} />
+        ))}
+      </div>
+    </>
   )
 }
