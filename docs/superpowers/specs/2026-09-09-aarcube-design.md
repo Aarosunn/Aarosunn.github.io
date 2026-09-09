@@ -173,3 +173,7 @@ Aaron: "the turning still causes some of the cubes to be misplaced". Geometry wa
 ## Poisson mask: min-filtered downsample (13:20)
 
 Moving seams from uv to geometry made them a true hairline, which the box-filter + bilinear downsample to the 256² Poisson grid washed below the alpha threshold: the 27 per-cubie fields merged into one. The mask alpha is now min-filtered over each destination texel's footprint (`DOWNMIN`, 4×4 taps at 1024, 3×3 at 768), so a hairline stays a hole and every cubie face keeps its own field. Verified: combined view shows 27 separate plates, integrity (positions, orientation, placement) passes for all 11 versions, 60 fps.
+
+## v11 restored, v12 = the geometry-true one (13:40)
+
+Aaron: "the cube looks different now, make this recent change a v12 and restore the old v11". Two version fields now carry the difference: `seamSpace` ('uv' = seams and plates from the geometry's uv, the v1–v11 look with its wider seams on rounded caps and the drift after turns; 'geometry' = true edges) and `poissonDown` ('blur' = box filter + bilinear, thin seams close and neighbouring cubies share a field; 'min' = hairlines stay holes). v11 is back on uv + blur; v12 is v11 on geometry + min. Same themes on both.

@@ -27,6 +27,10 @@ export type PaperVersion = {
   rubikRound: number
   /** poisson: Jacobi iterations per frame at 256² (warm-started) */
   poissonIters: number
+  /** seams and plates from the geometry's uv (v1-v11 look) or from local geometry (true edges on rounded cubies after turns) */
+  seamSpace: 'uv' | 'geometry'
+  /** how the mask alpha reaches the 256² Poisson grid: box blur (v1-v11) or min filter (hairline seams stay holes) */
+  poissonDown: 'blur' | 'min'
   /** heat blur radii in paper's 1750px canvas units */
   blur: { contour: number; inner: number; big: number }
   /** heat: run the big blur at size / bigDiv (2 = as paper's canvas; 4 = cheaper, for integrated GPUs) */
@@ -53,6 +57,8 @@ const base = {
   rubikGap: 1,
   rubikRound: 0,
   poissonIters: 30,
+  seamSpace: 'uv' as const,
+  poissonDown: 'blur' as const,
   blur: { contour: 5, inner: 18, big: 150 },
   bigDiv: 2 as const,
 }
@@ -84,6 +90,21 @@ export const PAPER_VERSIONS: PaperVersion[] = [
     // all liquid metal: the heatmap / icemint themes are v10's chrome with its luminance run through the palette
     themes: ['default', 'backdrop', 'heatmap', 'heatmap grain', 'ice', 'mint', 'icemint', 'icemint grain'].map((name) => ({ name, shader: 'liquid' as const, preset: name })),
     note: "v10's cube and effect for the site: eight colour themes on the scheme's background, nothing outside the cube, brightness and opacity to taste",
+  },
+  {
+    ...liquid,
+    name: 'v12',
+    field: 'poisson',
+    poissonIters: 60,
+    poissonDown: 'min',
+    seamSpace: 'geometry',
+    rubikRound: 0.07,
+    seam: 0.03,
+    halo: false,
+    shade: 0.35,
+    preset: 'ice',
+    themes: ['default', 'backdrop', 'heatmap', 'heatmap grain', 'ice', 'mint', 'icemint', 'icemint grain'].map((name) => ({ name, shader: 'liquid' as const, preset: name })),
+    note: 'v11 with seams and plates from the geometry (true edges on rounded cubies after turns) and a min-filtered Poisson mask: thinner seams, crisper plates',
   },
 ]
 

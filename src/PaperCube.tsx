@@ -130,10 +130,10 @@ const COPY = /* glsl */ `
 `
 // cubie faces
 const FACE_VERT = /* glsl */ `
-  in vec3 position; in vec3 normal; out vec3 vN; out vec3 vLocal; out vec3 vLocalN; out vec3 vCube; out vec3 vCubeN;
+  in vec3 position; in vec3 normal; in vec2 uv; out vec3 vN; out vec2 vUv; out vec3 vLocal; out vec3 vLocalN; out vec3 vCube; out vec3 vCubeN;
   uniform mat4 modelViewMatrix; uniform mat4 projectionMatrix; uniform mat3 normalMatrix; uniform mat4 modelMatrix; uniform mat4 uRootInv;
   void main() {
-    vN = normalMatrix * normal; vLocal = position; vLocalN = normal;
+    vN = normalMatrix * normal; vUv = uv; vLocal = position; vLocalN = normal;
     mat4 toCube = uRootInv * modelMatrix;
     vCube = (toCube * vec4(position, 1.0)).xyz;
     vCubeN = mat3(toCube) * normal;
@@ -142,18 +142,19 @@ const FACE_VERT = /* glsl */ `
 `
 const FACE_FRAG = /* glsl */ `
   precision highp float;
-  in vec3 vN; in vec3 vLocal; in vec3 vLocalN; in vec3 vCube; in vec3 vCubeN; out vec4 o;
+  in vec3 vN; in vec2 vUv; in vec3 vLocal; in vec3 vLocalN; in vec3 vCube; in vec3 vCubeN; out vec4 o;
   uniform float mode;   // 0 heat, 2 plate per cubie face, 3 plate per whole cube face (cube space)
   uniform float k;      // plate sharpness
   uniform float uHalf;  // cube half extent in cube space (mode 3)
   uniform float uSeam;  // hairline along each cubie face border, in cubie units (cubie = 1)
+  uniform float uSeamUv; // 1: seams and plates from the geometry's uv (v1-v11 look; drifts on rounded cubies after turns), 0: from local geometry
   float plate(vec2 p) { float b = (1.0 - p.x * p.x) * (1.0 - p.y * p.y); return 1.0 - pow(clamp(b, 0.0, 1.0), k); }
   // the two coordinates across the face this fragment lies on (dominant local normal axis), -.5..+.5
   vec2 across(vec3 pos, vec3 n) { vec3 a = abs(n); return a.x > a.y && a.x > a.z ? pos.yz : a.y > a.z ? pos.xz : pos.xy; }
   void main() {
     float l = 0.35 + 0.65 * max(dot(normalize(vN), normalize(vec3(0.35, 0.8, 0.6))), 0.0);
-    // seams and plates come from geometry, not uv: a rounded (extruded) cubie has different uv scales per face
-    vec2 f = across(vLocal, vLocalN);
+    // face coordinates -.5..+.5: from uv (the original look) or from geometry (true edges on rounded cubies)
+    vec2 f = uSeamUv > 0.5 ? vUv - 0.5 : across(vLocal, vLocalN);
     float e = 0.5 - max(abs(f.x), abs(f.y));
     float seam = uSeam > 0.0 ? 1.0 - smoothstep(uSeam * 0.6, uSeam, e) : 0.0;
     if (mode < 1.0) {
@@ -369,7 +370,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       reduceMax: raw(REDUCE_MAX, { t: { value: null }, texel: { value: 1 / 128 } }),
       downMin: raw(DOWNMIN, { t: { value: null }, texel: { value: 1 / 1024 }, taps: { value: 4 } }),
       copy: raw(COPY, { t: { value: null } }),
-      face: raw(FACE_FRAG, { mode: { value: 0 }, k: { value: 0.75 }, uHalf: { value: 1.5 }, uSeam: { value: 0 }, uRootInv: { value: new THREE.Matrix4() } }, FACE_VERT),
+      face: raw(FACE_FRAG, { mode: { value: 0 }, k: { value: 0.75 }, uHalf: { value: 1.5 }, uSeam: { value: 0 }, uSeamUv: { value: 1 }, uRootInv: { value: new THREE.Matrix4() } }, FACE_VERT),
       final: raw(finalFragment(V.shader), finalUniforms(), FINAL_VERT),
       final2: V.fuse ? raw(finalFragment(V.fuse), finalUniforms(), FINAL_VERT) : null,
       composite: raw(COMPOSITE, { a: { value: null }, b: { value: null } }),
@@ -408,6 +409,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     Q.face.uniforms.k.value = V.fieldK
     Q.face.uniforms.uHalf.value = 1.5 * V.rubikGap
     Q.face.uniforms.uSeam.value = V.seam
+    Q.face.uniforms.uSeamUv.value = V.seamSpace === 'geometry' ? 0 : 1
   }, [params, Q, V, gain, alpha])
 
   const pass = (mat: THREE.RawShaderMaterial, target: THREE.WebGLRenderTarget | null) => {
@@ -473,12 +475,20 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       Q.combineHeat.uniforms.inner.value = R.inner.texture
       pass(Q.combineHeat, R.combined)
     } else if (V.field === 'poisson') {
-      // min-downsample the alpha to 256 (hairline seams stay holes), iterate Jacobi (warm-started from
-      // last frame), reduce the max, normalise. DOWNMIN writes to rgb, so the solver's .g read works.
-      Q.downMin.uniforms.t.value = R.mask.texture
-      Q.downMin.uniforms.texel.value = 1 / SIZE
-      Q.downMin.uniforms.taps.value = SIZE / 256
-      pass(Q.downMin, R.pMask)
+      // bring the alpha to 256 for the solver, then iterate Jacobi (warm-started from last frame), reduce the
+      // max, normalise. 'min' keeps a hairline seam as a hole; 'blur' (box filter + bilinear, the v1-v11 look)
+      // lets thin seams close so neighbouring cubies share a field. Both write to rgb, so .g works.
+      if (V.poissonDown === 'min') {
+        Q.downMin.uniforms.t.value = R.mask.texture
+        Q.downMin.uniforms.texel.value = 1 / SIZE
+        Q.downMin.uniforms.taps.value = SIZE / 256
+        pass(Q.downMin, R.pMask)
+      } else {
+        Q.blur.uniforms.ch.value.set(0, 1, 0, 0)
+        boxBlur(R.mask, R.a, R.inner, Math.max(1, Math.round(SIZE / 512)), 1)
+        Q.blur.uniforms.ch.value.set(1, 0, 0, 0)
+        downsample(R.inner, R.pMask)
+      }
       Q.poisson.uniforms.mask.value = R.pMask.texture
       let a = R.pA, b = R.pB
       for (let i = 0; i < V.poissonIters; i++) {
