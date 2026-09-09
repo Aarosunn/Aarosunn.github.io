@@ -49,8 +49,9 @@ const SECTIONS: Section[] = [
 /** the cube emits the scheme's hue: scheme name -> heat preset */
 const HEAT_OF_SCHEME: Record<string, string> = { icemint: 'icemint', ice: 'icemint', mint: 'icemint', ember: 'ember', graphite: 'graphite', aura: 'default', paper: 'sepia' }
 
-/** cube versions worth comparing in place; key `v` cycles */
-const SITE_VERSIONS = ['v10', 'v16', 'v19', 'v13', 'v18', 'v17']
+/** cube versions worth comparing in place; key `v` cycles. Versions whose own preset is light get a dark one here. */
+const SITE_VERSIONS = ['v10', 'v16', 'v19', 'v20', 'v13', 'v18', 'v24', 'v17']
+const SITE_PRESET: Record<string, string> = { v24: 'ice' }
 
 export function Site({ version: initial = 'v10', scheme = 'icemint' }: { version?: string; scheme?: string }) {
   const [active, setActive] = useState(0)
@@ -64,10 +65,10 @@ export function Site({ version: initial = 'v10', scheme = 'icemint' }: { version
   const PV = useMemo(() => ({ ...VERSION_OF(version)!, size: narrow ? 768 : 1024 }), [version, narrow])
   const params = useMemo(() => {
     const presets = PRESETS_OF[PV.shader]
-    const want = PV.shader === 'heat' && PV.preset === undefined ? HEAT_OF_SCHEME[scheme] : PV.preset
+    const want = SITE_PRESET[version] ?? (PV.shader === 'heat' && PV.preset === undefined ? HEAT_OF_SCHEME[scheme] : PV.preset)
     const base = (presets.find((p) => p.name.toLowerCase() === want) ?? presets[0]).params as Record<string, unknown>
     return { ...base, ...(PV.shader === 'heat' ? { outerGlow: 0.42, contour: 0.75 } : {}), scale: (narrow ? 0.7 : 0.85) * (base.scale as number) }
-  }, [PV, narrow, scheme])
+  }, [PV, narrow, scheme, version])
 
   // deck stepping: arrows / digits; every step turns one layer
   const step = (i: number) => {
@@ -122,6 +123,7 @@ export function Site({ version: initial = 'v10', scheme = 'icemint' }: { version
         {SECTIONS.map((s, i) => (
           <section key={s.id} className={`sec sec-${s.id} ${i === active ? 'on' : ''}`} onClick={() => step(i)}>
             <h2>{s.title}</h2>
+            {s.id === 'about' && <div className="portrait">ascii portrait, later a webcam</div>}
             <p>{s.blurb}</p>
             <ul>
               {s.items.map((it, j) => {

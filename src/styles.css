@@ -447,9 +447,24 @@ button:focus-visible {
   outline: none;
 }
 
-/* the cube slides toward the free side while a panel is open */
+/* one load moment: the cube fades up first, sections rise after */
 canvas {
   transition: transform 0.7s var(--ease);
+  animation: fadein 1.4s var(--ease) both;
+}
+@keyframes fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.portrait {
+  width: 96px;
+  height: 96px;
+  border: 1px dashed var(--line);
+  color: var(--mute);
+  font-size: 10px;
+  line-height: 1.3;
+  padding: 6px;
+  margin: 2px 0 10px;
 }
 body:has(.site.has-panel .panel-left) canvas { transform: translateX(clamp(60px, 9vw, 130px)); }
 body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -9vw, -60px)); }
@@ -543,6 +558,7 @@ body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130
   .site-base { grid-area: 4 / 1; }
   .site-intro { display: none; }
   .site-tabs { display: none; }
+  .portrait { display: none; }
   .site ~ canvas, canvas { transform: translateY(-10vh); }
   .sec.on h2 { font-size: 26px; }
   /* scrim so the copy stays legible over the cube */
