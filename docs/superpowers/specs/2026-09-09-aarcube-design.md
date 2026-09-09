@@ -59,3 +59,13 @@ Lessons: three wants `vec4[]` uniforms as a flat Float32Array; RawShaderMaterial
 
 ### Heat cube v2 (same tab, `version` row)
 Aaron on v1: gaps between the sides, low quality, no background. v2: 1024 MSAA mask; the mask is *inverted* (cube faces R = 1 = paper's "outside", background black = the shape) so their animated hot band sweeps inside the cube; the background clips itself through their own `img.a == 0 -> colorBack` branch because mask G (lambert face shade inside, 0 outside) rides in the combined alpha; one appended multiply shades the faces. Edges are hairline black bars (0.007), so seams not gaps. Big blur radius 260 instead of 150 so the sweep reaches into the faces. v1 kept.
+
+## Shader cube v3–v9: generic paper pipeline (overnight run, 03:55)
+
+`src/PaperCube.tsx` + `src/paperVersions.ts`. One pipeline for all three paper shaders on any shape; v1/v2 stay frozen in HeatCube.tsx.
+- Mask render (1024, MSAA 4, depth) of the shape with a channel-writing face material. Heat: R = luminance (0 shape / 1 outside), G = lambert, B = inside. Liquid/smoke: R = analytic Poisson-like field per box face `1 - ((1-x²)(1-y²))^k`, G = alpha, B = lambert. Non-box shapes use a blurred-silhouette field instead.
+- Their preprocess on the GPU: heat = contour r5 ×1, inner r18 ×3, big r150 ×3 at half res (radii from their 1750px canvas; image = central 57%). Liquid/smoke need no blur (they blur in-shader).
+- Final pass = their fragment verbatim (`#version` stripped, mediump → highp) with `v_imageUV`/`v_objectUV`/`v_responsiveUV` reproduced for fit=contain, plus a tail: raw mask uniform, silhouette clip (`halo` off → colorBack outside), lambert multiply (`shade`).
+- Versions: v3 heat box (site-faithful), v4 heat cage (hidden-line strokes), v5 liquid box, v6 smoke box, v7 heat no-halo shaded, v8 liquid shaded, v9 smoke no outer smoke. Shape row: box / rounded / octa / cage. Preset row = the shader's site presets. 61 fps on the RTX for all.
+- Findings: paper's heatmap "shape" is solid (diamond.svg is a filled polygon); the moving band is the gap between three animated shadow blobs. Seam bars must be inset or they double the silhouette. Liquid/smoke want the object at ~75% of the image frame (camZ 3.9); heat wants it inside the central 57% (camZ 7).
+- v1 "broken": renders after ~600 ms warm-up; the seam gap at some orbit angles came from bars protruding past the silhouette.

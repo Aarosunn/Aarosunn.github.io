@@ -6,8 +6,13 @@ import * as THREE from 'three'
 import { Cube, SETS, SHAPES, VARIANTS_OF, type AnyVariant, type CubeHandle, type Set, type Shape } from './Cube'
 import { SCHEMES, type Scheme } from './schemes'
 import { Paper } from './Paper'
-import { HeatCube, type HeatVersion } from './HeatCube'
-import { heatmapPresets } from '@paper-design/shaders-react'
+import { HeatCube, type HeatDebug, type HeatVersion } from './HeatCube'
+import { PaperCube } from './PaperCube'
+import { PAPER_VERSIONS, VERSION_OF, type PaperShader, type PaperShape } from './paperVersions'
+import { gemSmokePresets, heatmapPresets, liquidMetalPresets } from '@paper-design/shaders-react'
+
+const PRESETS_OF: Record<PaperShader, { name: string; params: object }[]> = { heat: heatmapPresets, liquid: liquidMetalPresets, smoke: gemSmokePresets }
+const PAPER_SHAPES: PaperShape[] = ['box', 'rounded', 'octa', 'cage']
 
 // FPS sampler lives inside the canvas; reports out twice a second.
 function Fps({ onFps }: { onFps: (n: number) => void }) {
@@ -143,7 +148,9 @@ export default function App() {
   const [heatPreset, setHeatPreset] = useState(0)
   const [heatSpin, setHeatSpin] = useState(true)
   const [heatHollow, setHeatHollow] = useState(false)
-  const [heatVersion, setHeatVersion] = useState<HeatVersion>('v2')
+  const [heatVersion, setHeatVersion] = useState<string>('v3')
+  const [heatDebug, setHeatDebug] = useState<HeatDebug>('off')
+  const [heatShape, setHeatShape] = useState<PaperShape | null>(null)
   const [si, setSi] = useState(0)
   const [shape, setShape] = useState<Shape>('solid')
   const [set, setSet] = useState<Set>('v2')
@@ -188,6 +195,9 @@ export default function App() {
       setTab,
       setHeatHollow,
       setHeatVersion,
+      setHeatDebug,
+      setHeatPreset,
+      setHeatShape,
       setScheme: (n: string) => setSi(Math.max(0, SCHEMES.findIndex((x) => x.name === n))),
       setVariant,
       setShape,
@@ -224,36 +234,48 @@ export default function App() {
     </div>
   )
 
-  if (tab === 'heatcube')
+  if (tab === 'heatcube') {
+    const PV = VERSION_OF(heatVersion)
+    const legacy = !PV
+    const presets = PV ? PRESETS_OF[PV.shader] : heatmapPresets
+    const preset = presets[Math.min(heatPreset, presets.length - 1)]
     return (
       <>
-        <Canvas dpr={[1, 1.5]} camera={{ position: [0, 0, 6.5], fov: 30 }} gl={{ antialias: true }}>
-          <HeatCube key={heatVersion} params={heatmapPresets[heatPreset].params} spin={heatSpin} hollow={heatHollow} version={heatVersion} />
+        <Canvas key={heatVersion} dpr={[1, 1.5]} camera={{ position: [0, 0, PV?.camZ ?? 6.5], fov: 30 }} gl={{ antialias: true }}>
+          {legacy ? (
+            <HeatCube params={preset.params} spin={heatSpin} hollow={heatHollow} version={heatVersion as HeatVersion} debug={heatDebug} />
+          ) : (
+            <PaperCube version={PV} shape={heatShape ?? undefined} params={preset.params as Record<string, unknown>} spin={heatSpin} debug={heatDebug} />
+          )}
         </Canvas>
         <div className="ui">
           <div className="wordmark">aarcube</div>
           {tabs}
           <div className="controls">
-            <Row label="version" items={['v1', 'v2'] as HeatVersion[]} on={heatVersion} pick={setHeatVersion} />
-            <Row label="preset" items={heatmapPresets.map((p) => p.name.toLowerCase())} on={heatmapPresets[heatPreset].name.toLowerCase()} pick={(n) => setHeatPreset(heatmapPresets.findIndex((p) => p.name.toLowerCase() === n))} />
+            <Row label="version" items={['v1', 'v2', ...PAPER_VERSIONS.map((v) => v.name)]} on={heatVersion} pick={(v) => { setHeatVersion(v); setHeatPreset(0) }} />
+            <Row label="preset" items={presets.map((p) => p.name.toLowerCase())} on={preset.name.toLowerCase()} pick={(n) => setHeatPreset(presets.findIndex((p) => p.name.toLowerCase() === n))} />
+            {!legacy && <Row label="shape" items={PAPER_SHAPES} on={heatShape ?? PV.shape} pick={setHeatShape} />}
             <div className="row">
               <span className="k">motion</span>
               <button className={heatSpin ? 'on' : ''} onClick={() => setHeatSpin((v) => !v)}>
                 {heatSpin ? 'spinning' : 'still'}
               </button>
-              <button className={heatHollow ? 'on' : ''} onClick={() => setHeatHollow((v) => !v)}>
-                hollow
-              </button>
+              {legacy && (
+                <button className={heatHollow ? 'on' : ''} onClick={() => setHeatHollow((v) => !v)}>
+                  hollow
+                </button>
+              )}
             </div>
           </div>
           <div className="readout">
-            <span>paper heatmap on a cube</span>
+            <span>{PV ? `${PV.shader === 'heat' ? 'heatmap' : PV.shader === 'liquid' ? 'liquid metal' : 'gem smoke'} on a ${heatShape ?? PV.shape}` : 'paper heatmap on a cube'}</span>
             <span>drag to orbit</span>
             <span>keys p</span>
           </div>
         </div>
       </>
     )
+  }
 
   if (tab === 'paper')
     return (
@@ -349,7 +371,10 @@ declare global {
     __aar: {
       setTab: (t: Tab) => void
       setHeatHollow: (b: boolean) => void
-      setHeatVersion: (v: HeatVersion) => void
+      setHeatVersion: (v: string) => void
+      setHeatDebug: (v: HeatDebug) => void
+      setHeatPreset: (i: number) => void
+      setHeatShape: (s: PaperShape | null) => void
       setScheme: (n: string) => void
       setVariant: (v: AnyVariant) => void
       setShape: (v: Shape) => void

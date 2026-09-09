@@ -58,6 +58,12 @@ const FACE_VERT = /* glsl */ `
   uniform mat4 modelViewMatrix; uniform mat4 projectionMatrix; uniform mat3 normalMatrix;
   void main() { vN = normalMatrix * normal; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
 `
+// debug: blit one render target to the screen
+const COPY = /* glsl */ `
+  precision highp float;
+  in vec2 vUv; out vec4 o; uniform sampler2D t;
+  void main() { o = vec4(texture(t, vUv).rgb, 1.0); }
+`
 const QUAD_VERT = /* glsl */ `
   in vec3 position; in vec2 uv; out vec2 vUv;
   void main() { vUv = uv; gl_Position = vec4(position, 1.0); }
@@ -85,9 +91,10 @@ const rt = (size: number, depth = false, samples = 0) =>
     samples,
   })
 
-export type HeatCubeProps = { params: Omit<HeatmapParams, 'image'>; spin: boolean; hollow: boolean; version: HeatVersion }
+export type HeatDebug = 'off' | 'mask' | 'combined'
+export type HeatCubeProps = { params: Omit<HeatmapParams, 'image'>; spin: boolean; hollow: boolean; version: HeatVersion; debug?: HeatDebug }
 
-export function HeatCube({ params, spin, hollow, version }: HeatCubeProps) {
+export function HeatCube({ params, spin, hollow, version, debug = 'off' }: HeatCubeProps) {
   const SIZE = SIZE_OF[version]
   const v2 = version === 'v2'
   const cube = useRef<THREE.Mesh>(null!)
@@ -151,7 +158,8 @@ export function HeatCube({ params, spin, hollow, version }: HeatCubeProps) {
       },
     })
     const face = new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: FACE_VERT, fragmentShader: FACE })
-    return { scene, cam, mesh, blur, combine, heat, face }
+    const copy = new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: QUAD_VERT, fragmentShader: COPY, uniforms: { t: { value: null } } })
+    return { scene, cam, mesh, blur, combine, heat, face, copy }
   }, [])
 
   useEffect(
@@ -240,6 +248,13 @@ export function HeatCube({ params, spin, hollow, version }: HeatCubeProps) {
     quad.combine.uniforms.mask.value = R.mask.texture
     pass(quad.combine, R.combined)
 
+    if (debug !== 'off') {
+      quad.copy.uniforms.t.value = (debug === 'mask' ? R.mask : R.combined).texture
+      quad.mesh.material = quad.copy
+      gl.setRenderTarget(null)
+      gl.render(quad.scene, quad.cam)
+      return
+    }
     // 3. their fragment shader over the screen
     quad.heat.uniforms.u_image.value = R.combined.texture
     quad.heat.uniforms.u_time.value = t
