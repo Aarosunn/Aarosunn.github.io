@@ -215,6 +215,7 @@ function finalFragment(shader: PaperShader) {
       l += u_grain * 0.35 * (fract(sin(dot(v_imageUV * 1000.0, vec2(12.9898, 78.233))) * 43758.5453123) - 0.5);
       l = pow(clamp(l, 0.0, 1.0), abs(u_rampGamma));
       if (u_rampGamma < 0.0) l = 1.0 - l;
+      l = mix(u_rampFloor, 1.0, l); // floor: the darkest chrome still lands on a visible stop, not the page colour
       float mixer = l * u_rampCount;
       vec4 g = u_ramp[0];
       for (int i = 1; i < 11; i++) {
@@ -231,7 +232,7 @@ function finalFragment(shader: PaperShader) {
   const marker = 'fragColor = vec4(color, opacity);'
   const i = src.lastIndexOf(marker)
   const body = src.slice(0, i + marker.length) + tail + src.slice(i + marker.length)
-  return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_grain;')
+  return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain;')
 }
 
 const rt = (size: number, depth = false, samples = 0) =>
@@ -257,6 +258,7 @@ const finalUniforms = (): Record<string, THREE.IUniform> => ({
   u_ramp: { value: new Float32Array(40) },
   u_rampCount: { value: 0 },
   u_rampGamma: { value: 1 },
+  u_rampFloor: { value: 0 },
   u_grain: { value: 0 },
   u_aspect: { value: 1 },
   u_scale: { value: 1 },
@@ -302,6 +304,7 @@ const applyParams = (u: Record<string, THREE.IUniform>, params: Record<string, u
   u.u_ramp.value = ramp
   u.u_rampCount.value = stops.length
   u.u_rampGamma.value = typeof params.rampGamma === 'number' ? params.rampGamma : 1
+  u.u_rampFloor.value = typeof params.rampFloor === 'number' ? params.rampFloor : 0
   u.u_grain.value = typeof params.grain === 'number' ? params.grain : 0
 }
 
@@ -468,6 +471,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     root.current.updateMatrixWorld()
     Q.face.uniforms.uRootInv.value.copy(root.current.matrixWorld).invert()
     const speed = typeof params.speed === 'number' ? (params.speed as number) : 1
+    const frame = typeof params.frame === 'number' ? (params.frame as number) : 0 // paper's time offset (seconds)
     const px = (r: number, w: number) => Math.max(1, Math.round((r / 1750) * w))
 
     // 1. mask, 2. their preprocess
@@ -529,7 +533,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     const u = Q.final.uniforms
     u.u_image.value = R.combined.texture
     u.u_mask.value = R.mask.texture
-    u.u_time.value = state.clock.elapsedTime * speed
+    u.u_time.value = state.clock.elapsedTime * speed + frame
     u.u_aspect.value = size.width / size.height
     u.u_resolution.value.set(size.width * gl.getPixelRatio(), size.height * gl.getPixelRatio())
     if (!(V.fuse && F && Q.final2)) {
@@ -544,7 +548,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     const u2 = Q.final2.uniforms
     u2.u_image.value = F.combined2.texture
     u2.u_mask.value = F.mask2.texture
-    u2.u_time.value = state.clock.elapsedTime * speed
+    u2.u_time.value = state.clock.elapsedTime * speed + frame
     u2.u_aspect.value = size.width / size.height
     u2.u_resolution.value.copy(u.u_resolution.value)
     pass(Q.final2, F.out2)

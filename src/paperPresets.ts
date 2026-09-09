@@ -33,10 +33,11 @@ const OWN: Record<PaperShader, PaperPreset[]> = {
     { name: 'ice', params: { colorBack: '#07090c', colorTint: '#bfe0ff', softness: 0.2, repetition: 2, shiftRed: 0.3, shiftBlue: 0.3, distortion: 0.07, contour: 0.4, angle: 70, speed: 0.6, scale: 0.6 } },
     { name: 'noir slow', params: { colorBack: '#000000', colorTint: '#a0a0a4', softness: 0.35, repetition: 1.5, shiftRed: 0, shiftBlue: 0, distortion: 0, contour: 0, angle: 90, speed: 0.45, scale: 0.6 } },
     { name: 'mint', params: { colorBack: '#07090c', colorTint: '#9de8d4', softness: 0.15, repetition: 2.5, shiftRed: 0.2, shiftBlue: 0.4, distortion: 0.05, contour: 0.5, angle: 60, speed: 0.6, scale: 0.6 } },
-    tinted('heatmap', PAPER_HEAT, { rampGamma: 1.2 }),
-    tinted('heatmap grain', PAPER_HEAT, { rampGamma: 1.2, grain: 0.3 }),
-    tinted('icemint', ICEMINT),
-    tinted('icemint grain', ICEMINT, { grain: 0.3 }),
+    // rampFloor keeps the darkest chrome on a visible stop instead of the page colour
+    tinted('heatmap', PAPER_HEAT, { rampGamma: 1.2, rampFloor: 0.12 }),
+    tinted('heatmap grain', PAPER_HEAT, { rampGamma: 1.2, rampFloor: 0.12, grain: 0.3 }),
+    tinted('icemint', ICEMINT, { rampFloor: 0.2 }),
+    tinted('icemint grain', ICEMINT, { rampFloor: 0.2, grain: 0.3 }),
   ],
   smoke: [
     smoke('icemint', ['#0b1a2a', '#8fb8ff', '#9de8d4']),
