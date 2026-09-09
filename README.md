@@ -17,6 +17,8 @@ Verification (needs the dev server; uses the NVIDIA GPU via PRIME):
 node scripts/papercube-shoot.mjs            # every version: frames, orbits, turn integrity, fps
 node scripts/papercube-shoot.mjs v1 --igpu  # integrated GPU numbers
 node scripts/site-shoot.mjs                 # the site at 1440 / 1024 / 420
+node scripts/site-sweep.mjs                 # site cube: every layer turn per theme, mid-turn frames -> shots/site-sweep
+node scripts/site-rec.mjs --secs 20          # site cube: a recording per theme split into frames -> shots/site-rec
 node scripts/site-fps.mjs                   # site fps, RTX vs integrated
 node scripts/site-video.mjs                 # 30 s tour -> shots/site/tour.webm
 node scripts/sheet.mjs out.png a.png b.png  # contact sheet

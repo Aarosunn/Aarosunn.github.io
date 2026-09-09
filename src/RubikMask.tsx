@@ -68,6 +68,14 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
       for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) out.push(new THREE.Vector3(x, y, z))
       return out
     }, [])
+    // inline ref callbacks run again on every re-render (the site re-renders on each deck step): only a new mesh
+    // gets a fresh record, or the logical slot would reset to the starting cell and later turns would pick the
+    // wrong nine cubies and snap them to the wrong slots
+    const track = (i: number, m: THREE.Mesh | null) => {
+      if (!m) return
+      if (cubies.current[i]?.mesh !== m) cubies.current[i] = { mesh: m, pos: cells[i].clone() }
+      m.onBeforeRender = tagId(i)
+    }
 
     const turn = useMemo<RubikHandle['turn']>(
       () => (axis, layer, dir) => {
@@ -157,24 +165,14 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
               smoothness={3}
               position={[p.x * gap, p.y * gap, p.z * gap]}
               material={material}
-              ref={(m: THREE.Mesh | null) => {
-                if (m) {
-                  cubies.current[i] = { mesh: m, pos: p.clone() }
-                  m.onBeforeRender = tagId(i)
-                }
-              }}
+              ref={(m: THREE.Mesh | null) => track(i, m)}
             />
           ) : (
             <mesh
               key={i}
               position={[p.x * gap, p.y * gap, p.z * gap]}
               material={material}
-              ref={(m) => {
-                if (m) {
-                  cubies.current[i] = { mesh: m, pos: p.clone() }
-                  m.onBeforeRender = tagId(i)
-                }
-              }}
+              ref={(m) => track(i, m)}
             >
               <boxGeometry args={[1, 1, 1]} />
             </mesh>

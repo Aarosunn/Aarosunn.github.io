@@ -60,6 +60,8 @@ export function Site({ version: initial = 'v14', scheme = 'icemint', bg = '#0709
   const [layout, setLayout] = useState<'corners' | 'deck'>('corners')
   const [siteTheme, setSiteTheme] = useState(SITE_THEMES[2][0])
   const rubik = useRef<RubikHandle | null>(null)
+  // review hook: the Playwright sweeps drive the site's own cube (App's __aar only reaches the lab cube)
+  useEffect(() => { window.__aarSite = rubik }, [])
   // the lab's v1 at its own camera (blur radii are frame-relative, so the cube stays crisp);
   // paper's `scale` shrinks the whole image on screen so the sections breathe
   const narrow = typeof window !== 'undefined' && window.innerWidth < 900
@@ -215,4 +217,10 @@ export function Site({ version: initial = 'v14', scheme = 'icemint', bg = '#0709
       </div>
     </>
   )
+}
+
+declare global {
+  interface Window {
+    __aarSite: React.RefObject<RubikHandle | null>
+  }
 }
