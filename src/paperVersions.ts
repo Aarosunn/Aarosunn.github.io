@@ -99,6 +99,7 @@ export const PAPER_VERSIONS: PaperVersion[] = [
   { ...base, name: 'v32', shader: 'heat', shape: 'rubik', rubikGap: 1.03, seam: 0.035, camZ: 20, polarity: 'inverted', halo: false, shade: 0.5, preset: 'icemint', note: 'inverted polarity (the old v2 idea through the new pipeline): the band sweeps the faces, seams dark' },
   { ...base, name: 'v33', shader: 'heat', shape: 'rubik', rubikGap: 1.03, rubikRound: 0.08, seam: 0.035, camZ: 20, preset: 'icemint', note: 'rounded cubies (r .08): the bevel widens the painted seam into pillowed tiles with broad glowing gaps' },
   { ...base, name: 'v34', shader: 'heat', shape: 'rubik', rubikGap: 1.03, rubikRound: 0.06, seam: 0.012, camZ: 20, preset: 'icemint', note: 'rounded cubies with a hairline seam: softer corners, thin glow' },
+  { ...base, name: 'v35', shader: 'liquid', shape: 'rubik', field: 'poisson', rubikRound: 0.07, seam: 0.03, camZ: 11, shade: 0.35, preset: 'ice', note: 'liquid metal on rounded cubies, Poisson per cubie: 27 chrome pillows' },
 ]
 
 export const VERSION_OF = (name: string) => PAPER_VERSIONS.find((v) => v.name === name)

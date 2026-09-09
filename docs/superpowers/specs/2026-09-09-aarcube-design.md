@@ -141,3 +141,7 @@ Third sonnet review: touch-orbiting the cube no longer counts as a swipe (target
 ## v33–v34 rounded cubies (04:30)
 
 `rubikRound` swaps cubies for drei RoundedBox. Its uv puts the bevel at the face border, so the painted seam widens across the bevel: v33 (r .08, seam .035) = pillowed tiles with broad glowing gaps; v34 (r .06, seam .012) = soft corners, thin glow. The glass panel now emerges from the cube's side (scale .72, blur 6px → in place); shader-cube tab opens on v10.
+
+## v35 (04:35)
+
+Liquid metal on rounded cubies with per-cubie Poisson (seams cut the alpha): 27 icy chrome pillows, continuous through turns. Site cycle now includes v34.
