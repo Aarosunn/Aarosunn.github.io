@@ -104,21 +104,19 @@ export function Site({ version: initial = 'v10' }: { version?: string }) {
             <h2>{s.title}</h2>
             <p>{s.blurb}</p>
             <ul>
-              {s.items.map((it, j) => (
-                <li key={it}>
-                  <button
-                    className="item"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setActive(i)
-                      setOpen({ section: i, item: j })
-                      rubik.current?.turn()
-                    }}
-                  >
+              {s.items.map((it, j) => {
+                const openIt = (e: React.SyntheticEvent) => {
+                  e.stopPropagation()
+                  setActive(i)
+                  setOpen({ section: i, item: j })
+                  rubik.current?.turn()
+                }
+                return (
+                  <li key={it} role="button" tabIndex={0} onClick={openIt} onKeyDown={(e) => e.key === 'Enter' && openIt(e)}>
                     {it}
-                  </button>
-                </li>
-              ))}
+                  </li>
+                )
+              })}
             </ul>
           </section>
         ))}

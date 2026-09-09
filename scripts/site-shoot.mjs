@@ -20,7 +20,7 @@ for (const [w, h] of [[1440, 900], [1024, 700], [420, 820]]) {
   await page.keyboard.press('3')
   await page.waitForTimeout(900)
   await page.screenshot({ path: `shots/site/${w}-2.png` })
-  await page.click('.sec.on .item')
+  await page.click('.sec.on li')
   await page.waitForTimeout(900)
   await page.screenshot({ path: `shots/site/${w}-panel.png` })
   await page.keyboard.press('Escape')

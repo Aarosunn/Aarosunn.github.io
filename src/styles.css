@@ -438,16 +438,13 @@ button:focus-visible {
 .deck button:hover i {
   background: var(--mute);
 }
-.sec .item {
-  display: inline;
-  border: 0;
-  padding: 0;
-  color: inherit;
-  text-align: inherit;
-  letter-spacing: inherit;
+.sec li {
+  cursor: pointer;
 }
-.sec .item:hover {
+.sec li:hover,
+.sec li:focus-visible {
   color: var(--bright);
+  outline: none;
 }
 
 /* glass detail panel beside the cube: the cube's glow is the light behind the glass */
