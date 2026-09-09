@@ -35,3 +35,6 @@ Both iterations coexist, switchable in the UI and via keys `s` (shape) / `v` (se
 - v2 patterns use per-cubie rest-space uniforms (`uRot`/`uPos`, one material per cubie) so the skin rides with a turning slice. Never define surface patterns in root space again.
 - `float` toggle restores the old bob, default off. `icemint` scheme added (ice top-left, mint bottom-right).
 - `node scripts/shoot.mjs [--all]` shoots set x shape x material on icemint + paper (all schemes with `--all`) and asserts integrity for both sets.
+
+## Sets are additive (rule, 2026-09-09)
+A new iteration is a new set file (`src/materials/v4.ts`, `SETS` entry, env/bloom branch in App). An existing set is never edited in place; Aaron compares them side by side. Current: v1 (first shaders), v2 (paper trio on physical bases, rest-slot patterns), v3 (deeper heat, graded metal env with rainbow fringe, 3D marble smoke, fields in cube space so turns never pop).

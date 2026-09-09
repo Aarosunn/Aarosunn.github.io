@@ -33,7 +33,7 @@ const schemes = process.argv.includes('--all')
 const variants = ['heat', 'chrome', 'smoke']
 const state = () => page.$$eval('button.on', (b) => b.map((x) => x.textContent))
 
-for (const set of ['v1', 'v2']) {
+for (const set of ['v1', 'v2', 'v3']) {
   await page.evaluate((v) => window.__aar.setSet(v), set)
   for (const shape of ['classic', 'solid']) {
     await page.evaluate((v) => window.__aar.setShape(v), shape)
@@ -53,7 +53,7 @@ const fps = await page.evaluate(() => document.querySelector('.readout span:nth-
 console.log(fps)
 
 // Turn check per set: mid-turn frame + integrity after 12 turns.
-for (const set of ['v1', 'v2']) {
+for (const set of ['v1', 'v2', 'v3']) {
   await page.evaluate((v) => {
     window.__aar.setSet(v)
     window.__aar.setShape('solid')

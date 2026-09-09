@@ -61,7 +61,8 @@ function stripes(c1: number, c2: number, p: number, w: number[], blur: number, b
   return mix(ch, g, sst(border, border + 0.5 * blur, p))
 }
 
-function liquidTexture(a: string, b: string) {
+// v2: flat white body, narrow dispersion. v3: graded body (metal reads as metal), wider rainbow fringe.
+function liquidTexture(a: string, b: string, graded: boolean) {
   const W = 512, H = 512
   const canvas = document.createElement('canvas')
   canvas.width = W
@@ -74,14 +75,15 @@ function liquidTexture(a: string, b: string) {
     const t = Math.min(Math.max((x - lo) / (hi - lo), 0), 1)
     return t * t * (3 - 2 * t)
   }
-  const rep = 2, softness = 0.1, shiftR = 0.55, shiftB = 0.55
+  const rep = 2, softness = 0.1
+  const shiftR = graded ? 0.55 : 0.3, shiftB = shiftR
   const fract = (x: number) => x - Math.floor(x)
   for (let y = 0; y < H; y++) {
     const lat = y / H
     // metal reads as metal when the sky is bright and the ground is dark: a graded body, not flat white
-    const body = mix(0.97, 0.42, sst(0.35, 1, lat))
+    const body = graded ? mix(0.97, 0.42, sst(0.35, 1, lat)) : 0.98
     const c1 = [body, body, body * 1.02].map((v, i) => v * 0.93 + [ca.r, ca.g, ca.b][i] * 0.07)
-    const c2 = [0.03, 0.03, 0.045].map((v, i) => v * 0.9 + [cb.r, cb.g, cb.b][i] * 0.1)
+    const c2 = (graded ? [0.03, 0.03, 0.045] : [0.08, 0.08, 0.1]).map((v, i) => v * 0.9 + [cb.r, cb.g, cb.b][i] * 0.1)
     const bump = 1 - Math.abs(lat - 0.5) * 1.6
     const w = [0.12 * (1 - 0.4 * bump), 0.07 * (1 + 0.4 * bump), 0]
     w[2] = 1 - w[0] - w[1]
@@ -107,8 +109,8 @@ function liquidTexture(a: string, b: string) {
   return tex
 }
 
-function LiquidEnv({ s }: { s: Scheme }) {
-  const tex = useMemo(() => liquidTexture(s.a, s.b), [s])
+function LiquidEnv({ s, graded }: { s: Scheme; graded: boolean }) {
+  const tex = useMemo(() => liquidTexture(s.a, s.b, graded), [s, graded])
   useEffect(() => () => tex.dispose(), [tex])
   const scene = useThree((st) => st.scene)
   useFrame((st) => {
@@ -152,7 +154,7 @@ export default function App() {
       if (e.key === 'c') setSi((i) => (i + 1) % SCHEMES.length)
       if (e.key === 'm') setVariant((v) => VARIANTS[(VARIANTS.indexOf(v) + 1) % VARIANTS.length])
       if (e.key === 's') setShape((v) => (v === 'classic' ? 'solid' : 'classic'))
-      if (e.key === 'v') setSet((v) => (v === 'v1' ? 'v2' : 'v1'))
+      if (e.key === 'v') setSet((v) => SETS[(SETS.indexOf(v) + 1) % SETS.length])
       if (e.key === 't') setAuto((v) => !v)
       if (e.key === ' ') {
         e.preventDefault()
@@ -173,7 +175,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const bloom = { heat: [1.6, 0.5], chrome: [0.2, 0.95], smoke: [0.3, 0.9] }[variant]
+  const bloom = { heat: set === 'v3' ? [1.6, 0.5] : [1.2, 0.7], chrome: [0.2, 0.95], smoke: [0.3, 0.9] }[variant]
 
   return (
     <>
@@ -184,11 +186,11 @@ export default function App() {
       >
         <color attach="background" args={[s.bg]} />
         <Cube shape={shape} set={set} variant={variant} palette={s} auto={auto} float={float} onTurn={onTurn} handle={cube} />
-        {set === 'v2' && variant === 'chrome' ? (
-          <LiquidEnv s={s} />
+        {set !== 'v1' && variant === 'chrome' ? (
+          <LiquidEnv s={s} graded={set === 'v3'} />
         ) : (
-          // v2 smoke is a diffuse stone with no scene lights, so it needs a brighter dome to read as glass
-          <StudioEnv s={s} dome={set === 'v2' && variant === 'smoke' ? '#b4b6bf' : '#2b2e35'} />
+          // v2/v3 smoke is a diffuse stone with no scene lights, so it needs a brighter dome to read as glass
+          <StudioEnv s={s} dome={set !== 'v1' && variant === 'smoke' ? '#b4b6bf' : '#2b2e35'} />
         )}
         <EffectComposer>
           <Bloom mipmapBlur intensity={bloom[0]} luminanceThreshold={bloom[1]} luminanceSmoothing={0.3} />

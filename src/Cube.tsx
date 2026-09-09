@@ -4,12 +4,13 @@ import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
 import { makeMaterial, type Variant } from './materials/v1'
-import { makeShared, makeV2, type Palette, type V2Material } from './materials/v2'
+import { makeV2, type Palette, type V2Material } from './materials/v2'
+import { makeShared, makeV3 } from './materials/v3'
 
 export type Shape = 'classic' | 'solid'
-export type Set = 'v1' | 'v2'
+export type Set = 'v1' | 'v2' | 'v3'
 export const SHAPES: Shape[] = ['classic', 'solid']
-export const SETS: Set[] = ['v1', 'v2']
+export const SETS: Set[] = ['v1', 'v2', 'v3']
 
 // classic = first iteration exactly: rounded, gapped. solid = rounded corners, touching; the bevels are the seams.
 const SHAPE = {
@@ -45,21 +46,24 @@ export function Cube({ shape, set, variant, palette, auto, float, onTurn, handle
   const busy = useRef(false)
   const { gap, radius } = SHAPE[shape]
 
-  // v1: one shared material, as shipped. v2: one per cubie so rest-space uniforms can differ.
+  // v1: one shared material, as shipped. v2/v3: one per cubie so rest-slot uniforms can differ.
+  // Sets are additive: a new iteration is a new set, an old set is never edited in place.
   const shared = useMemo(makeShared, [])
   const mats = useMemo<THREE.Material[]>(
     () =>
       set === 'v1'
         ? [makeMaterial(variant, palette.a, palette.b, palette.bg)]
-        : Array.from({ length: 27 }, () => makeV2(variant, palette, gap + 0.5, shared)),
+        : Array.from({ length: 27 }, () =>
+            set === 'v2' ? makeV2(variant, palette, gap + 0.5) : makeV3(variant, palette, gap + 0.5, shared),
+          ),
     [set, variant, palette, gap, shared],
   )
   useEffect(() => () => mats.forEach((m) => m.dispose()), [mats])
 
-  // Push each cubie's snapped orientation + slot into its v2 material.
+  // Push each cubie's snapped orientation + slot into its v2/v3 material.
   const syncRest = useMemo(
     () => () => {
-      if (set !== 'v2') return
+      if (set === 'v1') return
       cubies.current.forEach((c, i) => {
         const u = (mats[i] as V2Material).u
         u.uRot.value.setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(c.mesh.quaternion))
@@ -144,8 +148,10 @@ export function Cube({ shape, set, variant, palette, auto, float, onTurn, handle
     root.current.updateMatrixWorld()
     shared.uTime.value = s.clock.elapsedTime
     shared.uRootInv.value.copy(root.current.matrixWorld).invert()
-    const v1 = (mats[0] as THREE.ShaderMaterial).uniforms
-    if (v1) v1.uTime.value = s.clock.elapsedTime
+    for (const m of mats) {
+      const u = (m as THREE.ShaderMaterial).uniforms ?? (m as V2Material).u
+      if (u?.uTime) u.uTime.value = s.clock.elapsedTime
+    }
   })
 
   const coords = useMemo(() => {
