@@ -83,6 +83,13 @@ export const FLORAL_VERSIONS: FloralVersion[] = [
       { flower: 'orchid', at: [0.05, -0.52, 0.35], scale: 0.52, gain: 1 },
     ] },
     note: 'v13 as an exact arrangement, no seeds: rose, the lotus turned to face away, a smaller orchid, close together, rose and lotus dimmed to the orchid\'s level, no stems' },
+  { ...base, name: 'v15', kind: 'mesh', ruler: false, foliage: false, buds: false, pollen: false, wire: 0.12, fresnel: { power: 2.8, gain: 0.9, base: 0.015 }, irid: 0.25, blur: 2.5, dim: 0.55,
+    scene: { flowers: [], ground: 'off', camDist: 4.6, place: [
+      { flower: 'rose', at: [-0.42, 0.04, 0], scale: 0.8, rot: [-0.45, 0, 0.4], gain: 0.3, wire: 0.3 },
+      { flower: 'lotus', at: [0.42, 0.06, -0.2], scale: 0.8, rot: [0, 1.15, 0], gain: 0.26, wire: 0.35 },
+      { flower: 'orchid', at: [0.02, -0.46, 0.35], scale: 0.58, gain: 1 },
+    ] },
+    note: 'v14 closer together: the lotus facing right, the rose facing up and to the left, the orchid a touch bigger' },
   { ...base, name: 'v12', kind: 'mesh', ruler: false, scheme: 'mint', placement: 'bottom', scene: { flowers: ['peony', 'tulip', 'poppy', 'rose', 'lotus'], ground: 'grid', layers: 3, density: 0.55, height: 0.7 }, buds: false, wire: 0.07, fresnel: { power: 3.2, gain: 0.32, base: 0.004 }, irid: 0.2, blur: 2.2, dim: 0.45, centreGlow: 0.3, petalWhite: 0.1, rimWhite: 0.55, note: 'the bed along the bottom of the page: peony, tulip, poppy, rose, lotus in three layers across the full width, dimmer and less glowy, the mint kept' },
   { ...base, name: 'v11', kind: 'mesh', ruler: false, scheme: 'mint', scene: { flowers: ['peony', 'tulip', 'poppy', 'rose', 'bell', 'lotus', 'iris'], ground: 'grid', layers: 3 }, buds: false, wire: 0.12, fresnel: { power: 2.8, gain: 0.7, base: 0.01 }, irid: 0.2, blur: 2.2, dim: 0.55, centreGlow: 0.8, petalWhite: 0.2, note: 'on the ground: seven kinds of flower planted in three overlapping depth layers on a faint wire ground, the mint scheme\'s ghost x-ray, foliage soft, no buds' },
 ]
