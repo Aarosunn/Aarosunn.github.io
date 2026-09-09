@@ -50,7 +50,7 @@ const SECTIONS: Section[] = [
 const HEAT_OF_SCHEME: Record<string, string> = { icemint: 'icemint', ice: 'icemint', mint: 'icemint', ember: 'ember', graphite: 'graphite', aura: 'default', paper: 'sepia' }
 
 /** cube versions worth comparing in place; key `v` cycles. Versions whose own preset is light get a dark one here. */
-const SITE_VERSIONS = ['v10', 'v16', 'v19', 'v20', 'v13', 'v18', 'v24', 'v17']
+const SITE_VERSIONS = ['v10', 'v16', 'v19', 'v20', 'v27', 'v13', 'v18', 'v24', 'v17']
 const SITE_PRESET: Record<string, string> = { v24: 'ice' }
 
 export function Site({ version: initial = 'v10', scheme = 'icemint' }: { version?: string; scheme?: string }) {
@@ -98,11 +98,22 @@ export function Site({ version: initial = 'v10', scheme = 'icemint' }: { version
       last = performance.now()
       stepRef.current(activeRef.current + (e.deltaY > 0 ? 1 : -1))
     }
+    // touch: a horizontal swipe steps the deck
+    let x0 = 0
+    const ts = (e: TouchEvent) => { x0 = e.touches[0].clientX }
+    const te = (e: TouchEvent) => {
+      const dx = e.changedTouches[0].clientX - x0
+      if (Math.abs(dx) > 48) stepRef.current(activeRef.current + (dx < 0 ? 1 : -1))
+    }
     window.addEventListener('keydown', f)
     window.addEventListener('wheel', w, { passive: true })
+    window.addEventListener('touchstart', ts, { passive: true })
+    window.addEventListener('touchend', te, { passive: true })
     return () => {
       window.removeEventListener('keydown', f)
       window.removeEventListener('wheel', w)
+      window.removeEventListener('touchstart', ts)
+      window.removeEventListener('touchend', te)
     }
   }, [])
   const activeRef = useRef(active)
