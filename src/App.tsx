@@ -254,7 +254,7 @@ export default function App() {
   if (tab === 'site')
     return (
       <>
-        <Site scheme={s.name} />
+        <Site scheme={s.name} bg={s.bg} />
         <div className="site-tabs">{tabs}</div>
       </>
     )

@@ -125,3 +125,7 @@ Clicking an item opens a glass panel (backdrop blur 18px over the cube's glow, 5
 ## v30–v31, presets, iGPU path (04:05)
 
 Presets: icemint grain (noise .3), icemint diagonal (angle 40). v30 gem smoke Rubik's per cubie with the outer plume kept on the dark scheme. `bigDiv` (2 | 4) runs heat's big blur at quarter res: v31 = v16 with bigDiv 4, same look, integrated GPU 41 → 48 fps; the site uses it under 900px along with the 768 mask. Old cube tab re-verified with `shoot.mjs` (all sets, 12 turns, integrity ok) after making it switch tabs first.
+
+## Site: scheme background is the shader background (04:12)
+
+The canvas paints paper's `colorBack`, so a light scheme was black behind dark text. The site now passes the scheme's `bg` as `colorBack`; `paper` renders a light page with the sepia cube (grain and all), `graphite` a monochrome one. All seven schemes verified (`shots/site/scheme-*.png`).

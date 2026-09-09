@@ -53,7 +53,7 @@ const HEAT_OF_SCHEME: Record<string, string> = { icemint: 'icemint', ice: 'icemi
 const SITE_VERSIONS = ['v10', 'v16', 'v19', 'v20', 'v27', 'v13', 'v18', 'v24', 'v17']
 const SITE_PRESET: Record<string, string> = { v24: 'ice' }
 
-export function Site({ version: initial = 'v10', scheme = 'icemint' }: { version?: string; scheme?: string }) {
+export function Site({ version: initial = 'v10', scheme = 'icemint', bg = '#07090c' }: { version?: string; scheme?: string; bg?: string }) {
   const [active, setActive] = useState(0)
   const [version, setVersion] = useState(initial)
   const [open, setOpen] = useState<{ section: number; item: number } | null>(null)
@@ -67,8 +67,9 @@ export function Site({ version: initial = 'v10', scheme = 'icemint' }: { version
     const presets = PRESETS_OF[PV.shader]
     const want = SITE_PRESET[version] ?? (PV.shader === 'heat' && PV.preset === undefined ? HEAT_OF_SCHEME[scheme] : PV.preset)
     const base = (presets.find((p) => p.name.toLowerCase() === want) ?? presets[0]).params as Record<string, unknown>
-    return { ...base, ...(PV.shader === 'heat' ? { outerGlow: 0.42, contour: 0.75 } : {}), scale: (narrow ? 0.7 : 0.85) * (base.scale as number) }
-  }, [PV, narrow, scheme, version])
+    // the page is the shader's background, so the scheme's bg is paper's colorBack
+    return { ...base, ...(PV.shader === 'heat' ? { outerGlow: 0.42, contour: 0.75 } : {}), colorBack: bg, scale: (narrow ? 0.7 : 0.85) * (base.scale as number) }
+  }, [PV, narrow, scheme, version, bg])
 
   // deck stepping: arrows / digits; every step turns one layer
   const step = (i: number) => {
