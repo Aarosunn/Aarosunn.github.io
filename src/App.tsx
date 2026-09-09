@@ -62,24 +62,29 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const bloom = variant === 'heat' ? 1.1 : variant === 'chrome' ? 0.35 : 0.5
+  const bloom = variant === 'heat' ? 1.1 : variant === 'chrome' ? 0.2 : 0.4
 
   return (
     <>
       <Canvas
         dpr={[1, 1.5]}
-        camera={{ position: [0, 0, 9.5], fov: 32 }}
+        camera={{ position: [0, 0, 13], fov: 32 }}
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
       >
         <color attach="background" args={[s.bg]} />
         <Cube variant={variant} a={s.a} b={s.b} bg={s.bg} auto={auto} onTurn={onTurn} handle={cube} />
         <Environment resolution={256}>
-          {/* studio strip lights: gives liquid-metal banding on chrome */}
-          <Lightformer intensity={4} position={[0, 5, -9]} scale={[10, 1, 1]} />
-          <Lightformer intensity={2} position={[-5, 1, -1]} rotation-y={Math.PI / 2} scale={[8, 0.6, 1]} />
-          <Lightformer intensity={2} position={[6, -1, 2]} rotation-y={-Math.PI / 2} scale={[8, 0.4, 1]} />
-          <Lightformer intensity={1.2} color={s.a} position={[0, -6, 3]} scale={[6, 1, 1]} />
-          <Lightformer intensity={0.8} color={s.b} position={[3, 3, 5]} scale={[3, 3, 1]} />
+          {/* soft grey dome = silver body; strips = liquid-metal banding; scheme colours tint the horizon */}
+          <mesh scale={60}>
+            <sphereGeometry args={[1, 32, 16]} />
+            <meshBasicMaterial color="#2b2e35" side={THREE.BackSide} />
+          </mesh>
+          <Lightformer form="ring" intensity={2.5} position={[0, 8, -6]} scale={9} />
+          <Lightformer intensity={2} position={[0, 4, 8]} scale={[12, 1.2, 1]} />
+          <Lightformer intensity={1.5} position={[-8, 0, 2]} rotation-y={Math.PI / 2} scale={[10, 0.7, 1]} />
+          <Lightformer intensity={1.5} position={[8, -1, 0]} rotation-y={-Math.PI / 2} scale={[10, 0.5, 1]} />
+          <Lightformer intensity={2} color={s.a} position={[0, -7, 2]} scale={[12, 2, 1]} />
+          <Lightformer intensity={1.2} color={s.b} position={[5, 5, -3]} scale={[4, 4, 1]} />
         </Environment>
         <EffectComposer>
           <Bloom mipmapBlur intensity={bloom} luminanceThreshold={0.75} luminanceSmoothing={0.3} />

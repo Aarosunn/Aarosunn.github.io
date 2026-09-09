@@ -61,10 +61,10 @@ const heatFrag = /* glsl */ `
   void main() {
     float fres = pow(1.0 - max(dot(vNormal, vView), 0.0), 2.5);
     float n = fbm(vWorld * 1.4 + vec3(0.0, -uTime * 0.25, uTime * 0.1));
-    float t = 0.42 + vWorld.y * 0.28 + fres * 0.35 + (n - 0.5) * 0.35;
-    vec3 c = turbo(t);
+    float t = 0.5 + vWorld.y * 0.26 + fres * 0.35 + (n - 0.5) * 0.35;
+    vec3 c = turbo(max(t, 0.12));
     // hotter regions push past 1.0 so bloom picks them up
-    c *= 0.55 + smoothstep(0.55, 1.0, t) * 1.6;
+    c *= 0.7 + smoothstep(0.55, 1.0, t) * 1.5;
     gl_FragColor = vec4(c, 1.0);
   }
 `
@@ -80,7 +80,7 @@ const smokeFrag = /* glsl */ `
     float veins = smoothstep(0.35, 0.7, q);
     vec3 glass = mix(uBg, uA, 0.35);
     vec3 col = mix(glass, mix(uB, uA, q), veins * 0.8);
-    col += fres * 0.55;
+    col += fres * 0.4;
     float alpha = 0.72 + fres * 0.28;
     gl_FragColor = vec4(col, alpha);
   }
@@ -91,11 +91,11 @@ export function makeMaterial(variant: Variant, a: string, b: string, bg: string)
     return new THREE.MeshPhysicalMaterial({
       color: '#ffffff',
       metalness: 1,
-      roughness: 0.12,
-      iridescence: 1,
-      iridescenceIOR: 1.35,
-      iridescenceThicknessRange: [120, 480],
-      envMapIntensity: 1.4,
+      roughness: 0.18,
+      iridescence: 0.9,
+      iridescenceIOR: 1.6,
+      iridescenceThicknessRange: [200, 600],
+      envMapIntensity: 1.2,
     })
   }
   const uniforms = {

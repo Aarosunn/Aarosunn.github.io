@@ -7,12 +7,23 @@ const url = process.argv[2] ?? 'http://localhost:5173/'
 const out = 'shots'
 mkdirSync(out, { recursive: true })
 
-const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
+// Full Chromium (new headless) so the real GPU renders; the headless shell falls back to SwiftShader at ~2 fps.
+const browser = await chromium.launch({
+  channel: 'chromium',
+  args: ['--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--use-gl=angle', '--use-angle=gl'],
+})
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 page.on('pageerror', (e) => console.error('pageerror', e.message))
 await page.goto(url)
 await page.waitForFunction(() => window.__aar && window.__aar.positions().length === 27)
 await page.waitForTimeout(2200) // entrance
+const fps = await page.evaluate(() => document.querySelector('.readout span:nth-child(4)')?.textContent)
+const gpu = await page.evaluate(() => {
+  const gl = document.createElement('canvas').getContext('webgl2')
+  const ext = gl?.getExtension('WEBGL_debug_renderer_info')
+  return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'unknown'
+})
+console.log(`renderer: ${gpu}\n${fps}`)
 
 const schemes = ['ice', 'aura', 'ember', 'graphite', 'mint', 'paper']
 const variants = ['heat', 'chrome', 'smoke']
@@ -21,6 +32,8 @@ for (const v of variants) {
   for (const s of schemes) {
     await page.evaluate((s) => window.__aar.setScheme(s), s)
     await page.waitForTimeout(800)
+    const on = await page.$$eval('button.on', (b) => b.map((x) => x.textContent))
+    if (!on.includes(s) || !on.includes(v)) console.error(`state mismatch: want ${s}/${v}, DOM says ${on}`)
     await page.screenshot({ path: `${out}/${v}-${s}.png` })
   }
 }
