@@ -69,3 +69,12 @@ Aaron on v1: gaps between the sides, low quality, no background. v2: 1024 MSAA m
 - Versions: v3 heat box (site-faithful), v4 heat cage (hidden-line strokes), v5 liquid box, v6 smoke box, v7 heat no-halo shaded, v8 liquid shaded, v9 smoke no outer smoke. Shape row: box / rounded / octa / cage. Preset row = the shader's site presets. 61 fps on the RTX for all.
 - Findings: paper's heatmap "shape" is solid (diamond.svg is a filled polygon); the moving band is the gap between three animated shadow blobs. Seam bars must be inset or they double the silhouette. Liquid/smoke want the object at ~75% of the image frame (camZ 3.9); heat wants it inside the central 57% (camZ 7).
 - v1 "broken": renders after ~600 ms warm-up; the seam gap at some orbit angles came from bars protruding past the silhouette.
+
+## Shader cube v10–v15: the Rubik's cube as the mask (04:20)
+
+`src/RubikMask.tsx`: 27 cubies sharing the mask material, pivot-attach quarter turns (same as Cube.tsx), `__aar.paperTurn / paperPositions / paperBusy`, integrity asserted after 12 random turns in `scripts/papercube-shoot.mjs`.
+- Seams: cubie gaps never show (inner cubies occlude the background), so the face shader paints a hairline of the opposite luminance along every cubie face border (`uSeam`, uv units). Heat then rims every cubie edge; through a turn the rotating layer keeps its own seams.
+- Field for liquid/smoke on the Rubik's: `field: 'cube'` = one plate per whole cube face computed in cube space (`uRootInv * modelMatrix`), so the turning layer's plate rotates with it and splits/re-merges without a pop; `field: 'face'` = one plate per cubie face (chrome-button grid).
+- Final pass clips to the mask frame (`inFrame`) so an object that spills past the square mask no longer smears via clamp-to-edge.
+- Camera: heat maps the mask through paper's central-57% window and scale .75, so the object must be ~2.3× farther than it looks (rubik camZ 20); liquid/smoke (scale .6) camZ 11.
+- v10 heat rubik (halo), v11 liquid rubik cube-plates, v12 smoke rubik cube-plates no halo, v13 heat rubik no halo, v14 liquid rubik cubie-plates, v15 smoke rubik cubie-plates. All 61 fps, integrity ok. v10/v13 are the strongest: the heatmap language on the actual Rubik's cube.

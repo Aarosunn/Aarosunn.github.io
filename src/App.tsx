@@ -8,11 +8,12 @@ import { SCHEMES, type Scheme } from './schemes'
 import { Paper } from './Paper'
 import { HeatCube, type HeatDebug, type HeatVersion } from './HeatCube'
 import { PaperCube } from './PaperCube'
+import type { RubikHandle } from './RubikMask'
 import { PAPER_VERSIONS, VERSION_OF, type PaperShader, type PaperShape } from './paperVersions'
 import { gemSmokePresets, heatmapPresets, liquidMetalPresets } from '@paper-design/shaders-react'
 
 const PRESETS_OF: Record<PaperShader, { name: string; params: object }[]> = { heat: heatmapPresets, liquid: liquidMetalPresets, smoke: gemSmokePresets }
-const PAPER_SHAPES: PaperShape[] = ['box', 'rounded', 'octa', 'cage']
+const PAPER_SHAPES: PaperShape[] = ['box', 'rounded', 'octa', 'cage', 'rubik']
 
 // FPS sampler lives inside the canvas; reports out twice a second.
 function Fps({ onFps }: { onFps: (n: number) => void }) {
@@ -151,6 +152,8 @@ export default function App() {
   const [heatVersion, setHeatVersion] = useState<string>('v3')
   const [heatDebug, setHeatDebug] = useState<HeatDebug>('off')
   const [heatShape, setHeatShape] = useState<PaperShape | null>(null)
+  const [heatAuto, setHeatAuto] = useState(false)
+  const rubik = useRef<RubikHandle | null>(null)
   const [si, setSi] = useState(0)
   const [shape, setShape] = useState<Shape>('solid')
   const [set, setSet] = useState<Set>('v2')
@@ -198,6 +201,10 @@ export default function App() {
       setHeatDebug,
       setHeatPreset,
       setHeatShape,
+      setHeatAuto,
+      paperTurn: (...args: Parameters<RubikHandle['turn']>) => rubik.current?.turn(...args) ?? Promise.resolve(),
+      paperPositions: () => rubik.current?.positions() ?? [],
+      paperBusy: () => rubik.current?.busy() ?? false,
       setScheme: (n: string) => setSi(Math.max(0, SCHEMES.findIndex((x) => x.name === n))),
       setVariant,
       setShape,
@@ -245,7 +252,7 @@ export default function App() {
           {legacy ? (
             <HeatCube params={preset.params} spin={heatSpin} hollow={heatHollow} version={heatVersion as HeatVersion} debug={heatDebug} />
           ) : (
-            <PaperCube version={PV} shape={heatShape ?? undefined} params={preset.params as Record<string, unknown>} spin={heatSpin} debug={heatDebug} />
+            <PaperCube version={PV} shape={heatShape ?? undefined} params={preset.params as Record<string, unknown>} spin={heatSpin} auto={heatAuto} debug={heatDebug} rubik={rubik} />
           )}
         </Canvas>
         <div className="ui">
@@ -264,6 +271,14 @@ export default function App() {
                 <button className={heatHollow ? 'on' : ''} onClick={() => setHeatHollow((v) => !v)}>
                   hollow
                 </button>
+              )}
+              {(heatShape ?? PV?.shape) === 'rubik' && (
+                <>
+                  <button className={heatAuto ? 'on' : ''} onClick={() => setHeatAuto((v) => !v)}>
+                    turning
+                  </button>
+                  <button onClick={() => rubik.current?.turn()}>turn</button>
+                </>
               )}
             </div>
           </div>
@@ -375,6 +390,10 @@ declare global {
       setHeatDebug: (v: HeatDebug) => void
       setHeatPreset: (i: number) => void
       setHeatShape: (s: PaperShape | null) => void
+      setHeatAuto: (b: boolean) => void
+      paperTurn: RubikHandle['turn']
+      paperPositions: () => number[][]
+      paperBusy: () => boolean
       setScheme: (n: string) => void
       setVariant: (v: AnyVariant) => void
       setShape: (v: Shape) => void

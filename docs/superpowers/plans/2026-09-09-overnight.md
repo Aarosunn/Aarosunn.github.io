@@ -5,16 +5,16 @@ Rules: every iteration = new version, nothing deleted; tsc → shoot → judge P
 Aaron's brief: "heat cube does not match the shaders at all, during the process it was closer; v1 is broken."
 
 ## P0 baseline
-- [ ] diagnose heatcube v1 break, fix, keep v1 exact
-- [ ] per-version config split (versions additive, like material sets)
-- [ ] reference frames: paper-ref.mjs for heatmap / liquid-metal / gem-smoke × presets
-- [ ] contact sheet script: reference vs cube side-by-side per version
+- [x] diagnose heatcube v1 break, fix, keep v1 exact
+- [x] per-version config split (versions additive, like material sets)
+- [x] reference frames: paper-ref.mjs for heatmap / liquid-metal / gem-smoke × presets
+- [x] contact sheet script: reference vs cube side-by-side per version
 
 ## P1 shaders on a shape (heatcube tab)
-- [ ] heatmap v3+: re-match reference (mask polarity, radii, seams, shade)
-- [ ] liquid metal on shape
-- [ ] gem smoke on shape
-- [ ] shape variants (box / rounded / cage / octahedron), preset play
+- [x] heatmap v3+: re-match reference (mask polarity, radii, seams, shade)
+- [x] liquid metal on shape
+- [x] gem smoke on shape
+- [x] shape variants (box / rounded / cage / octahedron), preset play
 
 ## P2 Rubik's cube as mask (cube tab)
 - [ ] v5 silhouette family: heat / liquid / smoke
@@ -29,3 +29,4 @@ Aaron's brief: "heat cube does not match the shaders at all, during the process 
 
 ## Log
 - 02:50 start
+- 03:58 commit: PaperCube v3-v9, all three shaders on 3D at 61fps. Next: Rubik's mask (P2)

@@ -36,6 +36,20 @@ for (const v of versions) {
     for (const s of ['rounded', 'octa', 'cage']) { await page.evaluate((s) => window.__aar.setHeatShape(s), s); await shot(`${v}-${s}`, 600) }
     await page.evaluate(() => window.__aar.setHeatShape(null))
   }
+  // rubik: turn continuity + integrity
+  if (await page.evaluate(() => window.__aar.paperPositions().length === 27)) {
+    await page.evaluate(() => window.__aar.setHeatDebug('off'))
+    await shot(`${v}-turn0before`, 300)
+    const p = page.evaluate(() => window.__aar.paperTurn('y', 1, 1))
+    await shot(`${v}-turn1mid`, 260)
+    await p
+    await shot(`${v}-turn2after`, 200)
+    for (let i = 0; i < 12; i++) await page.evaluate(() => window.__aar.paperTurn())
+    const pos = await page.evaluate(() => window.__aar.paperPositions())
+    const ok = new Set(pos.map((p) => p.join(','))).size === 27 && pos.every((p) => p.every((c) => Number.isInteger(c) && Math.abs(c) <= 1))
+    console.log(v, 'integrity after 12 turns:', ok ? 'ok' : 'BROKEN ' + JSON.stringify(pos))
+    await shot(`${v}-turn3later`, 200)
+  }
   const fps = await page.evaluate(() => new Promise((r) => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 < 1000) requestAnimationFrame(f); else r(n) }; requestAnimationFrame(f) }))
   console.log(v, 'fps', fps)
 }

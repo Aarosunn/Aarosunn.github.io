@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, RoundedBox } from '@react-three/drei'
+import { RubikMask, type RubikHandle } from './RubikMask'
 import * as THREE from 'three'
 import { gemSmokeFragmentShader, getShaderColorFromString, heatmapFragmentShader, liquidMetalFragmentShader } from '@paper-design/shaders'
 import type { PaperShader, PaperShape, PaperVersion } from './paperVersions'
@@ -68,23 +69,38 @@ const COPY = /* glsl */ `
 `
 // shape faces
 const FACE_VERT = /* glsl */ `
-  in vec3 position; in vec3 normal; in vec2 uv; out vec3 vN; out vec2 vUv;
-  uniform mat4 modelViewMatrix; uniform mat4 projectionMatrix; uniform mat3 normalMatrix;
-  void main() { vN = normalMatrix * normal; vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  in vec3 position; in vec3 normal; in vec2 uv; out vec3 vN; out vec2 vUv; out vec3 vCube; out vec3 vCubeN;
+  uniform mat4 modelViewMatrix; uniform mat4 projectionMatrix; uniform mat3 normalMatrix; uniform mat4 modelMatrix; uniform mat4 uRootInv;
+  void main() {
+    vN = normalMatrix * normal; vUv = uv;
+    mat4 toCube = uRootInv * modelMatrix;
+    vCube = (toCube * vec4(position, 1.0)).xyz;
+    vCubeN = mat3(toCube) * normal;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
 `
 const FACE_FRAG = /* glsl */ `
   precision highp float;
-  in vec3 vN; in vec2 vUv; out vec4 o;
-  uniform float mode;   // 0 heat solid, 1 heat inverted, 2 field
+  in vec3 vN; in vec2 vUv; in vec3 vCube; in vec3 vCubeN; out vec4 o;
+  uniform float mode;   // 0 heat solid, 1 heat inverted, 2 field per geometry face uv, 3 field per whole-cube face (cube space)
   uniform float k;      // field sharpness
+  uniform float uHalf;   // cube half extent in cube space (mode 3)
+  uniform float uSeam;   // heat modes: hairline of the opposite value along each geometry face border, in uv units
+  float plate(vec2 p) { float b = (1.0 - p.x * p.x) * (1.0 - p.y * p.y); return 1.0 - pow(clamp(b, 0.0, 1.0), k); }
   void main() {
     float l = 0.35 + 0.65 * max(dot(normalize(vN), normalize(vec3(0.35, 0.8, 0.6))), 0.0);
     if (mode < 1.5) {
-      o = vec4(mode, l, 1.0, 1.0);
+      float e = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+      float seam = uSeam > 0.0 ? 1.0 - smoothstep(uSeam * 0.6, uSeam, e) : 0.0;
+      o = vec4(mix(mode, 1.0 - mode, seam), l, 1.0, 1.0);
+    } else if (mode < 2.5) {
+      o = vec4(plate(2.0 * vUv - 1.0), 1.0, l, 1.0);
     } else {
-      vec2 p = 2.0 * vUv - 1.0;
-      float b = (1.0 - p.x * p.x) * (1.0 - p.y * p.y);
-      o = vec4(1.0 - pow(max(b, 0.0), k), 1.0, l, 1.0);
+      // the whole cube face this fragment lies on, in cube space: coords perpendicular to the dominant normal axis
+      vec3 n = abs(normalize(vCubeN));
+      vec3 c = vCube / uHalf;
+      vec2 p = n.x > n.y && n.x > n.z ? c.yz : n.y > n.z ? c.xz : c.xy;
+      o = vec4(plate(clamp(p, -1.0, 1.0)), 1.0, l, 1.0);
     }
   }
 `
@@ -114,7 +130,8 @@ function finalFragment(shader: PaperShader) {
     vec2 mUV = v_imageUV;
     ${shader === 'heat' ? 'mUV = (mUV - 0.5) * 0.5714285714285714 + 0.5;' : ''}
     vec4 m = texture(u_mask, vec2(mUV.x, 1.0 - mUV.y));
-    float inside = ${shader === 'heat' ? 'm.b' : 'm.g'};
+    float inFrame = step(0.0, mUV.x) * step(mUV.x, 1.0) * step(0.0, mUV.y) * step(mUV.y, 1.0);
+    float inside = ${shader === 'heat' ? 'm.b' : 'm.g'} * inFrame;
     float shade = ${shader === 'heat' ? 'm.g' : 'm.b'};
     fragColor = mix(u_colorBack, fragColor, max(inside, u_halo));
     fragColor.rgb *= mix(1.0, shade, u_shade * inside);
@@ -141,16 +158,19 @@ export type PaperCubeProps = {
   shape?: PaperShape
   params: Record<string, unknown>
   spin: boolean
+  /** rubik: chain random turns */
+  auto?: boolean
   debug?: PaperDebug
+  rubik?: React.RefObject<RubikHandle | null>
 }
 
-export function PaperCube({ version, shape: shapeOverride, params, spin, debug = 'off' }: PaperCubeProps) {
+export function PaperCube({ version, shape: shapeOverride, params, spin, auto = false, debug = 'off', rubik }: PaperCubeProps) {
   const V = version
   const shape = shapeOverride ?? V.shape
   const SIZE = V.size
   const isHeat = V.shader === 'heat'
   // only the box has one uv square per face; other shapes get the blurred-silhouette field
-  const useBlur = V.field === 'blur' || shape !== 'box'
+  const useBlur = V.field === 'blur' || (shape !== 'box' && shape !== 'rubik')
   const root = useRef<THREE.Group>(null!)
   const maskScene = useRef<THREE.Scene>(null!)
   const { gl, camera, size } = useThree()
@@ -179,7 +199,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, debug =
     const combineHeat = raw(COMBINE_HEAT, { contour: { value: null }, big: { value: null }, inner: { value: null } })
     const combineField = raw(COMBINE_FIELD, { mask: { value: null }, blurred: { value: null }, useBlur: { value: 0 } })
     const copy = raw(COPY, { t: { value: null } })
-    const face = raw(FACE_FRAG, { mode: { value: 0 }, k: { value: 0.75 } }, FACE_VERT)
+    const face = raw(FACE_FRAG, { mode: { value: 0 }, k: { value: 0.75 }, uHalf: { value: 1.5 }, uSeam: { value: 0 }, uRootInv: { value: new THREE.Matrix4() } }, FACE_VERT)
     const final = raw(
       finalFragment(V.shader),
       {
@@ -248,8 +268,10 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, debug =
     u.u_scale.value = num('scale', 1)
     u.u_halo.value = V.halo ? 1 : 0
     u.u_shade.value = V.shade
-    Q.face.uniforms.mode.value = isHeat ? (V.polarity === 'inverted' ? 1 : 0) : 2
+    Q.face.uniforms.mode.value = isHeat ? (V.polarity === 'inverted' ? 1 : 0) : V.field === 'cube' ? 3 : 2
     Q.face.uniforms.k.value = V.fieldK
+    Q.face.uniforms.uHalf.value = shape === 'rubik' ? 1.5 * V.rubikGap : 0.5
+    Q.face.uniforms.uSeam.value = shape === 'rubik' ? V.seam : 0
   }, [params, Q, V, isHeat])
 
   const pass = (mat: THREE.RawShaderMaterial, target: THREE.WebGLRenderTarget | null) => {
@@ -274,6 +296,8 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, debug =
 
   useFrame((state, dt) => {
     if (spin) root.current.rotation.y += dt * 0.35
+    root.current.updateMatrixWorld()
+    Q.face.uniforms.uRootInv.value.copy(root.current.matrixWorld).invert()
     const speed = typeof params.speed === 'number' ? (params.speed as number) : 1
     const cam = camera as THREE.PerspectiveCamera
     const aspect = cam.aspect
@@ -364,6 +388,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, debug =
               <primitive object={Q.face} attach="material" />
             </mesh>
           )}
+          {shape === 'rubik' && <RubikMask ref={rubik} gap={V.rubikGap} material={Q.face} auto={auto} />}
           {shape === 'cage' && (
             <mesh>
               <boxGeometry args={[1, 1, 1]} />
@@ -371,7 +396,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, debug =
               <meshBasicMaterial color="#ffffff" />
             </mesh>
           )}
-          {seam > 0 && shape !== 'octa' && <EdgeBars size={1} width={seam} color={shape === 'cage' ? '#000000' : seamColor} inset={shape !== 'cage'} />}
+          {seam > 0 && shape !== 'octa' && shape !== 'rubik' && <EdgeBars size={1} width={seam} color={shape === 'cage' ? '#000000' : seamColor} inset={shape !== 'cage'} />}
         </group>
       </scene>
     </>
