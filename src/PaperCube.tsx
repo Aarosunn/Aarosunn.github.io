@@ -60,6 +60,25 @@ const COMBINE_FIELD = /* glsl */ `
     o = vec4(m.r, m.g, 1.0, 1.0);
   }
 `
+// min-filtered downsample of the alpha (G): a hairline seam stays a hole in the coarse Poisson grid
+const DOWNMIN = /* glsl */ `
+  precision highp float;
+  in vec2 vUv; out vec4 o;
+  uniform sampler2D t; uniform float texel; uniform float taps;
+  void main() {
+    float m = 1.0;
+    float n = taps;
+    for (float y = 0.0; y < 8.0; y++) {
+      if (y >= n) break;
+      for (float x = 0.0; x < 8.0; x++) {
+        if (x >= n) break;
+        vec2 off = (vec2(x, y) - 0.5 * (n - 1.0)) * texel;
+        m = min(m, texture(t, vUv + off).g);
+      }
+    }
+    o = vec4(vec3(m), 1.0);
+  }
+`
 // poisson: field = 1 - u / max(u), like their toProcessed*
 const COMBINE_POISSON = /* glsl */ `
   precision highp float;
@@ -348,6 +367,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       combinePoisson: raw(COMBINE_POISSON, { mask: { value: null }, u: { value: null }, umax: { value: null } }),
       poisson: raw(POISSON, { u: { value: null }, mask: { value: null }, texel: { value: 1 / 256 } }),
       reduceMax: raw(REDUCE_MAX, { t: { value: null }, texel: { value: 1 / 128 } }),
+      downMin: raw(DOWNMIN, { t: { value: null }, texel: { value: 1 / 1024 }, taps: { value: 4 } }),
       copy: raw(COPY, { t: { value: null } }),
       face: raw(FACE_FRAG, { mode: { value: 0 }, k: { value: 0.75 }, uHalf: { value: 1.5 }, uSeam: { value: 0 }, uRootInv: { value: new THREE.Matrix4() } }, FACE_VERT),
       final: raw(finalFragment(V.shader), finalUniforms(), FINAL_VERT),
@@ -360,7 +380,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     () => () => {
       Object.values(R).forEach((t) => (Array.isArray(t) ? t.forEach((x) => x.dispose()) : t.dispose()))
       Q.mesh.geometry.dispose()
-      ;[Q.blur, Q.combineHeat, Q.combineField, Q.combinePoisson, Q.poisson, Q.reduceMax, Q.copy, Q.face, Q.final, Q.final2, Q.composite].forEach((m) => m?.dispose())
+      ;[Q.blur, Q.combineHeat, Q.combineField, Q.combinePoisson, Q.poisson, Q.reduceMax, Q.downMin, Q.copy, Q.face, Q.final, Q.final2, Q.composite].forEach((m) => m?.dispose())
     },
     [R, Q],
   )
@@ -453,12 +473,12 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       Q.combineHeat.uniforms.inner.value = R.inner.texture
       pass(Q.combineHeat, R.combined)
     } else if (V.field === 'poisson') {
-      // box-filter the alpha at full res (so hairline seams survive), downsample to 256, iterate Jacobi
-      // (warm-started from last frame), reduce the max, normalise. BLUR writes the channel to rgb, so .g works.
-      Q.blur.uniforms.ch.value.set(0, 1, 0, 0)
-      boxBlur(R.mask, R.a, R.inner, Math.max(1, Math.round(SIZE / 512)), 1)
-      Q.blur.uniforms.ch.value.set(1, 0, 0, 0)
-      downsample(R.inner, R.pMask)
+      // min-downsample the alpha to 256 (hairline seams stay holes), iterate Jacobi (warm-started from
+      // last frame), reduce the max, normalise. DOWNMIN writes to rgb, so the solver's .g read works.
+      Q.downMin.uniforms.t.value = R.mask.texture
+      Q.downMin.uniforms.texel.value = 1 / SIZE
+      Q.downMin.uniforms.taps.value = SIZE / 256
+      pass(Q.downMin, R.pMask)
       Q.poisson.uniforms.mask.value = R.pMask.texture
       let a = R.pA, b = R.pB
       for (let i = 0; i < V.poissonIters; i++) {
