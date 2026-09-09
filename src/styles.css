@@ -379,6 +379,7 @@ button:focus-visible {
 /* the flower bed along the bottom of the page: above the cube canvas, under the UI */
 .floral-bottom { position: fixed !important; left: 0; bottom: 0; z-index: 1; pointer-events: none; }
 .ui { z-index: 2; }
+.site-tabs .tabs { z-index: 3; }
 .floral-stage-page { padding: 0; overflow: hidden; }
 /* the mesh floral's own canvas sits in its box, not fixed over the page like the cube's */
 .xf3d canvas { position: absolute !important; inset: 0; transform: none !important; }
