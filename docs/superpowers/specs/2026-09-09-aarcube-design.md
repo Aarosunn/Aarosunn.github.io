@@ -47,3 +47,8 @@ Aaron's notes on v3: heat redder and dimmer; chrome not pixelated, slower, band 
 - heatsmoke: dark clearcoat glass, the smoke ring drives the heat ramp as emissive.
 - smokechrome: metal whose diffuse is the smoke (silver / dark oil / pale core) under the liquid env with strong iridescence.
 - Turn check now screenshots before/mid/after for every v4 variant (`shots/turn-v4-*`); all fields are continuous, edge glow rides the slice.
+
+## Paper shaders tab (2026-09-09, later)
+`src/Paper.tsx`, key `p` or the tab switch next to the wordmark. Pure recreation, no cube: the official `@paper-design/shaders-react` (Apache 2.0) `Heatmap`, `LiquidMetal`, `GemSmoke` with the site's own presets, preset buttons per panel. Heatmap is image-masked, so it gets the site's diamond logo vendored at `public/paper/diamond.svg`. Reference frames of the live pages: `node scripts/paper-ref.mjs` -> `shots/paper/<name>-N.png`; ours: `node scripts/paper-shoot.mjs` -> `shots/paper/mine-N.png`. Global `canvas { position: fixed }` is scoped away inside `.paper-canvas`.
+
+Why v4 smokechrome went green/pink: the 100–700 nm thin-film iridescence range on a white metal produces magenta/green interference, and the mint scheme's `b` colour tinted the oil veins. Neither is in paper's shader.

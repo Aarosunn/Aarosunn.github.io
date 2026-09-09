@@ -5,6 +5,7 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { Cube, SETS, SHAPES, VARIANTS_OF, type AnyVariant, type CubeHandle, type Set, type Shape } from './Cube'
 import { SCHEMES, type Scheme } from './schemes'
+import { Paper } from './Paper'
 
 // FPS sampler lives inside the canvas; reports out twice a second.
 function Fps({ onFps }: { onFps: (n: number) => void }) {
@@ -133,6 +134,7 @@ function LiquidEnv({ s, graded, slow = false }: { s: Scheme; graded: boolean; sl
 }
 
 export default function App() {
+  const [tab, setTab] = useState<'cube' | 'paper'>('cube')
   const [si, setSi] = useState(0)
   const [shape, setShape] = useState<Shape>('solid')
   const [set, setSet] = useState<Set>('v2')
@@ -161,6 +163,7 @@ export default function App() {
   // Keyboard + debug hook for Playwright.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'p') setTab((t) => (t === 'cube' ? 'paper' : 'cube'))
       if (e.key === 'c') setSi((i) => (i + 1) % SCHEMES.length)
       if (e.key === 'm') setVariant((v) => { const vs = VARIANTS_OF(setRef.current); return vs[(vs.indexOf(v) + 1) % vs.length] })
       if (e.key === 's') setShape((v) => (v === 'classic' ? 'solid' : 'classic'))
@@ -173,6 +176,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     window.__aar = {
+      setTab,
       setScheme: (n: string) => setSi(Math.max(0, SCHEMES.findIndex((x) => x.name === n))),
       setVariant,
       setShape,
@@ -194,6 +198,28 @@ export default function App() {
   }
   const bl = bloom[v]
   const metallic = v === 'chrome' || v === 'smokechrome'
+
+  const tabs = (
+    <div className="tabs">
+      <button className={tab === 'cube' ? 'on' : ''} onClick={() => setTab('cube')}>
+        cube
+      </button>
+      <button className={tab === 'paper' ? 'on' : ''} onClick={() => setTab('paper')}>
+        paper shaders
+      </button>
+    </div>
+  )
+
+  if (tab === 'paper')
+    return (
+      <>
+        <div className="ui paper-ui">
+          <div className="wordmark">aarcube</div>
+          {tabs}
+          <Paper />
+        </div>
+      </>
+    )
 
   return (
     <>
@@ -221,6 +247,7 @@ export default function App() {
 
       <div className="ui">
         <div className="wordmark">aarcube</div>
+        {tabs}
 
         <div className="slot slot-about">about</div>
         <div className="slot slot-code">code</div>
@@ -252,7 +279,7 @@ export default function App() {
           <span>material {v}</span>
           <span>turns {turns}</span>
           <span>fps {fps}</span>
-          <span>keys c s v m t space</span>
+          <span>keys p c s v m t space</span>
         </div>
       </div>
     </>
@@ -275,6 +302,7 @@ function Row<T extends string>({ label, items, on, pick }: { label: string; item
 declare global {
   interface Window {
     __aar: {
+      setTab: (t: 'cube' | 'paper') => void
       setScheme: (n: string) => void
       setVariant: (v: AnyVariant) => void
       setShape: (v: Shape) => void
