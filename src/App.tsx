@@ -6,6 +6,8 @@ import * as THREE from 'three'
 import { Cube, SETS, SHAPES, VARIANTS_OF, type AnyVariant, type CubeHandle, type Set, type Shape } from './Cube'
 import { SCHEMES, type Scheme } from './schemes'
 import { Paper } from './Paper'
+import { HeatCube } from './HeatCube'
+import { heatmapPresets } from '@paper-design/shaders-react'
 
 // FPS sampler lives inside the canvas; reports out twice a second.
 function Fps({ onFps }: { onFps: (n: number) => void }) {
@@ -133,8 +135,14 @@ function LiquidEnv({ s, graded, slow = false }: { s: Scheme; graded: boolean; sl
   return <Environment map={tex} />
 }
 
+type Tab = 'cube' | 'heatcube' | 'paper'
+const TABS: Tab[] = ['cube', 'heatcube', 'paper']
+
 export default function App() {
-  const [tab, setTab] = useState<'cube' | 'paper'>('cube')
+  const [tab, setTab] = useState<Tab>('cube')
+  const [heatPreset, setHeatPreset] = useState(0)
+  const [heatSpin, setHeatSpin] = useState(true)
+  const [heatHollow, setHeatHollow] = useState(false)
   const [si, setSi] = useState(0)
   const [shape, setShape] = useState<Shape>('solid')
   const [set, setSet] = useState<Set>('v2')
@@ -163,7 +171,7 @@ export default function App() {
   // Keyboard + debug hook for Playwright.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'p') setTab((t) => (t === 'cube' ? 'paper' : 'cube'))
+      if (e.key === 'p') setTab((t) => TABS[(TABS.indexOf(t) + 1) % TABS.length])
       if (e.key === 'c') setSi((i) => (i + 1) % SCHEMES.length)
       if (e.key === 'm') setVariant((v) => { const vs = VARIANTS_OF(setRef.current); return vs[(vs.indexOf(v) + 1) % vs.length] })
       if (e.key === 's') setShape((v) => (v === 'classic' ? 'solid' : 'classic'))
@@ -177,6 +185,7 @@ export default function App() {
     window.addEventListener('keydown', onKey)
     window.__aar = {
       setTab,
+      setHeatHollow,
       setScheme: (n: string) => setSi(Math.max(0, SCHEMES.findIndex((x) => x.name === n))),
       setVariant,
       setShape,
@@ -204,11 +213,44 @@ export default function App() {
       <button className={tab === 'cube' ? 'on' : ''} onClick={() => setTab('cube')}>
         cube
       </button>
+      <button className={tab === 'heatcube' ? 'on' : ''} onClick={() => setTab('heatcube')}>
+        heat cube
+      </button>
       <button className={tab === 'paper' ? 'on' : ''} onClick={() => setTab('paper')}>
         paper shaders
       </button>
     </div>
   )
+
+  if (tab === 'heatcube')
+    return (
+      <>
+        <Canvas dpr={[1, 1.5]} camera={{ position: [0, 0, 6.5], fov: 30 }} gl={{ antialias: true }}>
+          <HeatCube params={heatmapPresets[heatPreset].params} spin={heatSpin} hollow={heatHollow} />
+        </Canvas>
+        <div className="ui">
+          <div className="wordmark">aarcube</div>
+          {tabs}
+          <div className="controls">
+            <Row label="preset" items={heatmapPresets.map((p) => p.name.toLowerCase())} on={heatmapPresets[heatPreset].name.toLowerCase()} pick={(n) => setHeatPreset(heatmapPresets.findIndex((p) => p.name.toLowerCase() === n))} />
+            <div className="row">
+              <span className="k">motion</span>
+              <button className={heatSpin ? 'on' : ''} onClick={() => setHeatSpin((v) => !v)}>
+                {heatSpin ? 'spinning' : 'still'}
+              </button>
+              <button className={heatHollow ? 'on' : ''} onClick={() => setHeatHollow((v) => !v)}>
+                hollow
+              </button>
+            </div>
+          </div>
+          <div className="readout">
+            <span>paper heatmap on a cube</span>
+            <span>drag to orbit</span>
+            <span>keys p</span>
+          </div>
+        </div>
+      </>
+    )
 
   if (tab === 'paper')
     return (
@@ -302,7 +344,8 @@ function Row<T extends string>({ label, items, on, pick }: { label: string; item
 declare global {
   interface Window {
     __aar: {
-      setTab: (t: 'cube' | 'paper') => void
+      setTab: (t: Tab) => void
+      setHeatHollow: (b: boolean) => void
       setScheme: (n: string) => void
       setVariant: (v: AnyVariant) => void
       setShape: (v: Shape) => void
