@@ -51,7 +51,7 @@ const SECTIONS: Section[] = [
 const HEAT_OF_SCHEME: Record<string, string> = { icemint: 'icemint', ice: 'icemint', mint: 'icemint', ember: 'ember', graphite: 'graphite', aura: 'default', paper: 'sepia' }
 
 /** cube versions worth comparing in place; key `v` cycles. Versions whose own preset is light get a dark one here. */
-const SITE_VERSIONS = ['v10', 'v16', 'v19', 'v20', 'v27', 'v13', 'v18', 'v24', 'v17']
+const SITE_VERSIONS = ['v10', 'v16', 'v34', 'v19', 'v20', 'v27', 'v13', 'v18', 'v24', 'v17']
 const SITE_PRESET: Record<string, string> = { v24: 'ice' }
 
 export function Site({ version: initial = 'v10', scheme = 'icemint', bg = '#07090c' }: { version?: string; scheme?: string; bg?: string }) {
