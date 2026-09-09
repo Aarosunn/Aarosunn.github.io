@@ -39,6 +39,7 @@ export default function App() {
   const [cell, setCell] = useState<number | undefined>(undefined)
   const [floral, setFloral] = useState(FLORAL_VERSIONS[FLORAL_VERSIONS.length - 1].name)
   const [floralSeed, setFloralSeed] = useState(3)
+  const [floralFlower, setFloralFlower] = useState('poppy')
   // review hook: merge arbitrary params over the theme (scripts iterate looks without editing presets)
   const [override, setOverride] = useState<Record<string, unknown>>({})
   const [vOverride, setVOverride] = useState<Partial<PaperVersion>>({})
@@ -96,6 +97,7 @@ export default function App() {
       setShaderCell: setCell,
       setFloralVersion: setFloral,
       setFloralSeed: setFloralSeed,
+      setFloralFlower: setFloralFlower,
       setShaderVersionOverride: setVOverride,
       paperTurn: (...args: Parameters<RubikHandle['turn']>) => rubik.current?.turn(...args) ?? Promise.resolve(),
       paperRun: (alg: string, duration?: number) => rubik.current?.run(alg, duration) ?? Promise.resolve(),
@@ -122,7 +124,7 @@ export default function App() {
   if (tab === 'site')
     return (
       <>
-        <Site scheme={s.name} bg={s.bg} version={q.get('v') ?? undefined} floral={q.get('floral') ?? undefined} floralSeed={Number(q.get('seed') ?? 3)} />
+        <Site scheme={s.name} bg={s.bg} version={q.get('v') ?? undefined} floral={q.get('floral') ?? undefined} floralSeed={Number(q.get('seed') ?? 3)} flower={q.get('flower') ?? undefined} />
         <div className="site-tabs">{tabs}</div>
       </>
     )
@@ -132,7 +134,7 @@ export default function App() {
       <div className="ui paper-ui">
         <div className="wordmark">aarcube</div>
         {tabs}
-        <FloralTab v={FLORAL_OF(floral) ?? FLORAL_VERSIONS[0]} seed={floralSeed} scheme={s.name} setVersion={setFloral} setSeed={setFloralSeed} />
+        <FloralTab v={FLORAL_OF(floral) ?? FLORAL_VERSIONS[0]} seed={floralSeed} flower={floralFlower} scheme={s.name} setVersion={setFloral} setSeed={setFloralSeed} setFlower={setFloralFlower} />
       </div>
     )
 
@@ -213,6 +215,7 @@ declare global {
       setShaderCell: (c: number) => void
       setFloralVersion: (v: string) => void
       setFloralSeed: (s: number) => void
+      setFloralFlower: (f: string) => void
       setShaderVersionOverride: (o: Partial<PaperVersion>) => void
       paperTurn: RubikHandle['turn']
       paperRun: (alg: string, duration?: number) => Promise<void>

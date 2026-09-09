@@ -33,6 +33,11 @@ export type FloralVersion = {
   /** mesh: wire pass intensity (0 = off) and the fresnel curve */
   wire?: number
   fresnel?: { power: number; gain: number; base: number }
+  /** mesh: thin-film sheen on the petals (0..1), CSS blur (px) and opacity of the stem / leaf / bud canvas, centre brightness */
+  irid?: number
+  blur?: number
+  dim?: number
+  centreGlow?: number
   note: string
 }
 
@@ -47,6 +52,9 @@ export const FLORAL_VERSIONS: FloralVersion[] = [
   { ...base, name: 'v6', kind: 'mesh', wire: 0.14, fresnel: { power: 3.0, gain: 0.85, base: 0.012 }, note: 'mesh x-ray: the procedural flower rendered with a fresnel shader on additive blending, faces see-through, rims and edge-on geometry bright, a wire pass over it' },
   { ...base, name: 'v7', kind: 'mesh', wire: 0.14, fresnel: { power: 3.0, gain: 0.85, base: 0.012 }, labels: true, coords: 'static', frame: 'bloom', note: 'mesh blueprint: v6 with callouts, the bloom frame and coordinates projected from the 3D anchors' },
   { ...base, name: 'v8', kind: 'mesh', wire: 0.2, fresnel: { power: 3.4, gain: 1.0, base: 0.01 }, labels: true, coords: 'live', frame: 'parts', arcs: true, specks: 60, note: 'mesh scanner: denser wire, sharper fresnel, live readouts, arcs, part frames, specks' },
+  // flower assets: no technical layer, the bloom is the subject, stem and leaves soft
+  { ...base, name: 'v9', kind: 'mesh', ruler: false, wire: 0.12, fresnel: { power: 2.8, gain: 0.9, base: 0.015 }, irid: 0.25, blur: 2.5, dim: 0.55, centreGlow: 0.9, note: 'ghost: the scheme\'s white-blue x-ray on any flower type, a little sheen, stem and leaves blurred and dimmed' },
+  { ...base, name: 'v10', kind: 'mesh', tint: 'spectral', ruler: false, wire: 0.1, fresnel: { power: 2.6, gain: 1.0, base: 0.02 }, irid: 0.6, blur: 2.5, dim: 0.5, centreGlow: 1.6, note: 'iridescent: each flower\'s own palette with a thin-film sheen and a warm glowing centre, stem and leaves soft' },
 ]
 
 export const FLORAL_OF = (name: string) => FLORAL_VERSIONS.find((v) => v.name === name)

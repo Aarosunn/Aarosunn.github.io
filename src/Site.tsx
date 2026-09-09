@@ -55,7 +55,7 @@ export const ALG_KEYS: Record<string, string> = { j: 'T perm', k: 'U perm', l: '
 /** the site cube's themes (v14 / v15), key g cycles; the on-screen toggle is gone since Aaron settled on mint grain */
 const SITE_THEMES: [string, string][] = [['ice grain', 'ice'], ['mint grain', 'mint'], ['icemint grain soft', 'icemint']]
 
-export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#07090c', floral, floralSeed = 3 }: { version?: string; scheme?: string; bg?: string; floral?: string; floralSeed?: number }) {
+export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#07090c', floral, floralSeed = 3, flower }: { version?: string; scheme?: string; bg?: string; floral?: string; floralSeed?: number; flower?: string }) {
   const xray = floral ? FLORAL_OF(floral) : undefined
   const [active, setActive] = useState(0)
   const [version, setVersion] = useState(VERSION_OF(initial) ? initial : 'v17')
@@ -189,7 +189,7 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
           </aside>
         )}
         <div className="site-base">
-          {xray ? (xray.kind === 'mesh' ? <XrayFlower3D v={xray} seed={floralSeed} className="floral xray" scheme={scheme} /> : <XrayFloral v={xray} seed={floralSeed} className="floral xray" scheme={scheme} />) : <Floral className="floral" seed={11 + 7 * Math.max(0, SCHEMES.findIndex((x) => x.name === scheme))} />}
+          {xray ? (xray.kind === 'mesh' ? <XrayFlower3D v={xray} flower={flower} seed={floralSeed} className="floral xray" scheme={scheme} /> : <XrayFloral v={xray} seed={floralSeed} className="floral xray" scheme={scheme} />) : <Floral className="floral" seed={11 + 7 * Math.max(0, SCHEMES.findIndex((x) => x.name === scheme))} />}
           {layout === 'deck' && (
             <div className="deck-blurb">
               <h2>{SECTIONS[active].title}</h2>
