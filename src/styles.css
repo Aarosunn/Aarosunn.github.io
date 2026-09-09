@@ -526,11 +526,14 @@ body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130
   color: var(--mute);
 }
 .panel-close:hover { color: var(--bright); }
+/* the panel emerges from the cube: starts small at the cube's side, settles in place */
 @keyframes glass {
-  from { opacity: 0; transform: translateY(-50%) translateX(var(--from, 12px)); }
-  to { opacity: 1; transform: translateY(-50%); }
+  from { opacity: 0; transform: translateY(-50%) translateX(var(--from, -26vw)) scale(0.72); filter: blur(6px); }
+  60% { opacity: 1; }
+  to { opacity: 1; transform: translateY(-50%); filter: blur(0); }
 }
-.panel-left { --from: -12px; }
+.panel { transform-origin: var(--origin, 100% 50%); }
+.panel-left { --from: 26vw; --origin: 0% 50%; }
 @media (max-width: 900px) {
   .panel, .panel-left, .panel-right {
     left: 16px;

@@ -158,7 +158,7 @@ export default function App() {
   const [heatPreset, setHeatPreset] = useState(0)
   const [heatSpin, setHeatSpin] = useState(true)
   const [heatHollow, setHeatHollow] = useState(false)
-  const [heatVersion, setHeatVersion] = useState<string>('v3')
+  const [heatVersion, setHeatVersion] = useState<string>('v10')
   const [heatDebug, setHeatDebug] = useState<HeatDebug>('off')
   const [heatShape, setHeatShape] = useState<PaperShape | null>(null)
   const [heatAuto, setHeatAuto] = useState(false)
