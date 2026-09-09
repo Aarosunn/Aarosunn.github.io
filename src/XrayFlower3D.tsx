@@ -55,11 +55,11 @@ const xray = (color: THREE.Color, rim: THREE.Color, fr: Fresnel, irid: number, w
 type Colors = { petal: THREE.Color; rim: THREE.Color; centre: THREE.Color; green: THREE.Color; bright: THREE.Color }
 type Projected = { anchors: { name: string; p: Pt }[]; tips: Pt[]; leaves: Pt[][]; bud: Pt[]; centre: Pt; R: number }
 
-function Bloom({ f, v, colors, onProject, gainMul = 1 }: { f: Flower; v: FloralVersion; colors: Colors; onProject?: (p: Projected) => void; gainMul?: number }) {
+function Bloom({ f, v, colors, onProject, gainMul = 1, wireMul = 1 }: { f: Flower; v: FloralVersion; colors: Colors; onProject?: (p: Projected) => void; gainMul?: number; wireMul?: number }) {
   const { camera, size } = useThree()
   const fr0 = v.fresnel ?? { power: 3, gain: 0.85, base: 0.012 }
   const fr = { power: fr0.power, gain: fr0.gain * gainMul, base: fr0.base * gainMul }
-  const wire = v.wire ?? 0.14
+  const wire = (v.wire ?? 0.14) * wireMul
   const irid = v.irid ?? 0
   const mats = useMemo(
     () => ({
@@ -120,7 +120,7 @@ function Bloom({ f, v, colors, onProject, gainMul = 1 }: { f: Flower; v: FloralV
         </instancedMesh>
       )}
       {f.filaments.length > 0 && <lineSegments geometry={filaments} material={mats.filament} />}
-      <mesh geometry={f.stemTop} material={mats.stemTop} />
+      {v.foliage !== false && <mesh geometry={f.stemTop} material={mats.stemTop} />}
     </group>
   )
 }
@@ -162,10 +162,16 @@ function Foliage({ f, v, colors, gainMul = 1 }: { f: Flower; v: FloralVersion; c
 
 const hasTech = (v: FloralVersion) => v.labels || v.coords !== 'off' || v.frame !== 'off' || v.arcs || v.ruler || v.measures || v.swatches || v.specks > 0
 
-type Planted = { f: Flower; position: [number, number, number]; scale: number; gain: number }
+type V3 = [number, number, number]
+type Planted = { f: Flower; position: V3; scale: number; gain: number; wire?: number; rotation?: V3; offset?: V3 }
 const GROUND = -1.35
 /** the scene: the version's flowers spread along x with a little depth, front ones larger, each rooted on the ground */
 function plant(v: FloralVersion, seed: number, spread = 8.6): Planted[] {
+  // an exact arrangement: each bloom centred on its point, rotated about that centre
+  if (v.scene?.place) return v.scene.place.map((p, i) => {
+    const f = buildFlower(p.seed ?? i + 1, FLOWER_OF(p.flower), true, v.buds !== false, 1, v.pollen !== false)
+    return { f, position: p.at, scale: p.scale, gain: p.gain ?? 1, wire: p.wire, rotation: p.rot, offset: [-f.bloomCentre.x, -f.bloomCentre.y, -f.bloomCentre.z] }
+  })
   const names = v.scene?.flowers ?? []
   const layers = v.scene?.layers ?? 1
   const rng = mulberry32(seed * 7907 + 11)
@@ -252,12 +258,12 @@ export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, heig
     <div className={`xf3d ${className ?? ''}`} style={{ position: 'relative', width, height }}>
       <Canvas dpr={[1, 2]} camera={cam} gl={{ antialias: true, alpha: true }} style={{ position: 'absolute', inset: 0, filter: blur > 0 ? `blur(${blur}px)` : undefined, opacity: v.dim ?? 1 }} frameloop="always">
         {scene && <Look at={lookAt} />}
-        {scene ? planted.map((p, i) => <group key={i} position={p.position} scale={p.scale}><Foliage f={p.f} v={v} colors={colors} gainMul={p.gain} /></group>) : <Foliage f={f} v={v} colors={colors} />}
+        {v.foliage !== false && (scene ? planted.map((p, i) => <group key={i} position={p.position} scale={p.scale} rotation={p.rotation}><group position={p.offset}><Foliage f={p.f} v={v} colors={colors} gainMul={p.gain} /></group></group>) : <Foliage f={f} v={v} colors={colors} />)}
         {scene && v.scene?.ground === 'grid' && <Ground color={colors.green} />}
       </Canvas>
       <Canvas dpr={[1, 2]} camera={cam} gl={{ antialias: true, alpha: true }} style={{ position: 'absolute', inset: 0 }} frameloop="always">
         {scene && <Look at={lookAt} />}
-        {scene ? planted.map((p, i) => <group key={i} position={p.position} scale={p.scale}><Bloom f={p.f} v={v} colors={colors} gainMul={p.gain} /></group>) : <Bloom f={f} v={v} colors={colors} onProject={hasTech(v) ? setProj : undefined} />}
+        {scene ? planted.map((p, i) => <group key={i} position={p.position} scale={p.scale} rotation={p.rotation}><group position={p.offset}><Bloom f={p.f} v={v} colors={colors} gainMul={p.gain} wireMul={p.wire} /></group></group>) : <Bloom f={f} v={v} colors={colors} onProject={hasTech(v) ? setProj : undefined} />}
       </Canvas>
       {tech && (
         <svg viewBox={`0 0 ${XF_W} ${XF_H}`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} fill="none" strokeLinecap="round" strokeLinejoin="round">

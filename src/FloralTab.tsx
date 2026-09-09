@@ -24,12 +24,12 @@ export function FloralTab({ v, seed, flower, scheme, setVersion, setSeed, setFlo
             ))}
           </div>
         )}
-        <div className="row">
+        {!v.scene?.place && <div className="row">
           <span className="k">seed</span>
           {SEEDS.map((s) => (
             <button key={s} className={s === seed ? 'on' : ''} onClick={() => setSeed(s)}>{s}</button>
           ))}
-        </div>
+        </div>}
       </div>
       <div className={`floral-stage ${v.placement === 'bottom' ? 'floral-stage-page' : ''}`}>
         {v.placement === 'bottom' ? (
@@ -44,7 +44,7 @@ export function FloralTab({ v, seed, flower, scheme, setVersion, setSeed, setFlo
       )}
       <div className="readout">
         <span className="note">{v.note}</span>
-        <span>{mesh ? `/?floral=${v.name}&flower=${flower}&seed=${seed} shows it on the site` : `at 2× above, at the site's size below · /?floral=${v.name}&seed=${seed} shows it on the site`}</span>
+        <span>{v.scene?.place ? `/?floral=${v.name} shows it on the site` : mesh ? `/?floral=${v.name}&flower=${flower}&seed=${seed} shows it on the site` : `at 2× above, at the site's size below · /?floral=${v.name}&seed=${seed} shows it on the site`}</span>
       </div>
     </div>
   )
