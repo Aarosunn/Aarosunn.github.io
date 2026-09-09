@@ -34,6 +34,9 @@ export type PaperVersion = {
   camZ: number
   /** default preset name (lowercase) in the preset row */
   preset?: string
+  /** heat only: composite a second paper shader onto the faces (heat keeps the halo and seam rims) */
+  fuse?: 'liquid' | 'smoke'
+  fusePreset?: string
   note: string
 }
 
@@ -81,6 +84,10 @@ export const PAPER_VERSIONS: PaperVersion[] = [
   { ...base, name: 'v24', shader: 'liquid', shape: 'rubik', field: 'poisson', seam: 0.04, camZ: 11, shade: 0.35, note: 'liquid metal Rubik\'s, true Poisson per cubie face (seams as boundaries): 27 chrome cubies' },
   { ...base, name: 'v25', shader: 'smoke', shape: 'rubik', field: 'poisson', seam: 0.04, camZ: 11, halo: false, shade: 0.3, preset: 'icemint', note: 'gem smoke Rubik\'s, Poisson per cubie face, icemint, no outer smoke' },
   { ...base, name: 'v26', shader: 'liquid', shape: 'rubik', field: 'poisson', seam: 0.04, camZ: 11, shade: 0.35, preset: 'noir slow', note: 'v24 in noir, slow' },
+  // fusions: heat seams + halo over another paper shader on the faces
+  { ...base, name: 'v27', shader: 'heat', shape: 'rubik', rubikGap: 1.03, seam: 0.035, camZ: 20, preset: 'icemint', fuse: 'liquid', fusePreset: 'ice', shade: 0.3, note: 'fusion: heat seams and halo over liquid-metal cubie faces (ice)' },
+  { ...base, name: 'v28', shader: 'heat', shape: 'rubik', rubikGap: 1.03, seam: 0.035, camZ: 20, preset: 'icemint', fuse: 'smoke', fusePreset: 'icemint', shade: 0.3, note: 'fusion: heat seams and halo over gem-smoke cubie faces (icemint)' },
+  { ...base, name: 'v29', shader: 'heat', shape: 'box', seam: 0.012, camZ: 7, fuse: 'liquid', fusePreset: 'noir slow', shade: 0.3, note: 'fusion on the plain box: paper heat rim over noir liquid metal' },
 ]
 
 export const VERSION_OF = (name: string) => PAPER_VERSIONS.find((v) => v.name === name)

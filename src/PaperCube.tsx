@@ -16,6 +16,8 @@ import { RubikMask, type RubikHandle } from './RubikMask'
 import * as THREE from 'three'
 import { gemSmokeFragmentShader, getShaderColorFromString, heatmapFragmentShader, liquidMetalFragmentShader } from '@paper-design/shaders'
 import type { PaperShader, PaperShape, PaperVersion } from './paperVersions'
+import { PAPER_PRESETS } from './paperPresets'
+import { gemSmokePresets, liquidMetalPresets } from '@paper-design/shaders-react'
 
 export type PaperDebug = 'off' | 'mask' | 'combined'
 
@@ -100,6 +102,12 @@ const REDUCE_MAX = /* glsl */ `
     o = vec4(vec3(m), 1.0);
   }
 `
+// fusion: heat (a) over the fused shader (b) by heat's alpha (halo + seam rim)
+const COMPOSITE = /* glsl */ `
+  precision highp float;
+  in vec2 vUv; out vec4 o; uniform sampler2D a; uniform sampler2D b;
+  void main() { vec4 h = texture(a, vUv); o = vec4(mix(texture(b, vUv).rgb, h.rgb, h.a), 1.0); }
+`
 const COPY = /* glsl */ `
   precision highp float;
   in vec2 vUv; out vec4 o; uniform sampler2D t;
@@ -176,16 +184,76 @@ function finalFragment(shader: PaperShader) {
     float shade = ${shader === 'heat' ? 'm.g' : 'm.b'};
     fragColor = mix(u_colorBack, fragColor, max(inside, u_halo));
     fragColor.rgb *= mix(1.0, shade, u_shade * inside);
+    ${shader === 'heat' ? 'fragColor.a = mix(fragColor.a, max(1.0 - inside, smoothstep(0.0, 0.35, img.r)), u_fuse);' : ''}
   }`
   // insert before the last `fragColor = vec4(color, opacity);` -> after it
   const marker = 'fragColor = vec4(color, opacity);'
   const i = src.lastIndexOf(marker)
   const body = src.slice(0, i + marker.length) + tail + src.slice(i + marker.length)
-  return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade;')
+  return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse;')
 }
 
 const frt = (size: number) =>
   new THREE.WebGLRenderTarget(size, size, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false })
+const rt2 = (w: number, h: number) =>
+  new THREE.WebGLRenderTarget(w, h, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false })
+
+/** the superset of paper uniforms for one final pass (unused ones are harmless) */
+const finalUniforms = (): Record<string, THREE.IUniform> => ({
+  u_image: { value: null },
+  u_mask: { value: null },
+  u_time: { value: 0 },
+  u_resolution: { value: new THREE.Vector2(1, 1) },
+  u_imageAspectRatio: { value: 1 },
+  u_isImage: { value: true },
+  u_shape: { value: 0 },
+  u_halo: { value: 1 },
+  u_shade: { value: 0 },
+  u_fuse: { value: 0 },
+  u_aspect: { value: 1 },
+  u_scale: { value: 1 },
+  u_colorBack: { value: [0, 0, 0, 1] },
+  u_colorTint: { value: [1, 1, 1, 1] },
+  u_colorInner: { value: [1, 1, 1, 1] },
+  u_colors: { value: new Float32Array(40) },
+  u_colorsCount: { value: 0 },
+  u_angle: { value: 0 },
+  u_noise: { value: 0 },
+  u_innerGlow: { value: 0.5 },
+  u_outerGlow: { value: 0.5 },
+  u_contour: { value: 0.5 },
+  u_softness: { value: 0.1 },
+  u_repetition: { value: 2 },
+  u_shiftRed: { value: 0.3 },
+  u_shiftBlue: { value: 0.3 },
+  u_distortion: { value: 0.07 },
+  u_innerDistortion: { value: 0.8 },
+  u_outerDistortion: { value: 0.6 },
+  u_offset: { value: 0 },
+  u_size: { value: 0.8 },
+})
+const applyParams = (u: Record<string, THREE.IUniform>, params: Record<string, unknown>) => {
+  const color = (v: unknown, fallback: string) => getShaderColorFromString(typeof v === 'string' ? v : fallback)
+  if (Array.isArray(params.colors)) {
+    const flat = new Float32Array(40)
+    const cs = (params.colors as string[]).map(getShaderColorFromString)
+    cs.forEach((c, i) => flat.set(c, i * 4))
+    u.u_colors.value = flat
+    u.u_colorsCount.value = cs.length
+  }
+  u.u_colorBack.value = color(params.colorBack, '#000000')
+  u.u_colorTint.value = color(params.colorTint, '#ffffff')
+  u.u_colorInner.value = color(params.colorInner, '#ffffff')
+  for (const k of ['angle', 'noise', 'innerGlow', 'outerGlow', 'contour', 'softness', 'repetition', 'shiftRed', 'shiftBlue', 'distortion', 'innerDistortion', 'outerDistortion', 'offset', 'size'])
+    if (typeof params[k] === 'number') u[`u_${k}`].value = params[k]
+  u.u_scale.value = typeof params.scale === 'number' ? params.scale : 1
+}
+const PRESETS_ALL: Record<PaperShader, { name: string; params: object }[]> = {
+  heat: [...PAPER_PRESETS.heat],
+  liquid: [...liquidMetalPresets, ...PAPER_PRESETS.liquid],
+  smoke: [...gemSmokePresets, ...PAPER_PRESETS.smoke],
+}
+
 const rt = (size: number, depth = false, samples = 0) =>
   new THREE.WebGLRenderTarget(size, size, {
     minFilter: THREE.LinearFilter,
@@ -235,13 +303,21 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpe
       pA: frt(256),
       pB: frt(256),
       pMask: rt(256),
-      r64: frt(64),
-      r16: frt(16),
-      r4: frt(4),
-      r1: frt(1),
+      // max reduce: halve eight times, each pass samples the 2x2 block centres
+      red: [128, 64, 32, 16, 8, 4, 2, 1].map(frt),
     }),
     [SIZE],
   )
+  // fusion needs a second mask and two screen-size outputs
+  const dpr = gl.getPixelRatio()
+  const F = useMemo(
+    () =>
+      V.fuse
+        ? { mask2: rt(SIZE, true, 4), combined2: rt(SIZE), out1: rt2(Math.round(size.width * dpr), Math.round(size.height * dpr)), out2: rt2(Math.round(size.width * dpr), Math.round(size.height * dpr)) }
+        : null,
+    [V.fuse, SIZE, size.width, size.height, dpr],
+  )
+  useEffect(() => () => { if (F) Object.values(F).forEach((t) => t.dispose()) }, [F])
   const Q = useMemo(() => {
     const scene = new THREE.Scene()
     const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
@@ -257,51 +333,18 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpe
     const reduceMax = raw(REDUCE_MAX, { t: { value: null }, texel: { value: 1 / 128 } })
     const copy = raw(COPY, { t: { value: null } })
     const face = raw(FACE_FRAG, { mode: { value: 0 }, k: { value: 0.75 }, uHalf: { value: 1.5 }, uSeam: { value: 0 }, uRootInv: { value: new THREE.Matrix4() } }, FACE_VERT)
-    const final = raw(
-      finalFragment(V.shader),
-      {
-        u_image: { value: null },
-        u_mask: { value: null },
-        u_time: { value: 0 },
-        u_resolution: { value: new THREE.Vector2(1, 1) },
-        u_imageAspectRatio: { value: 1 },
-        u_isImage: { value: true },
-        u_shape: { value: 0 },
-        u_halo: { value: 1 },
-        u_shade: { value: 0 },
-        u_aspect: { value: 1 },
-        u_scale: { value: 1 },
-        // shader params (superset; unused ones are harmless)
-        u_colorBack: { value: [0, 0, 0, 1] },
-        u_colorTint: { value: [1, 1, 1, 1] },
-        u_colorInner: { value: [1, 1, 1, 1] },
-        u_colors: { value: new Float32Array(40) },
-        u_colorsCount: { value: 0 },
-        u_angle: { value: 0 },
-        u_noise: { value: 0 },
-        u_innerGlow: { value: 0.5 },
-        u_outerGlow: { value: 0.5 },
-        u_contour: { value: 0.5 },
-        u_softness: { value: 0.1 },
-        u_repetition: { value: 2 },
-        u_shiftRed: { value: 0.3 },
-        u_shiftBlue: { value: 0.3 },
-        u_distortion: { value: 0.07 },
-        u_innerDistortion: { value: 0.8 },
-        u_outerDistortion: { value: 0.6 },
-        u_offset: { value: 0 },
-        u_size: { value: 0.8 },
-      },
-      FINAL_VERT,
-    )
-    return { scene, cam, mesh, blur, combineHeat, combineField, combinePoisson, poisson, reduceMax, copy, face, final }
-  }, [V.shader])
+    const final = raw(finalFragment(V.shader), finalUniforms(), FINAL_VERT)
+    // fusion: a second final pass for the fused shader, composited by heat's alpha
+    const final2 = V.fuse ? raw(finalFragment(V.fuse), finalUniforms(), FINAL_VERT) : null
+    const composite = raw(COMPOSITE, { a: { value: null }, b: { value: null } })
+    return { scene, cam, mesh, blur, combineHeat, combineField, combinePoisson, poisson, reduceMax, copy, face, final, final2, composite }
+  }, [V.shader, V.fuse])
 
   useEffect(
     () => () => {
-      Object.values(R).forEach((t) => t.dispose())
+      Object.values(R).forEach((t) => (Array.isArray(t) ? t.forEach((x) => x.dispose()) : t.dispose()))
       Q.mesh.geometry.dispose()
-      ;[Q.blur, Q.combineHeat, Q.combineField, Q.combinePoisson, Q.poisson, Q.reduceMax, Q.copy, Q.face, Q.final].forEach((m) => m.dispose())
+      ;[Q.blur, Q.combineHeat, Q.combineField, Q.combinePoisson, Q.poisson, Q.reduceMax, Q.copy, Q.face, Q.final, Q.final2, Q.composite].forEach((m) => m?.dispose())
     },
     [R, Q],
   )
@@ -309,23 +352,21 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpe
   // preset params -> uniforms
   useEffect(() => {
     const u = Q.final.uniforms
-    const color = (v: unknown, fallback: string) => getShaderColorFromString(typeof v === 'string' ? v : fallback)
-    const num = (k: string, fallback: number) => (typeof params[k] === 'number' ? (params[k] as number) : fallback)
-    if (Array.isArray(params.colors)) {
-      const flat = new Float32Array(40)
-      const cs = (params.colors as string[]).map(getShaderColorFromString)
-      cs.forEach((c, i) => flat.set(c, i * 4))
-      u.u_colors.value = flat
-      u.u_colorsCount.value = cs.length
-    }
-    u.u_colorBack.value = color(params.colorBack, '#000000')
-    u.u_colorTint.value = color(params.colorTint, '#ffffff')
-    u.u_colorInner.value = color(params.colorInner, '#ffffff')
-    for (const k of ['angle', 'noise', 'innerGlow', 'outerGlow', 'contour', 'softness', 'repetition', 'shiftRed', 'shiftBlue', 'distortion', 'innerDistortion', 'outerDistortion', 'offset', 'size'])
-      if (typeof params[k] === 'number') u[`u_${k}`].value = params[k]
-    u.u_scale.value = num('scale', 1)
+    applyParams(u, params)
     u.u_halo.value = V.halo ? 1 : 0
     u.u_shade.value = V.shade
+    u.u_fuse.value = V.fuse ? 1 : 0
+    if (Q.final2 && V.fuse) {
+      const ps = PRESETS_ALL[V.fuse]
+      const fp = (ps.find((p) => p.name.toLowerCase() === V.fusePreset) ?? ps[0]).params as Record<string, unknown>
+      const u2 = Q.final2.uniforms
+      applyParams(u2, fp)
+      // same camera and mask as the heat pass: heat shows the mask's central 57% window through its scale,
+      // so the full mask spans scale / 0.571 of the screen for the fused pass
+      u2.u_scale.value = (typeof params.scale === 'number' ? params.scale : 0.75) / IMG
+      u2.u_halo.value = 0
+      u2.u_shade.value = V.shade
+    }
     Q.face.uniforms.mode.value = isHeat ? (V.polarity === 'solid' ? 0 : 1) : V.field === 'cube' ? 3 : 2
     Q.face.uniforms.k.value = V.fieldK
     Q.face.uniforms.uHalf.value = shape === 'rubik' ? 1.5 * V.rubikGap : 0.5
@@ -366,6 +407,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpe
     const prevClear = gl.getClearColor(new THREE.Color())
     const prevAlpha = gl.getClearAlpha()
     // heat solid: white outside (lum 1), no shade, not inside. inverted: black outside. field: boundary value, alpha 0
+    if (V.fuse) Q.face.uniforms.mode.value = V.polarity === 'solid' ? 0 : 1
     if (isHeat) gl.setClearColor(V.polarity === 'inverted' ? new THREE.Color(0, 0, 0) : new THREE.Color(1, 0, 0), 1)
     // cage: faces white (outside) and seams black (the shape) on a white background
     else gl.setClearColor(new THREE.Color(1, 0, 0), 1)
@@ -402,14 +444,15 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpe
         Q.blur.uniforms.ch.value.set(1, 0, 0, 0)
       }
       if (V.field === 'poisson') {
-        // downsample the mask, iterate Jacobi (warm-started from last frame), reduce the max, normalise
+        // box-filter the alpha at full res (so hairline seams survive), downsample to 256, iterate Jacobi
+        // (warm-started from last frame), reduce the max, normalise. BLUR writes the channel to rgb, so .g works.
         Q.blur.uniforms.ch.value.set(0, 1, 0, 0)
+        boxBlur(R.mask, R.a, R.inner, Math.max(1, Math.round(SIZE / 512)), 1)
+        Q.blur.uniforms.ch.value.set(1, 0, 0, 0)
         Q.blur.uniforms.radius.value = 0
-        Q.blur.uniforms.t.value = R.mask.texture
+        Q.blur.uniforms.t.value = R.inner.texture
         Q.blur.uniforms.dir.value.set(0, 0)
         pass(Q.blur, R.pMask)
-        Q.blur.uniforms.ch.value.set(1, 0, 0, 0)
-        // pMask R now holds alpha; the solver reads .g, so point it at R via a swizzle-free trick: copy R->G
         Q.poisson.uniforms.mask.value = R.pMask.texture
         let a = R.pA, b = R.pB
         for (let i = 0; i < V.poissonIters; i++) {
@@ -417,17 +460,16 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpe
           pass(Q.poisson, b)
           ;[a, b] = [b, a]
         }
-        const chain = [R.r64, R.r16, R.r4, R.r1]
         let src: THREE.WebGLRenderTarget = a
-        for (const dst of chain) {
+        for (const dst of R.red) {
           Q.reduceMax.uniforms.t.value = src.texture
-          Q.reduceMax.uniforms.texel.value = 0.5 / dst.width
+          Q.reduceMax.uniforms.texel.value = 0.25 / dst.width // ± half a source texel around the destination centre
           pass(Q.reduceMax, dst)
           src = dst
         }
         Q.combinePoisson.uniforms.mask.value = R.mask.texture
         Q.combinePoisson.uniforms.u.value = a.texture
-        Q.combinePoisson.uniforms.umax.value = R.r1.texture
+        Q.combinePoisson.uniforms.umax.value = R.red[R.red.length - 1].texture
         pass(Q.combinePoisson, R.combined)
       } else {
         Q.combineField.uniforms.mask.value = R.mask.texture
@@ -450,7 +492,36 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpe
     u.u_time.value = state.clock.elapsedTime * speed
     u.u_aspect.value = size.width / size.height
     u.u_resolution.value.set(size.width * gl.getPixelRatio(), size.height * gl.getPixelRatio())
-    pass(Q.final, null)
+    if (!(V.fuse && F && Q.final2)) {
+      pass(Q.final, null)
+      return
+    }
+    // fusion: heat -> out1; second mask with per-face fields and seams as holes -> fused shader -> out2; composite
+    pass(Q.final, F.out1)
+    Q.face.uniforms.mode.value = 2
+    cam.aspect = 1
+    cam.updateProjectionMatrix()
+    gl.setClearColor(new THREE.Color(1, 0, 0), 1)
+    gl.setRenderTarget(F.mask2)
+    gl.clear()
+    gl.render(maskScene.current, cam)
+    gl.setClearColor(prevClear, prevAlpha)
+    cam.aspect = aspect
+    cam.updateProjectionMatrix()
+    Q.combineField.uniforms.mask.value = F.mask2.texture
+    Q.combineField.uniforms.blurred.value = R.big.texture
+    Q.combineField.uniforms.useBlur.value = 0
+    pass(Q.combineField, F.combined2)
+    const u2 = Q.final2.uniforms
+    u2.u_image.value = F.combined2.texture
+    u2.u_mask.value = F.mask2.texture
+    u2.u_time.value = state.clock.elapsedTime * speed
+    u2.u_aspect.value = size.width / size.height
+    u2.u_resolution.value.copy(u.u_resolution.value)
+    pass(Q.final2, F.out2)
+    Q.composite.uniforms.a.value = F.out1.texture
+    Q.composite.uniforms.b.value = F.out2.texture
+    pass(Q.composite, null)
   }, 1)
 
   const seam = V.seam

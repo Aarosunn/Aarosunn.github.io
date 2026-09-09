@@ -72,6 +72,7 @@ export function Site({ version: initial = 'v10', scheme = 'icemint' }: { version
 
   // deck stepping: arrows / digits; every step turns one layer
   const step = (i: number) => {
+    setOpen(null)
     setActive(((i % SECTIONS.length) + SECTIONS.length) % SECTIONS.length)
     rubik.current?.turn()
   }

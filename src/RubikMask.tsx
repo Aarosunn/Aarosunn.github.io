@@ -23,13 +23,16 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
     const cubies = useRef<Cubie[]>([])
     const busy = useRef(false)
     const alive = useRef(true)
-    // a tween still in flight when we unmount must not touch dead refs
+    const pending = useRef<(() => void) | null>(null)
+    // a tween still in flight when we unmount must not touch dead refs, and its promise must still settle
     useEffect(() => {
       alive.current = true
       const pv = pivot.current
       return () => {
         alive.current = false
         gsap.killTweensOf(pv.rotation)
+        pending.current?.()
+        pending.current = null
       }
     }, [])
     const cells = useMemo(() => {
@@ -50,6 +53,7 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
         pv.rotation.set(0, 0, 0)
         slice.forEach((c) => pv.attach(c.mesh))
         return new Promise<void>((res) => {
+          pending.current = res
           gsap.to(pv.rotation, {
             [ax]: (d * Math.PI) / 2,
             duration: 0.55,
@@ -65,6 +69,7 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
                 e.set(snap(e.x), snap(e.y), snap(e.z))
               })
               busy.current = false
+              pending.current = null
               onTurn?.()
               res()
             },
