@@ -17,9 +17,12 @@ const smoke = (name: string, colors: string[], extra: Record<string, unknown> = 
   params: { colors, colorBack: '#07090c', colorInner: '#0e1216', innerDistortion: 0.8, outerDistortion: 0.6, outerGlow: 0.55, innerGlow: 1, offset: 0, angle: 0, size: 0.8, speed: 0.7, scale: 0.6, ...extra },
 })
 
+const PAPER_HEAT = heatmapPresets[0].params.colors as string[]
 const OWN: Record<PaperShader, PaperPreset[]> = {
   heat: [
     heat('icemint', ICEMINT),
+    heat('grain', PAPER_HEAT, { noise: 0.3 }),
+    heat('icemint grain', ICEMINT, { noise: 0.3 }),
     heat('ember', ['#12060a', '#3a0d1f', '#7a1533', '#d43d3a', '#ff8a3d', '#ffd08a', '#fff3d6']),
     heat('graphite', ['#050608', '#15181f', '#2a2f3a', '#4a5262', '#8b95a8', '#c9d2d8', '#f2f5f7']),
     heat('icemint slow', ICEMINT, { speed: 0.55 }),

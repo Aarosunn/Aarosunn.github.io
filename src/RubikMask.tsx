@@ -11,11 +11,26 @@ export type Axis = 'x' | 'y' | 'z'
 export type RubikHandle = {
   turn: (axis?: Axis, layer?: -1 | 0 | 1, dir?: 1 | -1) => Promise<void>
   positions: () => number[][]
+  /** largest deviation of any cubie's rotation matrix element from {-1, 0, 1} (0 = every cubie sits on an exact quarter turn) */
+  orientationError: () => number
   busy: () => boolean
 }
 type Cubie = { mesh: THREE.Mesh; pos: THREE.Vector3 }
 const AXES: Axis[] = ['x', 'y', 'z']
-const snap = (r: number) => Math.round(r / (Math.PI / 2)) * (Math.PI / 2)
+// snap a cubie onto the nearest exact quarter-turn orientation by rounding its rotation matrix, so
+// error never accumulates (rounding Euler angles is not safe near gimbal lock)
+const snapMesh = (m: THREE.Mesh) => {
+  const r = new THREE.Matrix4().makeRotationFromQuaternion(m.quaternion)
+  const e = r.elements
+  for (let i = 0; i < 16; i++) e[i] = Math.round(e[i])
+  m.quaternion.setFromRotationMatrix(r)
+}
+const orientationError = (m: THREE.Mesh) => {
+  const e = new THREE.Matrix4().makeRotationFromQuaternion(m.quaternion).elements
+  let worst = 0
+  for (let i = 0; i < 12; i++) worst = Math.max(worst, Math.abs(e[i] - Math.round(e[i])))
+  return worst
+}
 
 export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.Material; auto: boolean; autoInterval?: number; rounded?: number; onTurn?: () => void }>(
   function RubikMask({ gap, material, auto, autoInterval = 900, rounded = 0, onTurn }, ref) {
@@ -66,8 +81,7 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
                 root.current.attach(c.mesh)
                 c.pos.applyAxisAngle(rot, (d * Math.PI) / 2).round()
                 c.mesh.position.copy(c.pos).multiplyScalar(gap)
-                const e = c.mesh.rotation
-                e.set(snap(e.x), snap(e.y), snap(e.z))
+                snapMesh(c.mesh)
               })
               busy.current = false
               pending.current = null
@@ -80,7 +94,16 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
       [gap, onTurn],
     )
 
-    useImperativeHandle(ref, () => ({ turn, positions: () => cubies.current.map((c) => c.pos.toArray()), busy: () => busy.current }), [turn])
+    useImperativeHandle(
+      ref,
+      () => ({
+        turn,
+        positions: () => cubies.current.map((c) => c.pos.toArray()),
+        orientationError: () => Math.max(0, ...cubies.current.map((c) => orientationError(c.mesh))),
+        busy: () => busy.current,
+      }),
+      [turn],
+    )
 
     useEffect(() => {
       if (!auto) return

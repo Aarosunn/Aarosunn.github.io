@@ -5,13 +5,15 @@ import { Paper } from './Paper'
 import { PaperCube, type PaperDebug } from './PaperCube'
 import { Site } from './Site'
 import type { RubikHandle } from './RubikMask'
-import { PAPER_VERSIONS, VERSION_OF } from './paperVersions'
-import { PRESETS_OF } from './paperPresets'
+import { PAPER_VERSIONS, VERSION_OF, withTheme } from './paperVersions'
+import { PRESETS_OF, presetNamed } from './paperPresets'
 
 type Tab = 'site' | 'shader' | 'paper'
 const TABS: Tab[] = ['site', 'shader', 'paper']
 const LABEL: Record<Tab, string> = { site: 'site', shader: 'shader cube', paper: 'paper shaders' }
 const SHADER_NAME = { heat: 'heatmap', liquid: 'liquid metal', smoke: 'gem smoke' }
+const GAINS = [0.7, 0.85, 1, 1.2, 1.4]
+const ALPHAS = [0.5, 0.7, 0.85, 1]
 
 export default function App() {
   // ?tab=&c=&v= let a specific state be linked for review
@@ -23,18 +25,26 @@ export default function App() {
   const [spin, setSpin] = useState(true)
   const [auto, setAuto] = useState(false)
   const [debug, setDebug] = useState<PaperDebug>('off')
+  const [gain, setGain] = useState(1)
+  const [alpha, setAlpha] = useState(1)
   const rubik = useRef<RubikHandle | null>(null)
   const s = SCHEMES[si]
-  const PV = VERSION_OF(version) ?? PAPER_VERSIONS[0]
-  const presets = PRESETS_OF[PV.shader]
-  const preset = presets[Math.min(presetIx, presets.length - 1)]
+  const base = VERSION_OF(version) ?? PAPER_VERSIONS[0]
+  // the preset row is either the version's themes or its shader's presets
+  const choices = base.themes ? base.themes.map((t) => t.name) : PRESETS_OF[base.shader].map((p) => p.name.toLowerCase())
+  const choice = choices[Math.min(presetIx, choices.length - 1)]
+  const theme = base.themes?.find((t) => t.name === choice)
+  const PV = withTheme(base, theme)
+  // every lab cube sits on the scheme's background, like the site
+  // themed versions share one scale per shader so every theme sits at the same size on screen
+  const params = { ...presetNamed(PV.shader, theme ? theme.preset : choice).params, colorBack: s.bg, ...(theme ? { scale: PV.shader === 'heat' ? 0.75 : 0.6 } : {}) }
 
   // switching version also selects its default preset
   const setVersion = (v: string) => {
     const pv = VERSION_OF(v)
     if (!pv) return
     setVersionRaw(v)
-    setPresetIx(Math.max(0, PRESETS_OF[pv.shader].findIndex((p) => p.name.toLowerCase() === pv.preset)))
+    setPresetIx(pv.themes ? Math.max(0, pv.themes.findIndex((t) => t.preset === pv.preset)) : Math.max(0, PRESETS_OF[pv.shader].findIndex((p) => p.name.toLowerCase() === pv.preset)))
   }
 
   // scheme -> CSS variables
@@ -57,9 +67,12 @@ export default function App() {
       setShaderVersion: setVersion,
       setShaderPreset: setPresetIx,
       setShaderAuto: setAuto,
+      setShaderSpin: setSpin,
       setShaderDebug: setDebug,
+      setShaderLook: (g: number, a: number) => { setGain(g); setAlpha(a) },
       paperTurn: (...args: Parameters<RubikHandle['turn']>) => rubik.current?.turn(...args) ?? Promise.resolve(),
       paperPositions: () => rubik.current?.positions() ?? [],
+      paperOrientationError: () => rubik.current?.orientationError() ?? 0,
       paperBusy: () => rubik.current?.busy() ?? false,
     }
     return () => window.removeEventListener('keydown', onKey)
@@ -94,15 +107,17 @@ export default function App() {
 
   return (
     <>
-      <Canvas key={version} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
-        <PaperCube version={PV} params={preset.params} spin={spin} auto={auto} debug={debug} rubik={rubik} />
+      <Canvas key={version + (theme?.name ?? '')} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
+        <PaperCube version={PV} params={params} spin={spin} auto={auto} debug={debug} gain={gain} alpha={alpha} rubik={rubik} />
       </Canvas>
       <div className="ui">
         <div className="wordmark">aarcube</div>
         {tabs}
         <div className="controls">
           <Row label="version" items={PAPER_VERSIONS.map((v) => v.name)} on={version} pick={setVersion} />
-          <Row label="preset" items={presets.map((p) => p.name.toLowerCase())} on={preset.name.toLowerCase()} pick={(n) => setPresetIx(presets.findIndex((p) => p.name.toLowerCase() === n))} />
+          <Row label={base.themes ? 'theme' : 'preset'} items={choices} on={choice} pick={(n) => setPresetIx(choices.indexOf(n))} />
+          <Row label="brightness" items={GAINS.map(String)} on={String(gain)} pick={(n) => setGain(Number(n))} />
+          <Row label="opacity" items={ALPHAS.map(String)} on={String(alpha)} pick={(n) => setAlpha(Number(n))} />
           <div className="row">
             <span className="k">motion</span>
             <button className={spin ? 'on' : ''} onClick={() => setSpin((v) => !v)}>
@@ -146,9 +161,12 @@ declare global {
       setShaderVersion: (v: string) => void
       setShaderPreset: (i: number) => void
       setShaderAuto: (b: boolean) => void
+      setShaderSpin: (b: boolean) => void
       setShaderDebug: (v: PaperDebug) => void
+      setShaderLook: (gain: number, alpha: number) => void
       paperTurn: RubikHandle['turn']
       paperPositions: () => number[][]
+      paperOrientationError: () => number
       paperBusy: () => boolean
     }
   }

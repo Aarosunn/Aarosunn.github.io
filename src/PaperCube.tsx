@@ -178,12 +178,15 @@ function finalFragment(shader: PaperShader) {
     float shade = ${shader === 'heat' ? 'm.g' : 'm.b'};
     fragColor = mix(u_colorBack, fragColor, max(inside, u_halo));
     fragColor.rgb *= mix(1.0, shade, u_shade * inside);
+    // look controls: brightness on the whole effect, opacity fades the cube body toward the page
+    fragColor.rgb *= u_gain;
+    fragColor.rgb = mix(u_colorBack.rgb, fragColor.rgb, mix(1.0, u_alpha, inside));
     ${shader === 'heat' ? 'fragColor.a = mix(fragColor.a, max(1.0 - inside, smoothstep(0.0, 0.35, img.r)), u_fuse);' : ''}
   }`
   const marker = 'fragColor = vec4(color, opacity);'
   const i = src.lastIndexOf(marker)
   const body = src.slice(0, i + marker.length) + tail + src.slice(i + marker.length)
-  return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse;')
+  return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha;')
 }
 
 const rt = (size: number, depth = false, samples = 0) =>
@@ -204,6 +207,8 @@ const finalUniforms = (): Record<string, THREE.IUniform> => ({
   u_halo: { value: 1 },
   u_shade: { value: 0 },
   u_fuse: { value: 0 },
+  u_gain: { value: 1 },
+  u_alpha: { value: 1 },
   u_aspect: { value: 1 },
   u_scale: { value: 1 },
   u_colorBack: { value: [0, 0, 0, 1] },
@@ -253,10 +258,13 @@ export type PaperCubeProps = {
   auto?: boolean
   autoInterval?: number
   debug?: PaperDebug
+  /** look controls: brightness multiplier and cube-body opacity */
+  gain?: number
+  alpha?: number
   rubik?: React.RefObject<RubikHandle | null>
 }
 
-export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = false, autoInterval = 900, debug = 'off', rubik }: PaperCubeProps) {
+export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = false, autoInterval = 900, debug = 'off', gain = 1, alpha = 1, rubik }: PaperCubeProps) {
   const SIZE = V.size
   const isHeat = V.shader === 'heat'
   const fieldMode = V.field === 'cube' ? 3 : 2
@@ -333,6 +341,8 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     u.u_halo.value = V.halo ? 1 : 0
     u.u_shade.value = V.shade
     u.u_fuse.value = V.fuse ? 1 : 0
+    u.u_gain.value = gain
+    u.u_alpha.value = alpha
     if (Q.final2 && V.fuse) {
       const u2 = Q.final2.uniforms
       applyParams(u2, presetNamed(V.fuse, V.fusePreset).params)
@@ -341,11 +351,13 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       u2.u_scale.value = (typeof params.scale === 'number' ? params.scale : 0.75) / IMG
       u2.u_halo.value = 0
       u2.u_shade.value = V.shade
+      u2.u_gain.value = gain
+      u2.u_alpha.value = alpha
     }
     Q.face.uniforms.k.value = V.fieldK
     Q.face.uniforms.uHalf.value = 1.5 * V.rubikGap
     Q.face.uniforms.uSeam.value = V.seam
-  }, [params, Q, V])
+  }, [params, Q, V, gain, alpha])
 
   const pass = (mat: THREE.RawShaderMaterial, target: THREE.WebGLRenderTarget | null) => {
     Q.mesh.material = mat

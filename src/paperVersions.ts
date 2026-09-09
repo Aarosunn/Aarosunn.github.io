@@ -4,6 +4,9 @@
  */
 export type PaperShader = 'heat' | 'liquid' | 'smoke'
 
+/** a theme picks a shader + preset and may override version fields (a heat theme on a liquid version) */
+export type PaperTheme = { name: string; shader: PaperShader; preset: string; over?: Partial<PaperVersion> }
+
 export type PaperVersion = {
   name: string
   shader: PaperShader
@@ -35,6 +38,8 @@ export type PaperVersion = {
   /** heat only: composite a second paper shader onto the faces (heat keeps the halo and seam rims) */
   fuse?: 'liquid' | 'smoke'
   fusePreset?: string
+  /** when set, the preset row shows these themes instead of the shader's presets */
+  themes?: PaperTheme[]
   note: string
 }
 
@@ -55,6 +60,9 @@ const heat = { ...base, shader: 'heat' as const, rubikGap: 1.03, seam: 0.035, ca
 const liquid = { ...base, shader: 'liquid' as const, camZ: 11 }
 const smoke = { ...base, shader: 'smoke' as const, camZ: 11, halo: false, shade: 0.3 }
 
+/** v11's heat themes: the same rounded cube with heat's mask, hairline seams and camera */
+const HEAT_ON_ROUNDED: Partial<PaperVersion> = { rubikGap: 1.03, seam: 0.015, camZ: 20, halo: true, shade: 0.3, field: 'face' }
+
 export const PAPER_VERSIONS: PaperVersion[] = [
   { ...heat, name: 'v1', note: "heatmap on the Rubik's cube: rim glow on every seam, halo, the hot band sweeping the base" },
   { ...heat, name: 'v2', halo: false, shade: 0.45, note: 'v1 without the halo, faces shaded' },
@@ -66,6 +74,28 @@ export const PAPER_VERSIONS: PaperVersion[] = [
   { ...heat, name: 'v8', seam: 0.02, preset: 'icemint', bigDiv: 4, note: 'icemint hairline seams with the big blur at quarter res: same look, cheaper on integrated GPUs' },
   { ...heat, name: 'v9', rubikRound: 0.06, seam: 0.012, preset: 'icemint', note: 'rounded cubies with a hairline seam: soft corners, thin glow' },
   { ...liquid, name: 'v10', field: 'poisson', rubikRound: 0.07, seam: 0.03, shade: 0.35, preset: 'ice', note: 'liquid metal on rounded cubies, Poisson per cubie: 27 chrome pillows' },
+  {
+    ...liquid,
+    name: 'v11',
+    field: 'poisson',
+    poissonIters: 60,
+    rubikRound: 0.07,
+    seam: 0.03,
+    halo: false,
+    shade: 0.35,
+    preset: 'ice',
+    themes: [
+      { name: 'default', shader: 'liquid', preset: 'default' },
+      { name: 'backdrop', shader: 'liquid', preset: 'backdrop' },
+      { name: 'heatmap', shader: 'heat', preset: 'default', over: HEAT_ON_ROUNDED },
+      { name: 'heatmap grain', shader: 'heat', preset: 'grain', over: HEAT_ON_ROUNDED },
+      { name: 'ice', shader: 'liquid', preset: 'ice' },
+      { name: 'mint', shader: 'liquid', preset: 'mint' },
+      { name: 'icemint', shader: 'heat', preset: 'icemint', over: HEAT_ON_ROUNDED },
+      { name: 'icemint grain', shader: 'heat', preset: 'icemint grain', over: HEAT_ON_ROUNDED },
+    ],
+    note: "v10's rounded cube for the site: eight themes across liquid metal and heat on the scheme's background, brightness and opacity to taste",
+  },
 ]
 
 /** paper tab: the shaders on a plain-looking cube (whole-face plates hide the cubies until a layer turns) */
@@ -77,3 +107,6 @@ export const CUBE_DEMOS: PaperVersion[] = [
 ]
 
 export const VERSION_OF = (name: string) => PAPER_VERSIONS.find((v) => v.name === name)
+
+/** the version to render for a theme (its fields overridden), or the version itself */
+export const withTheme = (v: PaperVersion, theme?: PaperTheme): PaperVersion => (theme ? { ...v, ...theme.over, shader: theme.shader } : v)
