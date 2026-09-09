@@ -38,7 +38,7 @@ Started 02:50 EDT. Everything below is committed on `main`; nothing older was ed
 
 ## Numbers
 
-RTX 4060: every version 61 fps at 1440×900. Integrated GPU (`--igpu`): v10 39, v16 41, v19 43, v24 61, v31 (quarter-res big blur) 48. The site uses a 768 mask and the quarter-res blur under 900px wide for that reason.
+RTX 4060: every version 61 fps at 1440×900. Integrated GPU (`--igpu`), lab tab: v10 39, v16 41, v19 43, v24 61, v31 (quarter-res big blur) 48. The **site** on the integrated GPU (`scripts/site-fps.mjs`, after warm-up): 52 fps at 1440×900 with v10, 55–60 at 420×820 (768 mask + quarter-res blur under 900px), 60 with v24.
 
 ## Decisions for you
 
