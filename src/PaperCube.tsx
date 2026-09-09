@@ -201,13 +201,15 @@ export type PaperCubeProps = {
   shape?: PaperShape
   params: Record<string, unknown>
   spin: boolean
+  /** idle spin, rad/s */
+  spinSpeed?: number
   /** rubik: chain random turns */
   auto?: boolean
   debug?: PaperDebug
   rubik?: React.RefObject<RubikHandle | null>
 }
 
-export function PaperCube({ version, shape: shapeOverride, params, spin, auto = false, debug = 'off', rubik }: PaperCubeProps) {
+export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpeed = 0.35, auto = false, debug = 'off', rubik }: PaperCubeProps) {
   const V = version
   const shape = shapeOverride ?? V.shape
   const SIZE = V.size
@@ -350,7 +352,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, auto = 
   }
 
   useFrame((state, dt) => {
-    if (spin) root.current.rotation.y += dt * 0.35
+    if (spin) root.current.rotation.y += dt * spinSpeed
     root.current.updateMatrixWorld()
     Q.face.uniforms.uRootInv.value.copy(root.current.matrixWorld).invert()
     const speed = typeof params.speed === 'number' ? (params.speed as number) : 1

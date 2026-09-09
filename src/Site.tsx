@@ -62,7 +62,7 @@ export function Site({ version: initial = 'v10' }: { version?: string }) {
   const params = useMemo(() => {
     const presets = PRESETS_OF[PV.shader]
     const base = (presets.find((p) => p.name.toLowerCase() === PV.preset) ?? presets[0]).params as Record<string, unknown>
-    return { ...base, ...(PV.shader === 'heat' ? { outerGlow: 0.42 } : {}), scale: (narrow ? 0.7 : 0.85) * (base.scale as number) }
+    return { ...base, ...(PV.shader === 'heat' ? { outerGlow: 0.42, contour: 0.75 } : {}), scale: (narrow ? 0.7 : 0.85) * (base.scale as number) }
   }, [PV, narrow])
 
   // deck stepping: arrows / digits; every step turns one layer
@@ -90,7 +90,7 @@ export function Site({ version: initial = 'v10' }: { version?: string }) {
   return (
     <>
       <Canvas key={version} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
-        <PaperCube version={PV} params={params} spin rubik={rubik} />
+        <PaperCube version={PV} params={params} spin spinSpeed={0.12} rubik={rubik} />
       </Canvas>
       <div className="aura" />
       <div className="grain" />

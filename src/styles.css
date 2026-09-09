@@ -439,6 +439,7 @@ button:focus-visible {
   background: var(--mute);
 }
 .sec .item {
+  display: inline;
   border: 0;
   padding: 0;
   color: inherit;
