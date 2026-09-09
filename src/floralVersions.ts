@@ -38,6 +38,12 @@ export type FloralVersion = {
   blur?: number
   dim?: number
   centreGlow?: number
+  /** mesh, mono tint: how far the petal colour leans from the scheme's `a` toward white (default .45) */
+  petalWhite?: number
+  /** mesh: force a colour scheme (else the page's) */
+  scheme?: string
+  /** mesh: several flowers rooted on a ground plane instead of one upright flower */
+  scene?: { flowers: string[]; ground: 'grid' | 'off' }
   note: string
 }
 
@@ -55,6 +61,7 @@ export const FLORAL_VERSIONS: FloralVersion[] = [
   // flower assets: no technical layer, the bloom is the subject, stem and leaves soft
   { ...base, name: 'v9', kind: 'mesh', ruler: false, wire: 0.12, fresnel: { power: 2.8, gain: 0.9, base: 0.015 }, irid: 0.25, blur: 2.5, dim: 0.55, centreGlow: 0.9, note: 'ghost: the scheme\'s white-blue x-ray on any flower type, a little sheen, stem and leaves blurred and dimmed' },
   { ...base, name: 'v10', kind: 'mesh', tint: 'spectral', ruler: false, wire: 0.1, fresnel: { power: 2.6, gain: 1.0, base: 0.02 }, irid: 0.6, blur: 2.5, dim: 0.5, centreGlow: 0.7, note: 'iridescent: each flower\'s own palette with a thin-film sheen and a warm glowing centre, stem and leaves soft' },
+  { ...base, name: 'v11', kind: 'mesh', ruler: false, scheme: 'mint', scene: { flowers: ['peony', 'tulip', 'poppy', 'daisy', 'rose', 'bell', 'lotus', 'iris'], ground: 'grid' }, wire: 0.12, fresnel: { power: 2.8, gain: 0.7, base: 0.01 }, irid: 0.2, blur: 2.2, dim: 0.55, centreGlow: 0.8, petalWhite: 0.2, note: 'on the ground: eight flowers of different kinds and sizes rooted on a faint wire ground, the mint scheme\'s ghost x-ray, foliage soft' },
 ]
 
 export const FLORAL_OF = (name: string) => FLORAL_VERSIONS.find((v) => v.name === name)

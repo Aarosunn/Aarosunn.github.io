@@ -158,18 +158,57 @@ function Foliage({ f, v, colors }: { f: Flower; v: FloralVersion; colors: Colors
 
 const hasTech = (v: FloralVersion) => v.labels || v.coords !== 'off' || v.frame !== 'off' || v.arcs || v.ruler || v.measures || v.swatches || v.specks > 0
 
-export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, height = XF_H, className, scheme, upright = false }: { v: FloralVersion; flower?: string; seed?: number; width?: number; height?: number; className?: string; scheme?: string; upright?: boolean }) {
+type Planted = { f: Flower; position: [number, number, number]; scale: number }
+const GROUND = -1.35
+/** the scene: the version's flowers spread along x with a little depth, front ones larger, each rooted on the ground */
+function plant(v: FloralVersion, seed: number): Planted[] {
+  const names = v.scene?.flowers ?? []
+  const rng = mulberry32(seed * 7907 + 11)
+  const n = names.length
+  return names.map((name, i) => {
+    const f = buildFlower(seed + i * 17, FLOWER_OF(name), true)
+    f.stem.computeBoundingBox()
+    const baseY = f.stem.boundingBox!.min.y
+    const z = (rng() - 0.5) * 1.6
+    const scale = (0.5 + 0.38 * ((z + 0.8) / 1.6)) * (0.9 + rng() * 0.2)
+    const x = -3.7 + (i + 0.5) * (7.4 / n) + (rng() - 0.5) * 0.5
+    return { f, position: [x, GROUND - baseY * scale, z], scale }
+  })
+}
+function Ground({ color }: { color: THREE.Color }) {
+  const geo = useMemo(() => {
+    const pts: number[] = []
+    for (let i = -10; i <= 10; i++) pts.push(i * 0.5, GROUND, -3, i * 0.5, GROUND, 2)
+    for (let j = 0; j <= 10; j++) pts.push(-5, GROUND, -3 + j * 0.5, 5, GROUND, -3 + j * 0.5)
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
+    return g
+  }, [])
+  const mat = useMemo(() => new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false }), [color])
+  useEffect(() => () => { geo.dispose(); mat.dispose() }, [geo, mat])
+  return <lineSegments geometry={geo} material={mat} />
+}
+function Look({ at }: { at: [number, number, number] }) {
+  const { camera } = useThree()
+  useEffect(() => { camera.lookAt(...at) }, [camera, at])
+  return null
+}
+
+export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, height = XF_H, className, scheme: pageScheme, upright = false }: { v: FloralVersion; flower?: string; seed?: number; width?: number; height?: number; className?: string; scheme?: string; upright?: boolean }) {
+  const scheme = v.scheme ?? pageScheme
   const spec = FLOWER_OF(flower)
   const f = useMemo(() => buildFlower(seed, spec, upright), [seed, spec, upright])
   useEffect(() => () => f.dispose(), [f])
+  const planted = useMemo(() => (v.scene ? plant(v, seed) : []), [v, seed])
+  useEffect(() => () => planted.forEach((p) => p.f.dispose()), [planted])
   // colours from the scheme table (on the site this mounts before App has applied the CSS variables);
   // 'spectral' takes the flower's own palette, 'mono' the scheme's ghost blue / white
   const colors = useMemo<Colors>(() => {
     const sc = SCHEMES.find((x) => x.name === scheme) ?? SCHEMES[0]
     const bright = new THREE.Color(sc.bright)
     if (v.tint === 'spectral') return { petal: new THREE.Color(spec.palette[0]), rim: new THREE.Color(spec.palette[1]), centre: new THREE.Color(spec.palette[2]), green: new THREE.Color(sc.b), bright }
-    return { petal: new THREE.Color(sc.a).lerp(bright, 0.45), rim: bright, centre: new THREE.Color(sc.b).lerp(bright, 0.3), green: new THREE.Color(sc.b), bright }
-  }, [scheme, v.tint, spec])
+    return { petal: new THREE.Color(sc.a).lerp(bright, v.petalWhite ?? 0.45), rim: bright, centre: new THREE.Color(sc.b).lerp(bright, 0.3), green: new THREE.Color(sc.b), bright }
+  }, [scheme, v.tint, spec, v.petalWhite])
   const [proj, setProj] = useState<Projected | null>(null)
   const tech: Tech | null = useMemo(() => {
     if (!proj || !hasTech(v)) return null
@@ -185,15 +224,20 @@ export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, heig
   }, [live])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const swatches = useMemo(() => readSwatches(v), [v.swatches, scheme])
-  const cam = { position: [0, 0, upright ? 4.9 : 6.8] as [number, number, number], fov: 30 }
+  const scene = !!v.scene
+  const cam = { position: (scene ? [0, 1.0, 8.4] : [0, 0, upright ? 4.9 : 6.8]) as [number, number, number], fov: 30 }
+  const lookAt: [number, number, number] = [0, -0.25, 0]
   const blur = v.blur ?? 0
   return (
     <div className={`xf3d ${className ?? ''}`} style={{ position: 'relative', width, height }}>
       <Canvas dpr={[1, 2]} camera={cam} gl={{ antialias: true, alpha: true }} style={{ position: 'absolute', inset: 0, filter: blur > 0 ? `blur(${blur}px)` : undefined, opacity: v.dim ?? 1 }} frameloop="always">
-        <Foliage f={f} v={v} colors={colors} />
+        {scene && <Look at={lookAt} />}
+        {scene ? planted.map((p, i) => <group key={i} position={p.position} scale={p.scale}><Foliage f={p.f} v={v} colors={colors} /></group>) : <Foliage f={f} v={v} colors={colors} />}
+        {scene && v.scene?.ground === 'grid' && <Ground color={colors.green} />}
       </Canvas>
       <Canvas dpr={[1, 2]} camera={cam} gl={{ antialias: true, alpha: true }} style={{ position: 'absolute', inset: 0 }} frameloop="always">
-        <Bloom f={f} v={v} colors={colors} onProject={hasTech(v) ? setProj : undefined} />
+        {scene && <Look at={lookAt} />}
+        {scene ? planted.map((p, i) => <group key={i} position={p.position} scale={p.scale}><Bloom f={p.f} v={v} colors={colors} /></group>) : <Bloom f={f} v={v} colors={colors} onProject={hasTech(v) ? setProj : undefined} />}
       </Canvas>
       {tech && (
         <svg viewBox={`0 0 ${XF_W} ${XF_H}`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} fill="none" strokeLinecap="round" strokeLinejoin="round">

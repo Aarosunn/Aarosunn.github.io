@@ -16,7 +16,7 @@ export function FloralTab({ v, seed, flower, scheme, setVersion, setSeed, setFlo
             <button key={x.name} className={x.name === v.name ? 'on' : ''} onClick={() => setVersion(x.name)}>{x.name}</button>
           ))}
         </div>
-        {mesh && (
+        {mesh && !v.scene && (
           <div className="row">
             <span className="k">flower</span>
             {FLOWERS.map((f) => (
@@ -32,7 +32,7 @@ export function FloralTab({ v, seed, flower, scheme, setVersion, setSeed, setFlo
         </div>
       </div>
       <div className="floral-stage">
-        {mesh ? <XrayFlower3D key={`${v.name}-${flower}-${seed}`} v={v} flower={flower} seed={seed} width={960} height={600} scheme={scheme} upright /> : <XrayFloral v={v} seed={seed} width={XF_W * 2} height={XF_H * 2} scheme={scheme} />}
+        {mesh ? <XrayFlower3D key={`${v.name}-${flower}-${seed}`} v={v} flower={flower} seed={seed} width={v.scene ? 1200 : 960} height={v.scene ? 520 : 600} scheme={scheme} upright /> : <XrayFloral v={v} seed={seed} width={XF_W * 2} height={XF_H * 2} scheme={scheme} />}
       </div>
       {!mesh && (
         <div className="floral-stage floral-stage-site">
