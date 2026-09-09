@@ -248,8 +248,7 @@ const applyParams = (u: Record<string, THREE.IUniform>, params: Record<string, u
     if (typeof params[k] === 'number') u[`u_${k}`].value = params[k]
   u.u_scale.value = typeof params.scale === 'number' ? params.scale : 1
 }
-const PRESETS_ALL: Record<PaperShader, { name: string; params: object }[]> = {
-  heat: [...PAPER_PRESETS.heat],
+const PRESETS_ALL: Record<'liquid' | 'smoke', { name: string; params: object }[]> = {
   liquid: [...liquidMetalPresets, ...PAPER_PRESETS.liquid],
   smoke: [...gemSmokePresets, ...PAPER_PRESETS.smoke],
 }
@@ -498,7 +497,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpe
     }
     // fusion: heat -> out1; second mask with per-face fields and seams as holes -> fused shader -> out2; composite
     pass(Q.final, F.out1)
-    Q.face.uniforms.mode.value = 2
+    Q.face.uniforms.mode.value = V.field === 'cube' ? 3 : 2
     cam.aspect = 1
     cam.updateProjectionMatrix()
     gl.setClearColor(new THREE.Color(1, 0, 0), 1)

@@ -101,8 +101,10 @@ export function Site({ version: initial = 'v10', scheme = 'icemint', bg = '#0709
     }
     // touch: a horizontal swipe steps the deck
     let x0 = 0
-    const ts = (e: TouchEvent) => { x0 = e.touches[0].clientX }
+    const onCanvas = (e: TouchEvent) => (e.target as Element | null)?.closest?.('canvas') != null
+    const ts = (e: TouchEvent) => { x0 = onCanvas(e) ? NaN : e.touches[0].clientX } // orbiting the cube is not a swipe
     const te = (e: TouchEvent) => {
+      if (Number.isNaN(x0)) return
       const dx = e.changedTouches[0].clientX - x0
       if (Math.abs(dx) > 48) stepRef.current(activeRef.current + (dx < 0 ? 1 : -1))
     }
