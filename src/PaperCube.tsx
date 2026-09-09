@@ -203,13 +203,14 @@ export type PaperCubeProps = {
   spin: boolean
   /** idle spin, rad/s */
   spinSpeed?: number
-  /** rubik: chain random turns */
+  /** rubik: chain random turns, with this pause between them (ms) */
   auto?: boolean
+  autoInterval?: number
   debug?: PaperDebug
   rubik?: React.RefObject<RubikHandle | null>
 }
 
-export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpeed = 0.35, auto = false, debug = 'off', rubik }: PaperCubeProps) {
+export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpeed = 0.35, auto = false, autoInterval = 900, debug = 'off', rubik }: PaperCubeProps) {
   const V = version
   const shape = shapeOverride ?? V.shape
   const SIZE = V.size
@@ -476,7 +477,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpe
               <primitive object={Q.face} attach="material" />
             </mesh>
           )}
-          {shape === 'rubik' && <RubikMask ref={rubik} gap={V.rubikGap} material={Q.face} auto={auto} />}
+          {shape === 'rubik' && <RubikMask ref={rubik} gap={V.rubikGap} material={Q.face} auto={auto} autoInterval={autoInterval} />}
           {shape === 'cage' && (
             <mesh>
               <boxGeometry args={[1, 1, 1]} />

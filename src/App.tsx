@@ -254,7 +254,7 @@ export default function App() {
   if (tab === 'site')
     return (
       <>
-        <Site />
+        <Site scheme={s.name} />
         <div className="site-tabs">{tabs}</div>
       </>
     )

@@ -46,10 +46,13 @@ const SECTIONS: Section[] = [
   },
 ]
 
+/** the cube emits the scheme's hue: scheme name -> heat preset */
+const HEAT_OF_SCHEME: Record<string, string> = { icemint: 'icemint', ice: 'icemint', mint: 'icemint', ember: 'ember', graphite: 'graphite', aura: 'default', paper: 'sepia' }
+
 /** cube versions worth comparing in place; key `v` cycles */
 const SITE_VERSIONS = ['v10', 'v16', 'v19', 'v13', 'v18', 'v17']
 
-export function Site({ version: initial = 'v10' }: { version?: string }) {
+export function Site({ version: initial = 'v10', scheme = 'icemint' }: { version?: string; scheme?: string }) {
   const [active, setActive] = useState(0)
   const [version, setVersion] = useState(initial)
   const [open, setOpen] = useState<{ section: number; item: number } | null>(null)
@@ -61,9 +64,10 @@ export function Site({ version: initial = 'v10' }: { version?: string }) {
   const PV = useMemo(() => ({ ...VERSION_OF(version)!, size: narrow ? 768 : 1024 }), [version, narrow])
   const params = useMemo(() => {
     const presets = PRESETS_OF[PV.shader]
-    const base = (presets.find((p) => p.name.toLowerCase() === PV.preset) ?? presets[0]).params as Record<string, unknown>
+    const want = PV.shader === 'heat' && PV.preset === undefined ? HEAT_OF_SCHEME[scheme] : PV.preset
+    const base = (presets.find((p) => p.name.toLowerCase() === want) ?? presets[0]).params as Record<string, unknown>
     return { ...base, ...(PV.shader === 'heat' ? { outerGlow: 0.42, contour: 0.75 } : {}), scale: (narrow ? 0.7 : 0.85) * (base.scale as number) }
-  }, [PV, narrow])
+  }, [PV, narrow, scheme])
 
   // deck stepping: arrows / digits; every step turns one layer
   const step = (i: number) => {
@@ -106,7 +110,7 @@ export function Site({ version: initial = 'v10' }: { version?: string }) {
   return (
     <>
       <Canvas key={version} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
-        <PaperCube version={PV} params={params} spin={!reduced} spinSpeed={0.12} rubik={rubik} />
+        <PaperCube version={PV} params={params} spin={!reduced} spinSpeed={0.12} auto={!reduced} autoInterval={6500} rubik={rubik} />
       </Canvas>
       <div className="aura" />
       <div className="grain" />

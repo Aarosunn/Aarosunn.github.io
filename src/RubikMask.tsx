@@ -16,8 +16,8 @@ type Cubie = { mesh: THREE.Mesh; pos: THREE.Vector3 }
 const AXES: Axis[] = ['x', 'y', 'z']
 const snap = (r: number) => Math.round(r / (Math.PI / 2)) * (Math.PI / 2)
 
-export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.Material; auto: boolean; onTurn?: () => void }>(
-  function RubikMask({ gap, material, auto, onTurn }, ref) {
+export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.Material; auto: boolean; autoInterval?: number; onTurn?: () => void }>(
+  function RubikMask({ gap, material, auto, autoInterval = 900, onTurn }, ref) {
     const root = useRef<THREE.Group>(null!)
     const pivot = useRef<THREE.Group>(null!)
     const cubies = useRef<Cubie[]>([])
@@ -82,14 +82,14 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
       const loop = async () => {
         while (live) {
           await turn()
-          await new Promise((r) => setTimeout(r, 900))
+          await new Promise((r) => setTimeout(r, autoInterval))
         }
       }
       loop()
       return () => {
         live = false
       }
-    }, [auto, turn])
+    }, [auto, autoInterval, turn])
 
     return (
       <group ref={root}>

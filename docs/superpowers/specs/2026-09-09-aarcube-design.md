@@ -111,3 +111,8 @@ In field modes the face shader now cuts the seam hairline out of the alpha, so t
 ## Site: glass detail panel (03:42)
 
 Clicking an item opens a glass panel (backdrop blur 18px over the cube's glow, 55% bg2, 14% bright hairline, inset top highlight) on the far side of the section, with placeholder title / paragraph / media slot / meta; Esc or close dismisses; opening turns the cube once; other sections fade to 12% while it is open. Narrow: bottom sheet. Narrow screens also use a 768 mask so integrated GPUs keep up.
+
+## Site: scheme → palette, idle turns, wheel (03:48)
+
+- `HEAT_OF_SCHEME`: when the site's cube version has no fixed preset, the heat palette follows the scheme (icemint/ice/mint → icemint, ember → ember, graphite → graphite, aura → paper default, paper → sepia). Key `c` now recolours the cube and the aura together.
+- Idle: spin .12 rad/s plus one random layer turn every 6.5 s (`autoInterval`); reduced-motion disables both. Wheel walks the deck (one step per gesture, 900 ms gate). List items are the clickable controls (Chromium computes `display: inline` on a button as inline-block, which orphaned the bullet).
