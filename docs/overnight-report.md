@@ -12,7 +12,7 @@ Started 02:50 EDT. Cleaned up the morning after: the old cube tab and the weaker
    - `c` cycles the colour scheme: the cube's palette follows it (ember = red cube, paper = light page), `p` cycles tabs
    - link a state: `/?v=v7&c=ember`, `/?tab=shader`
    - wheel and swipe also step the deck; the cube turns a layer on every step and idles with a turn every few seconds
-2. **shader cube** tab: 10 versions, opens on v1, rows version / preset / motion; the readout shows each version's note.
+2. **shader cube** tab: 11 versions, opens on v1; v11 is the site candidate (v10's cube with eight colour themes, brightness and opacity rows), rows version / preset / motion; the readout shows each version's note.
 3. `shots/sheet-all.png` = every version v1–v10 in one image; `shots/sheet-palettes.png` = v10 across the heat presets and v24 across the liquid presets; `shots/sheet-site*.png`, `shots/sheet-panel*.png`, `shots/sheet-schemes.png`.
 
 ## What was built
