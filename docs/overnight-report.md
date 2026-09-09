@@ -7,16 +7,18 @@ Started 02:50 EDT. Everything below is committed on `main`; nothing older was ed
 1. `npx vite --port 5173` → http://localhost:5173. The **site** tab is the default: the mock portfolio.
    - arrows / 1–4 / click / wheel step the deck; every step turns a layer of the cube
    - click any list item → glass detail panel; Esc closes
-   - `v` cycles the cube version in place: v10 → v16 → v19 → v13 → v18 → v17
-   - `c` cycles the colour scheme (aura wash + UI greys), `p` cycles tabs
-2. **heat cube** tab (shader cube): 26 versions, rows version / preset / shape / motion. The `rubik` shape has `turning` (auto) and `turn`.
-3. `shots/sheet-all.png` = every version v3–v23 in one image; `shots/sheet-v24-26.png`; `shots/sheet-site*.png`, `shots/sheet-panel.png`.
+   - `v` cycles the cube version in place: v10 → v16 → v19 → v20 → v27 → v13 → v18 → v24 → v17
+   - `c` cycles the colour scheme: the cube's palette follows it (ember = red cube), `p` cycles tabs
+   - wheel and swipe also step the deck; the cube turns a layer on every step and idles with a turn every few seconds
+2. **heat cube** tab (shader cube): 31 versions, rows version / preset / shape / motion; the readout shows each version's note. The `rubik` shape has `turning` (auto) and `turn`.
+3. `shots/sheet-all.png` = every version v3–v31 in one image; `shots/sheet-site*.png`, `shots/sheet-panel*.png`, `shots/sheet-schemes.png`.
 
 ## What was built
 
 - **PaperCube pipeline** (`src/PaperCube.tsx`, `src/paperVersions.ts`, `src/paperPresets.ts`): paper.design's heatmap, liquid metal and gem smoke run *verbatim* over a per-frame GPU render of a 3D shape. Heat gets their three blurs; liquid/smoke get either an analytic per-face plate or their real Poisson field solved on the GPU (Jacobi, 256², warm-started). The final pass clips to the silhouette (`halo`), can shade faces by lambert, and works on box / rounded box / octahedron / hidden-line cage / the Rubik's cube.
 - **Rubik's cube as the mask** (`src/RubikMask.tsx`): 27 cubies, real quarter turns, integrity asserted after 12 random turns in the shoot script for every Rubik's version. Seams are painted in the face shader; in liquid/smoke modes they cut the alpha so each cubie face is its own paper shape.
 - **Site mock** (`src/Site.tsx`, `src/Floral.tsx`): cube as the light source, four sections as a deck, glass panel, x-ray floral, aura + grain, responsive at 1440 / 1024 / 420.
+- **Fusion** (v27–v29): heat's halo and seam rims composited over another paper shader on the faces.
 - **Scripts**: `papercube-shoot.mjs` (frames, orbit drags, mask/combined debug views, turn before/mid/after, integrity, fps, `--igpu`), `sheet.mjs` (contact sheets), `site-shoot.mjs`.
 
 ## The versions I'd put in front of you first
@@ -27,12 +29,13 @@ Started 02:50 EDT. Everything below is committed on `main`; nothing older was ed
 | v16 / v19 | same in icemint, hairline seams, with / without halo | the site's palette |
 | v20 | hidden-line Rubik's cage | quietest, most graphic |
 | v24 | liquid metal, one Poisson shape per cubie | 27 chrome cubies, exact paper field each |
-| v18 | gem smoke icemint, no outer smoke | glassy marble faces |
+| v27 | fusion: heat seams and halo over ice liquid-metal cubies | the two languages in one object |
+| v18 / v30 | gem smoke icemint, without / with its plume | glassy marble faces |
 | v3 / v4 / v5 / v6 | the three shaders on a plain box / cage | closest to the site pages themselves |
 
 ## Numbers
 
-RTX 4060: every version 61 fps at 1440×900. Integrated GPU (`--igpu`): v10 39, v16 36, v19 43, v24 61. The site uses a 768 mask under 900px wide for that reason.
+RTX 4060: every version 61 fps at 1440×900. Integrated GPU (`--igpu`): v10 39, v16 41, v19 43, v24 61, v31 (quarter-res big blur) 48. The site uses a 768 mask and the quarter-res blur under 900px wide for that reason.
 
 ## Decisions for you
 
