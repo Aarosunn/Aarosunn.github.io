@@ -6,7 +6,7 @@ import * as THREE from 'three'
 import { Cube, SETS, SHAPES, VARIANTS_OF, type AnyVariant, type CubeHandle, type Set, type Shape } from './Cube'
 import { SCHEMES, type Scheme } from './schemes'
 import { Paper } from './Paper'
-import { HeatCube } from './HeatCube'
+import { HeatCube, type HeatVersion } from './HeatCube'
 import { heatmapPresets } from '@paper-design/shaders-react'
 
 // FPS sampler lives inside the canvas; reports out twice a second.
@@ -143,6 +143,7 @@ export default function App() {
   const [heatPreset, setHeatPreset] = useState(0)
   const [heatSpin, setHeatSpin] = useState(true)
   const [heatHollow, setHeatHollow] = useState(false)
+  const [heatVersion, setHeatVersion] = useState<HeatVersion>('v2')
   const [si, setSi] = useState(0)
   const [shape, setShape] = useState<Shape>('solid')
   const [set, setSet] = useState<Set>('v2')
@@ -186,6 +187,7 @@ export default function App() {
     window.__aar = {
       setTab,
       setHeatHollow,
+      setHeatVersion,
       setScheme: (n: string) => setSi(Math.max(0, SCHEMES.findIndex((x) => x.name === n))),
       setVariant,
       setShape,
@@ -226,12 +228,13 @@ export default function App() {
     return (
       <>
         <Canvas dpr={[1, 1.5]} camera={{ position: [0, 0, 6.5], fov: 30 }} gl={{ antialias: true }}>
-          <HeatCube params={heatmapPresets[heatPreset].params} spin={heatSpin} hollow={heatHollow} />
+          <HeatCube key={heatVersion} params={heatmapPresets[heatPreset].params} spin={heatSpin} hollow={heatHollow} version={heatVersion} />
         </Canvas>
         <div className="ui">
           <div className="wordmark">aarcube</div>
           {tabs}
           <div className="controls">
+            <Row label="version" items={['v1', 'v2'] as HeatVersion[]} on={heatVersion} pick={setHeatVersion} />
             <Row label="preset" items={heatmapPresets.map((p) => p.name.toLowerCase())} on={heatmapPresets[heatPreset].name.toLowerCase()} pick={(n) => setHeatPreset(heatmapPresets.findIndex((p) => p.name.toLowerCase() === n))} />
             <div className="row">
               <span className="k">motion</span>
@@ -346,6 +349,7 @@ declare global {
     __aar: {
       setTab: (t: Tab) => void
       setHeatHollow: (b: boolean) => void
+      setHeatVersion: (v: HeatVersion) => void
       setScheme: (n: string) => void
       setVariant: (v: AnyVariant) => void
       setShape: (v: Shape) => void

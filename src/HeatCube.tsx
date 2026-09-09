@@ -11,7 +11,14 @@ import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { getShaderColorFromString, heatmapFragmentShader, type HeatmapParams } from '@paper-design/shaders'
 
-const SIZE = 512 // processed canvas; theirs is 1750 with the image in the central 57%
+// v1: 512 mask, black cube with white edge bars on white, outer glow as on the site.
+// v2: 1024 MSAA mask, inverted: the cube body is paper's "outside" (R = 1) and the black background is
+//     the shape, so their animated hot band sweeps *inside* the cube; edges are black seams that get the
+//     inner glow. Mask G = lambert shade on the faces, 0 on the background; it rides in the combined
+//     alpha so their own `a == 0 -> colorBack` branch clips everything beyond the silhouette, and one
+//     appended multiply shades the faces so the cube reads 3D.
+export type HeatVersion = 'v1' | 'v2'
+const SIZE_OF: Record<HeatVersion, number> = { v1: 512, v2: 1024 }
 const IMG = 1000 / 1750 // image fraction of the padded canvas
 
 // separable box blur; one pass = one direction
@@ -31,8 +38,25 @@ const BLUR = /* glsl */ `
 const COMBINE = /* glsl */ `
   precision highp float;
   in vec2 vUv; out vec4 o;
-  uniform sampler2D contour; uniform sampler2D big; uniform sampler2D inner;
-  void main() { o = vec4(texture(contour, vUv).r, texture(big, vUv).r, texture(inner, vUv).r, 1.0); }
+  uniform sampler2D contour; uniform sampler2D big; uniform sampler2D inner; uniform sampler2D mask;
+  void main() {
+    // alpha = mask G: 1 in v1; in v2 the face shade (> 0) inside and 0 outside (their colorBack branch)
+    o = vec4(texture(contour, vUv).r, texture(big, vUv).r, texture(inner, vUv).r, texture(mask, vUv).g);
+  }
+`
+// v2 faces: R = 1 (paper's "outside", where the heat lives), G = lambert shade in view space
+const FACE = /* glsl */ `
+  precision highp float;
+  in vec3 vN; out vec4 o;
+  void main() {
+    float l = 0.45 + 0.55 * max(dot(normalize(vN), normalize(vec3(0.35, 0.8, 0.6))), 0.0);
+    o = vec4(1.0, l, 0.0, 1.0);
+  }
+`
+const FACE_VERT = /* glsl */ `
+  in vec3 position; in vec3 normal; out vec3 vN;
+  uniform mat4 modelViewMatrix; uniform mat4 projectionMatrix; uniform mat3 normalMatrix;
+  void main() { vN = normalMatrix * normal; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
 `
 const QUAD_VERT = /* glsl */ `
   in vec3 position; in vec2 uv; out vec2 vUv;
@@ -51,25 +75,28 @@ const HEAT_VERT = /* glsl */ `
   }
 `
 
-const rt = (size: number, depth = false) =>
+const rt = (size: number, depth = false, samples = 0) =>
   new THREE.WebGLRenderTarget(size, size, {
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
     wrapS: THREE.ClampToEdgeWrapping,
     wrapT: THREE.ClampToEdgeWrapping,
     depthBuffer: depth,
+    samples,
   })
 
-export type HeatCubeProps = { params: Omit<HeatmapParams, 'image'>; spin: boolean; hollow: boolean }
+export type HeatCubeProps = { params: Omit<HeatmapParams, 'image'>; spin: boolean; hollow: boolean; version: HeatVersion }
 
-export function HeatCube({ params, spin, hollow }: HeatCubeProps) {
+export function HeatCube({ params, spin, hollow, version }: HeatCubeProps) {
+  const SIZE = SIZE_OF[version]
+  const v2 = version === 'v2'
   const cube = useRef<THREE.Mesh>(null!)
   const maskScene = useRef<THREE.Scene>(null!)
   const { gl, camera, size } = useThree()
 
   const R = useMemo(
     () => ({
-      mask: rt(SIZE, true), // depth so the faces hide the back edges
+      mask: rt(SIZE, true, v2 ? 4 : 0), // depth so the faces hide the back edges; MSAA in v2
       a: rt(SIZE),
       b: rt(SIZE),
       contour: rt(SIZE),
@@ -79,7 +106,7 @@ export function HeatCube({ params, spin, hollow }: HeatCubeProps) {
       big: rt(SIZE / 2),
       combined: rt(SIZE),
     }),
-    [],
+    [SIZE, v2],
   )
   const quad = useMemo(() => {
     const scene = new THREE.Scene()
@@ -96,12 +123,16 @@ export function HeatCube({ params, spin, hollow }: HeatCubeProps) {
       glslVersion: THREE.GLSL3,
       vertexShader: QUAD_VERT,
       fragmentShader: COMBINE,
-      uniforms: { contour: { value: null }, big: { value: null }, inner: { value: null } },
+      uniforms: { contour: { value: null }, big: { value: null }, inner: { value: null }, mask: { value: null } },
     })
     const heat = new THREE.RawShaderMaterial({
       glslVersion: THREE.GLSL3,
       vertexShader: HEAT_VERT,
-      fragmentShader: heatmapFragmentShader.replace('#version 300 es', ''),
+      // their shader verbatim, plus one appended multiply by the face shade (u_shade = 0 leaves it untouched)
+      fragmentShader: heatmapFragmentShader
+        .replace('#version 300 es', '')
+        .replace('uniform float u_contour;', 'uniform float u_contour; uniform float u_shade;')
+        .replace('fragColor = vec4(color, opacity);', 'fragColor = vec4(color, opacity);\n  fragColor.rgb *= mix(1.0, texture(u_image, imgUV).a, u_shade);'),
       uniforms: {
         u_image: { value: null },
         u_time: { value: 0 },
@@ -114,11 +145,13 @@ export function HeatCube({ params, spin, hollow }: HeatCubeProps) {
         u_innerGlow: { value: 0.5 },
         u_outerGlow: { value: 0.5 },
         u_contour: { value: 0.5 },
+        u_shade: { value: 0 },
         u_aspect: { value: 1 },
         u_scale: { value: 0.75 },
       },
     })
-    return { scene, cam, mesh, blur, combine, heat }
+    const face = new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: FACE_VERT, fragmentShader: FACE })
+    return { scene, cam, mesh, blur, combine, heat, face }
   }, [])
 
   useEffect(
@@ -127,6 +160,7 @@ export function HeatCube({ params, spin, hollow }: HeatCubeProps) {
       quad.blur.dispose()
       quad.combine.dispose()
       quad.heat.dispose()
+      quad.face.dispose()
     },
     [R, quad],
   )
@@ -145,9 +179,10 @@ export function HeatCube({ params, spin, hollow }: HeatCubeProps) {
     u.u_noise.value = params.noise ?? 0
     u.u_innerGlow.value = params.innerGlow ?? 0.5
     u.u_outerGlow.value = params.outerGlow ?? 0.5
+    u.u_shade.value = v2 ? 0.55 : 0
     u.u_contour.value = params.contour ?? 0.5
     u.u_scale.value = params.scale ?? 0.75
-  }, [params, quad])
+  }, [params, quad, v2])
 
   const pass = (mat: THREE.RawShaderMaterial, target: THREE.WebGLRenderTarget) => {
     quad.mesh.material = mat
@@ -179,7 +214,7 @@ export function HeatCube({ params, spin, hollow }: HeatCubeProps) {
     cam.aspect = 1
     cam.updateProjectionMatrix()
     const prevClear = gl.getClearColor(new THREE.Color())
-    gl.setClearColor('#ffffff', 1)
+    gl.setClearColor(v2 ? '#000000' : '#ffffff', 1) // v2: background is the shape, G = 0 clips it
     gl.setRenderTarget(R.mask)
     gl.clear()
     gl.render(maskScene.current, cam)
@@ -196,11 +231,13 @@ export function HeatCube({ params, spin, hollow }: HeatCubeProps) {
     quad.blur.uniforms.t.value = R.mask.texture
     quad.blur.uniforms.dir.value.set(0, 0)
     pass(quad.blur, R.bigA)
-    boxBlur(R.bigA, R.bigB, R.big, px(150, SIZE / 2), 3)
+    // v2: wider big blur so the sweep reaches into the faces instead of hugging the rim
+    boxBlur(R.bigA, R.bigB, R.big, px(v2 ? 260 : 150, SIZE / 2), 3)
 
     quad.combine.uniforms.contour.value = R.contour.texture
     quad.combine.uniforms.big.value = R.big.texture
     quad.combine.uniforms.inner.value = R.inner.texture
+    quad.combine.uniforms.mask.value = R.mask.texture
     pass(quad.combine, R.combined)
 
     // 3. their fragment shader over the screen
@@ -219,10 +256,18 @@ export function HeatCube({ params, spin, hollow }: HeatCubeProps) {
       <scene ref={maskScene}>
         <mesh ref={cube} rotation={[0.5, -0.7, 0]}>
           <boxGeometry args={[1, 1, 1]} />
-          {/* hollow: drop the faces so every edge shows through */}
-          <meshBasicMaterial color="#000000" visible={!hollow} />
-          {/* solid: white edges cut lines into the black shape. hollow: the black edges are the shape */}
-          <EdgeBars size={1} width={hollow ? 0.06 : 0.035} color={hollow ? '#000000' : '#ffffff'} />
+          {/* hollow: drop the faces so every edge shows through. v2 faces write the shade into G */}
+          {v2 ? (
+            <primitive object={quad.face} attach="material" visible={!hollow} />
+          ) : (
+            <meshBasicMaterial color="#000000" visible={!hollow} />
+          )}
+          {/* v1 solid: white edges cut lines into the shape. v2: half-grey hairline seams. hollow: black edges are the shape */}
+          <EdgeBars
+            size={1}
+            width={hollow ? 0.06 : v2 ? 0.007 : 0.035}
+            color={hollow ? '#000000' : v2 ? '#000000' : '#ffffff'}
+          />
         </mesh>
       </scene>
     </>

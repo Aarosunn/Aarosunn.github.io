@@ -31,4 +31,9 @@ for (let i = 0; i < drags.length; i++) {
 await page.evaluate(() => window.__aar.setHeatHollow(true))
 await page.waitForTimeout(500)
 await page.screenshot({ path: 'shots/heatcube/hollow.png' })
+await page.evaluate(() => window.__aar.setHeatHollow(false))
+// v1 for comparison
+await page.evaluate(() => window.__aar.setHeatVersion('v1'))
+await page.waitForTimeout(800)
+await page.screenshot({ path: 'shots/heatcube/v1.png' })
 await browser.close()
