@@ -145,3 +145,7 @@ Third sonnet review: touch-orbiting the cube no longer counts as a swipe (target
 ## v35 (04:35)
 
 Liquid metal on rounded cubies with per-cubie Poisson (seams cut the alpha): 27 icy chrome pillows, continuous through turns. Site cycle now includes v34.
+
+## Site layout A/B (04:40)
+
+Key `l` toggles `corners` (four sections around the cube) and `deck` (cube alone; the active section's title, blurb and items sit above the deck, panels do the rest; floral fades to 16%). One of the morning decisions is now a live comparison. `.site-head`/`.site-base` are pinned to rows 1 and 4 so an empty middle never pulls the base up. Floral seed follows the scheme.

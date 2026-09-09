@@ -324,6 +324,7 @@ button:focus-visible {
 }
 .site-head {
   grid-column: 1 / -1;
+  grid-row: 1;
   display: flex;
   align-items: baseline;
   gap: 28px;
@@ -402,6 +403,7 @@ button:focus-visible {
 
 .site-base {
   grid-column: 1 / -1;
+  grid-row: 4;
   display: grid;
   justify-items: center;
   gap: 10px;
@@ -548,6 +550,37 @@ body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130
 .site.has-panel .sec:not(.on) {
   opacity: 0.12;
 }
+/* deck-only layout: corners empty, the active section lives above the deck */
+.layout-deck .sec { display: none; }
+.layout-deck .floral { opacity: 0.16; }
+.deck-blurb {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  animation: rise 0.5s var(--ease) both;
+}
+.deck-blurb h2 {
+  font: 300 26px/1.1 var(--display);
+  color: var(--bright);
+  letter-spacing: -0.01em;
+}
+.deck-blurb p {
+  color: var(--mute);
+  max-width: 44ch;
+}
+.deck-blurb ul {
+  list-style: none;
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+  color: var(--text);
+  opacity: 0.85;
+}
+.deck-blurb li { cursor: pointer; }
+.deck-blurb li:hover { color: var(--bright); }
 .site-ver {
   color: var(--line);
   font-size: 11px;

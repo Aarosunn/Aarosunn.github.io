@@ -20,6 +20,7 @@ for (const [w, h] of [[1440, 900], [1024, 700], [420, 820]]) {
   await page.keyboard.press('3')
   await page.waitForTimeout(900)
   await page.screenshot({ path: `shots/site/${w}-2.png` })
+  if (w === 1440) { await page.keyboard.press('l'); await page.waitForTimeout(900); await page.screenshot({ path: `shots/site/${w}-deck.png` }); await page.keyboard.press('ArrowRight'); await page.waitForTimeout(900); await page.screenshot({ path: `shots/site/${w}-deck2.png` }); await page.keyboard.press('l'); await page.waitForTimeout(500) }
   await page.click('.sec.on li')
   await page.waitForTimeout(900)
   await page.screenshot({ path: `shots/site/${w}-panel.png` })
