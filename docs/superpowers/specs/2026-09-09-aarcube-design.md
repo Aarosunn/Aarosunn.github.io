@@ -107,3 +107,7 @@ Sonnet critique on the three viewports, applied: inactive sections recede (opaci
 ## v24–v26: per-cubie Poisson (03:38)
 
 In field modes the face shader now cuts the seam hairline out of the alpha, so the GPU Poisson sees every cubie face as its own shape: v24 liquid metal = 27 chrome cubies with paper's exact field each, v25 gem smoke icemint per cubie, v26 v24 in noir. Continuous through turns (the solver is per-frame, warm-started). Integrated GPU (no PRIME, `--igpu`): v10 39, v16 36, v19 43, v24 61 fps; the three heat blur chains at 1024 are the cost, Poisson at 256 is cheap.
+
+## Site: glass detail panel (03:42)
+
+Clicking an item opens a glass panel (backdrop blur 18px over the cube's glow, 55% bg2, 14% bright hairline, inset top highlight) on the far side of the section, with placeholder title / paragraph / media slot / meta; Esc or close dismisses; opening turns the cube once; other sections fade to 12% while it is open. Narrow: bottom sheet. Narrow screens also use a 768 mask so integrated GPUs keep up.

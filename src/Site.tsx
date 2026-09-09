@@ -52,11 +52,13 @@ const SITE_VERSIONS = ['v10', 'v16', 'v19', 'v13', 'v18', 'v17']
 export function Site({ version: initial = 'v10' }: { version?: string }) {
   const [active, setActive] = useState(0)
   const [version, setVersion] = useState(initial)
+  const [open, setOpen] = useState<{ section: number; item: number } | null>(null)
   const rubik = useRef<RubikHandle | null>(null)
   // the lab's v10 at its own camera (blur radii are frame-relative, so the cube stays crisp);
   // paper's `scale` shrinks the whole image on screen so the sections breathe
   const narrow = typeof window !== 'undefined' && window.innerWidth < 900
-  const PV = VERSION_OF(version)!
+  // narrow screens are usually integrated GPUs: a 768 mask keeps the heat blurs cheap
+  const PV = useMemo(() => ({ ...VERSION_OF(version)!, size: narrow ? 768 : 1024 }), [version, narrow])
   const params = useMemo(() => {
     const presets = PRESETS_OF[PV.shader]
     const base = (presets.find((p) => p.name.toLowerCase() === PV.preset) ?? presets[0]).params as Record<string, unknown>
@@ -72,6 +74,7 @@ export function Site({ version: initial = 'v10' }: { version?: string }) {
   // swapped during dispatch never sees it, so the live handler lives in a ref
   const onKey = useRef<(e: KeyboardEvent) => void>(() => {})
   onKey.current = (e) => {
+    if (e.key === 'Escape') setOpen(null)
     if (e.key === 'ArrowRight') step(active + 1)
     if (e.key === 'ArrowLeft') step(active - 1)
     if (e.key === 'v') setVersion((v) => SITE_VERSIONS[(SITE_VERSIONS.indexOf(v) + 1) % SITE_VERSIONS.length])
@@ -91,7 +94,7 @@ export function Site({ version: initial = 'v10' }: { version?: string }) {
       </Canvas>
       <div className="aura" />
       <div className="grain" />
-      <div className="ui site">
+      <div className={`ui site ${open ? 'has-panel' : ''}`}>
         <header className="site-head">
           <div className="wordmark">aarcube</div>
           <p className="site-intro">Aaron. Engineer of small machines and large gradients.</p>
@@ -101,12 +104,36 @@ export function Site({ version: initial = 'v10' }: { version?: string }) {
             <h2>{s.title}</h2>
             <p>{s.blurb}</p>
             <ul>
-              {s.items.map((it) => (
-                <li key={it}>{it}</li>
+              {s.items.map((it, j) => (
+                <li key={it}>
+                  <button
+                    className="item"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setActive(i)
+                      setOpen({ section: i, item: j })
+                      rubik.current?.turn()
+                    }}
+                  >
+                    {it}
+                  </button>
+                </li>
               ))}
             </ul>
           </section>
         ))}
+        {open && (
+          <aside className={`panel ${SECTIONS[open.section].id === 'about' || SECTIONS[open.section].id === 'creatives' ? 'panel-right' : 'panel-left'}`}>
+            <span className="panel-k">{SECTIONS[open.section].title}</span>
+            <h3>{SECTIONS[open.section].items[open.item].replace(/^placeholder: /, '')}</h3>
+            <p>Placeholder detail. A paragraph about what this is, why it exists, and what it taught. One image or a short clip would sit below.</p>
+            <div className="panel-media" />
+            <p className="panel-meta">2026 · placeholder stack · link</p>
+            <button className="panel-close" onClick={() => setOpen(null)}>
+              close
+            </button>
+          </aside>
+        )}
         <div className="site-base">
           <Floral className="floral" seed={11} />
           <nav className="deck" aria-label="sections">
