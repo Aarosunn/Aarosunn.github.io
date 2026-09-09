@@ -40,6 +40,8 @@ Started 02:50 EDT. Everything below is committed on `main`; nothing older was ed
 
 RTX 4060: every version 61 fps at 1440×900. Integrated GPU (`--igpu`), lab tab: v10 39, v16 41, v19 43, v24 61, v31 (quarter-res big blur) 48. The **site** on the integrated GPU (`scripts/site-fps.mjs`, after warm-up): 52 fps at 1440×900 with v10, 55–60 at 420×820 (768 mask + quarter-res blur under 900px), 60 with v24.
 
+`npx vite build` passes (one 1.44 MB chunk, 407 kB gzip: three + paper shaders + react); code-splitting the lab tabs is the obvious next step before a Pages deploy.
+
 ## Decisions for you
 
 - Which cube goes on the site (v10 paper palette vs v16/v19 icemint vs v20 cage vs v24 chrome).
