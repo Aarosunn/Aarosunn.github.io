@@ -55,6 +55,14 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
         pending.current = null
       }
     }, [])
+    // the mask material is shared; each cubie writes its own id (1..27 over 28) so the field solver never bridges two cubies
+    const tagId = (i: number) => (_r: THREE.WebGLRenderer, _s: THREE.Scene, _c: THREE.Camera, _g: THREE.BufferGeometry, mat: THREE.Material) => {
+      const u = (mat as THREE.ShaderMaterial).uniforms
+      if (u?.uId) {
+        u.uId.value = (i + 1) / 28
+        ;(mat as THREE.ShaderMaterial).uniformsNeedUpdate = true
+      }
+    }
     const cells = useMemo(() => {
       const out: THREE.Vector3[] = []
       for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) out.push(new THREE.Vector3(x, y, z))
@@ -150,7 +158,10 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
               position={[p.x * gap, p.y * gap, p.z * gap]}
               material={material}
               ref={(m: THREE.Mesh | null) => {
-                if (m) cubies.current[i] = { mesh: m, pos: p.clone() }
+                if (m) {
+                  cubies.current[i] = { mesh: m, pos: p.clone() }
+                  m.onBeforeRender = tagId(i)
+                }
               }}
             />
           ) : (
@@ -159,7 +170,10 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
               position={[p.x * gap, p.y * gap, p.z * gap]}
               material={material}
               ref={(m) => {
-                if (m) cubies.current[i] = { mesh: m, pos: p.clone() }
+                if (m) {
+                  cubies.current[i] = { mesh: m, pos: p.clone() }
+                  m.onBeforeRender = tagId(i)
+                }
               }}
             >
               <boxGeometry args={[1, 1, 1]} />

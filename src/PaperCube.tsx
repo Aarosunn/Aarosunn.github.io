@@ -60,6 +60,23 @@ const COMBINE_FIELD = /* glsl */ `
     o = vec4(m.r, m.g, 1.0, 1.0);
   }
 `
+// occlusion edges: where a nearer cubie overlaps a farther one there is no painted seam, so cut one from the depth
+// stored in the mask alpha (both sides must be inside the cube; the silhouette is left alone)
+const EDGE = /* glsl */ `
+  precision highp float;
+  in vec2 vUv; out vec4 o;
+  uniform sampler2D t; uniform float texel;
+  void main() {
+    vec4 m = texture(t, vUv);
+    float edge = 0.0;
+    for (int i = 0; i < 8; i++) {
+      float a = float(i) * 0.785398;
+      vec4 n = texture(t, vUv + vec2(cos(a), sin(a)) * texel * 2.0);
+      edge = max(edge, step(0.012, abs(n.a - m.a)) * step(0.01, n.b) * step(0.01, m.b));
+    }
+    o = vec4(m.r, m.g * (1.0 - edge), m.b, m.a);
+  }
+`
 // min-filtered downsample of the alpha (G): a hairline seam stays a hole in the coarse Poisson grid
 const DOWNMIN = /* glsl */ `
   precision highp float;
@@ -96,11 +113,16 @@ const COMBINE_POISSON = /* glsl */ `
 const POISSON = /* glsl */ `
   precision highp float;
   in vec2 vUv; out vec4 o;
-  uniform sampler2D u; uniform sampler2D mask; uniform float texel;
+  uniform sampler2D u; uniform sampler2D mask; uniform sampler2D ids; uniform float texel; uniform float thresh;
+  // a neighbour that belongs to another cubie (id in the full-res mask R) is a wall (u = 0 there)
+  float nb(vec2 p, float id) {
+    float same = step(abs(texture(ids, p).r - id), 0.012);
+    return texture(u, p).r * same;
+  }
   void main() {
-    float inside = step(0.5, texture(mask, vUv).g);
-    float s = texture(u, vUv + vec2(texel, 0.0)).r + texture(u, vUv - vec2(texel, 0.0)).r
-            + texture(u, vUv + vec2(0.0, texel)).r + texture(u, vUv - vec2(0.0, texel)).r;
+    float inside = step(thresh, texture(mask, vUv).g);
+    float id = texture(ids, vUv).r;
+    float s = nb(vUv + vec2(texel, 0.0), id) + nb(vUv - vec2(texel, 0.0), id) + nb(vUv + vec2(0.0, texel), id) + nb(vUv - vec2(0.0, texel), id);
     o = vec4(vec3(inside * 0.25 * (s + 1.0)), 1.0);
   }
 `
@@ -130,7 +152,7 @@ const COPY = /* glsl */ `
 `
 // cubie faces
 const FACE_VERT = /* glsl */ `
-  in vec3 position; in vec3 normal; in vec2 uv; out vec3 vN; out vec2 vUv; out vec3 vLocal; out vec3 vLocalN; out vec3 vCube; out vec3 vCubeN; out vec3 vShift; out vec3 vCap;
+  in vec3 position; in vec3 normal; in vec2 uv; out vec3 vN; out vec2 vUv; out vec3 vLocal; out vec3 vLocalN; out vec3 vCube; out vec3 vCubeN; out vec3 vShift; out vec3 vCap; out float vViewZ;
   uniform mat4 modelViewMatrix; uniform mat4 projectionMatrix; uniform mat3 normalMatrix; uniform mat4 modelMatrix; uniform mat4 uRootInv;
   void main() {
     vN = normalMatrix * normal; vUv = uv; vLocal = position; vLocalN = normal;
@@ -147,11 +169,15 @@ const FACE_VERT = /* glsl */ `
 `
 const FACE_FRAG = /* glsl */ `
   precision highp float;
-  in vec3 vN; in vec2 vUv; in vec3 vLocal; in vec3 vLocalN; in vec3 vCube; in vec3 vCubeN; in vec3 vShift; in vec3 vCap; out vec4 o;
+  in vec3 vN; in vec2 vUv; in vec3 vLocal; in vec3 vLocalN; in vec3 vCube; in vec3 vCubeN; in vec3 vShift; in vec3 vCap; in float vViewZ; out vec4 o;
+  uniform float uCamZ;    // alpha = view depth relative to the camera distance, over 6 units (occlusion edges)
   uniform float mode;   // 0 heat, 2 plate per cubie face, 3 plate per whole cube face (cube space)
   uniform float k;      // plate sharpness
   uniform float uHalf;  // cube half extent in cube space (mode 3)
   uniform float uSeam;  // hairline along each cubie face border, in cubie units (cubie = 1)
+  uniform float uSeamSym; // mode 2: seams on all four sides (1) or v11's two (0)
+  uniform float uId;      // this cubie's id, written to R in plate mode when uIdOut = 1 (Poisson keeps cubies apart)
+  uniform float uIdOut;
   uniform float uCapCos; // mode 2: a fragment counts as a cap (z face) only if |n.z| exceeds this, like the extrusion's cap / side-wall split
   uniform float uSeamUv; // 0: from local geometry (true edges); 1: from the geometry's uv (v1-v11 look; drifts on rounded cubies after turns);
                          // 2: the v11 mapping (extrude uv = coordinate + 0.43: one-sided seams, plate centre at +0.07) rebuilt in cube-space axes
@@ -159,32 +185,35 @@ const FACE_FRAG = /* glsl */ `
   float plate(vec2 p) { float b = (1.0 - p.x * p.x) * (1.0 - p.y * p.y); return 1.0 - pow(clamp(b, 0.0, 1.0), k); }
   // the two coordinates across the face this fragment lies on (dominant local normal axis), -.5..+.5
   vec2 across(vec3 pos, vec3 n) { vec3 a = abs(n); return a.x > a.y && a.x > a.z ? pos.yz : a.y > a.z ? pos.xz : pos.xy; }
-  // the extrusion's rule in the cubie's own frame: the face is the cap axis (cube z, carried in as vCap) when the
-  // normal sits on it beyond capCos, else the dominant of the other two; return the two coordinates across it
-  vec2 acrossRigid(vec3 pos, vec3 n, vec3 cap) {
-    vec3 a = abs(normalize(n));
-    vec3 c = abs(cap);
-    float onCap = step(uCapCos, dot(a, c));
-    vec3 w = mix(a * (1.0 - c), c, onCap);
-    return w.x >= w.y && w.x >= w.z ? pos.yz : w.y >= w.z ? pos.xz : pos.xy;
+  // which face of the cubie a fragment lies on, from its position alone (the largest |coordinate|); never from
+  // the interpolated normal, which drifts across a rounded face and splits it. Returns the two coordinates across
+  // that face, taken from the shifted position (v11's +0.07 plate offset).
+  vec2 acrossRigid(vec3 pos, vec3 shifted) {
+    vec3 ap = abs(pos);
+    return ap.x >= ap.y && ap.x >= ap.z ? shifted.yz : ap.y >= ap.z ? shifted.xz : shifted.xy;
   }
   void main() {
     float l = 0.35 + 0.65 * max(dot(normalize(vN), normalize(vec3(0.35, 0.8, 0.6))), 0.0);
-    // face coordinates -.5..+.5
-    vec2 f = uSeamUv > 1.5 ? acrossRigid(vLocal - vShift, vLocalN, vCap) : uSeamUv > 0.5 ? vUv - 0.5 : across(vLocal, vLocalN);
-    float e = 0.5 - max(abs(f.x), abs(f.y));
+    // face coordinates -.5..+.5 for the plate, and for the seam. v11's uv shifts both by the same +0.07, so seams
+    // fall on two sides of each face only and neighbouring faces merge into one field island across the edge;
+    // that island creases when the cubie turns. Mode 2 keeps the shifted plate but seams every side (uSeamSym).
+    vec2 f = uSeamUv > 1.5 ? acrossRigid(vLocal, vLocal - vShift) : uSeamUv > 0.5 ? vUv - 0.5 : across(vLocal, vLocalN);
+    vec2 fs = uSeamUv > 1.5 && uSeamSym > 0.5 ? acrossRigid(vLocal, vLocal) : f;
+    float e = 0.5 - max(abs(fs.x), abs(fs.y));
     float seam = uSeam > 0.0 ? 1.0 - smoothstep(uSeam * 0.6, uSeam, e) : 0.0;
+    float depth = clamp((vViewZ - uCamZ) / 6.0 + 0.5, 0.0, 1.0);
     if (mode < 1.0) {
-      o = vec4(seam, l, 1.0, 1.0);
+      o = vec4(seam, l, 1.0, depth);
     } else if (mode < 2.5) {
-      // seams become holes in the alpha, so a Poisson field sees every cubie face as its own shape
-      o = vec4(plate(2.0 * f), 1.0 - seam, l, 1.0);
+      // seams become holes in the alpha, so a Poisson field sees every cubie face as its own shape;
+      // with uIdOut the R channel carries the cubie id instead of the plate (the solver uses it as a wall)
+      o = vec4(uIdOut > 0.5 ? uId : plate(2.0 * f), 1.0 - seam, l, depth);
     } else {
       // the whole cube face this fragment lies on, in cube space: coords perpendicular to the dominant normal axis
       vec3 n = abs(normalize(vCubeN));
       vec3 c = vCube / uHalf;
       vec2 p = n.x > n.y && n.x > n.z ? c.yz : n.y > n.z ? c.xz : c.xy;
-      o = vec4(plate(clamp(p, -1.0, 1.0)), 1.0, l, 1.0);
+      o = vec4(plate(clamp(p, -1.0, 1.0)), 1.0, l, depth);
     }
   }
 `
@@ -377,6 +406,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       bigB: rt(SIZE / V.bigDiv),
       big: rt(SIZE / V.bigDiv),
       combined: rt(SIZE),
+      maskE: rt(SIZE), // mask with occlusion-edge seams cut in (liquid / smoke)
       // poisson: solved at 256 with float targets; max reduced by halving eight times
       pA: frt(256),
       pB: frt(256),
@@ -410,22 +440,24 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       combineHeat: raw(COMBINE_HEAT, { contour: { value: null }, big: { value: null }, inner: { value: null } }),
       combineField: raw(COMBINE_FIELD, { mask: { value: null } }),
       combinePoisson: raw(COMBINE_POISSON, { mask: { value: null }, u: { value: null }, umax: { value: null } }),
-      poisson: raw(POISSON, { u: { value: null }, mask: { value: null }, texel: { value: 1 / 256 } }),
+      poisson: raw(POISSON, { u: { value: null }, mask: { value: null }, ids: { value: null }, texel: { value: 1 / 256 }, thresh: { value: 0.5 } }),
       reduceMax: raw(REDUCE_MAX, { t: { value: null }, texel: { value: 1 / 128 } }),
       downMin: raw(DOWNMIN, { t: { value: null }, texel: { value: 1 / 1024 }, taps: { value: 4 } }),
+      edge: raw(EDGE, { t: { value: null }, texel: { value: 1 / 1024 } }),
       copy: raw(COPY, { t: { value: null } }),
-      face: raw(FACE_FRAG, { mode: { value: 0 }, k: { value: 0.75 }, uHalf: { value: 1.5 }, uSeam: { value: 0 }, uSeamUv: { value: 1 }, uCapCos: { value: 0.999 }, uRootInv: { value: new THREE.Matrix4() } }, FACE_VERT),
+      face: raw(FACE_FRAG, { mode: { value: 0 }, k: { value: 0.75 }, uHalf: { value: 1.5 }, uSeam: { value: 0 }, uSeamUv: { value: 1 }, uSeamSym: { value: 0 }, uId: { value: 0 }, uIdOut: { value: 0 }, uCamZ: { value: 11 }, uCapCos: { value: 0.999 }, uRootInv: { value: new THREE.Matrix4() } }, FACE_VERT),
       final: raw(finalFragment(V.shader), finalUniforms(), FINAL_VERT),
       final2: V.fuse ? raw(finalFragment(V.fuse), finalUniforms(), FINAL_VERT) : null,
       composite: raw(COMPOSITE, { a: { value: null }, b: { value: null } }),
     }
-  }, [V.shader, V.fuse])
+  // shader sources in the deps: a hot reload of this file must rebuild the materials, not keep the old GLSL
+  }, [V.shader, V.fuse, FACE_FRAG, FACE_VERT])
 
   useEffect(
     () => () => {
       Object.values(R).forEach((t) => (Array.isArray(t) ? t.forEach((x) => x.dispose()) : t.dispose()))
       Q.mesh.geometry.dispose()
-      ;[Q.blur, Q.combineHeat, Q.combineField, Q.combinePoisson, Q.poisson, Q.reduceMax, Q.downMin, Q.copy, Q.face, Q.final, Q.final2, Q.composite].forEach((m) => m?.dispose())
+      ;[Q.blur, Q.combineHeat, Q.combineField, Q.combinePoisson, Q.poisson, Q.reduceMax, Q.downMin, Q.edge, Q.copy, Q.face, Q.final, Q.final2, Q.composite].forEach((m) => m?.dispose())
     },
     [R, Q],
   )
@@ -458,6 +490,8 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     Q.face.uniforms.uSeam.value = V.seam
     Q.face.uniforms.uSeamUv.value = V.seamSpace === 'geometry' ? 0 : V.seamSpace === 'cube' ? 2 : 1
     Q.face.uniforms.uCapCos.value = V.capCos
+    Q.face.uniforms.uSeamSym.value = V.seamSym ? 1 : 0
+    Q.face.uniforms.uCamZ.value = V.camZ
   }, [params, Q, V, gain, alpha, outline, outlineColor])
 
   const pass = (mat: THREE.RawShaderMaterial, target: THREE.WebGLRenderTarget | null) => {
@@ -487,7 +521,8 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     pass(Q.blur, dst)
   }
   // square render of the cube into a mask target: clear = (1, 0, 0) = seam / outside, no alpha, no shade
-  const renderMask = (target: THREE.WebGLRenderTarget, mode: number) => {
+  const renderMask = (target: THREE.WebGLRenderTarget, mode: number, idOut = false) => {
+    Q.face.uniforms.uIdOut.value = idOut ? 1 : 0
     const cam = camera as THREE.PerspectiveCamera
     const aspect = cam.aspect
     cam.aspect = 1
@@ -513,7 +548,14 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     const px = (r: number, w: number) => Math.max(1, Math.round((r / 1750) * w))
 
     // 1. mask, 2. their preprocess
-    renderMask(R.mask, isHeat ? 0 : fieldMode)
+    renderMask(R.mask, isHeat ? 0 : fieldMode, V.field === 'poisson')
+    // liquid / smoke: cut hairline seams at occlusion edges, then everything below reads maskE
+    const M = isHeat ? R.mask : R.maskE
+    if (!isHeat) {
+      Q.edge.uniforms.t.value = R.mask.texture
+      Q.edge.uniforms.texel.value = 1 / SIZE
+      pass(Q.edge, R.maskE)
+    }
     if (isHeat) {
       boxBlur(R.mask, R.a, R.contour, px(V.blur.contour, SIZE), 1)
       boxBlur(R.mask, R.a, R.inner, px(V.blur.inner, SIZE), 3)
@@ -528,17 +570,19 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       // max, normalise. 'min' keeps a hairline seam as a hole; 'blur' (box filter + bilinear, the v1-v11 look)
       // lets thin seams close so neighbouring cubies share a field. Both write to rgb, so .g works.
       if (V.poissonDown === 'min') {
-        Q.downMin.uniforms.t.value = R.mask.texture
+        Q.downMin.uniforms.t.value = M.texture
         Q.downMin.uniforms.texel.value = 1 / SIZE
         Q.downMin.uniforms.taps.value = SIZE / 256
         pass(Q.downMin, R.pMask)
       } else {
         Q.blur.uniforms.ch.value.set(0, 1, 0, 0)
-        boxBlur(R.mask, R.a, R.inner, Math.max(1, Math.round(SIZE / 512)), 1)
+        boxBlur(M, R.a, R.inner, Math.max(1, Math.round(SIZE / 512)), 1)
         Q.blur.uniforms.ch.value.set(1, 0, 0, 0)
         downsample(R.inner, R.pMask)
       }
       Q.poisson.uniforms.mask.value = R.pMask.texture
+      Q.poisson.uniforms.ids.value = M.texture
+      Q.poisson.uniforms.thresh.value = V.poissonThresh
       let a = R.pA, b = R.pB
       for (let i = 0; i < V.poissonIters; i++) {
         Q.poisson.uniforms.u.value = a.texture
@@ -552,12 +596,12 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
         pass(Q.reduceMax, dst)
         src = dst
       }
-      Q.combinePoisson.uniforms.mask.value = R.mask.texture
+      Q.combinePoisson.uniforms.mask.value = M.texture
       Q.combinePoisson.uniforms.u.value = a.texture
       Q.combinePoisson.uniforms.umax.value = R.red[R.red.length - 1].texture
       pass(Q.combinePoisson, R.combined)
     } else {
-      Q.combineField.uniforms.mask.value = R.mask.texture
+      Q.combineField.uniforms.mask.value = M.texture
       pass(Q.combineField, R.combined)
     }
 
@@ -570,7 +614,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     // 3. their fragment over the screen
     const u = Q.final.uniforms
     u.u_image.value = R.combined.texture
-    u.u_mask.value = R.mask.texture
+    u.u_mask.value = M.texture
     u.u_time.value = state.clock.elapsedTime * speed + frame
     u.u_aspect.value = size.width / size.height
     u.u_resolution.value.set(size.width * gl.getPixelRatio(), size.height * gl.getPixelRatio())

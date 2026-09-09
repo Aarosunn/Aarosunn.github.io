@@ -1,5 +1,5 @@
 /**
- * Mock of the portfolio page: the shader cube in the middle (heatmap on the Rubik's cube, v1),
+ * Mock of the portfolio page: the shader cube in the middle (v14, icemint grain: liquid metal on the rounded Rubik's),
  * four sections around it stepped like a deck (arrow keys / click / 1-4), the x-ray floral at the base.
  * Copy is placeholder. Every deck step turns one layer of the cube.
  */
@@ -45,14 +45,14 @@ const SECTIONS: Section[] = [
 const HEAT_OF_SCHEME: Record<string, string> = { icemint: 'icemint', ice: 'icemint', mint: 'icemint', ember: 'ember', graphite: 'graphite', aura: 'default', paper: 'sepia' }
 
 /** cube versions worth comparing in place; key `v` cycles. Versions whose own preset is light get a dark one here. */
-const SITE_VERSIONS = ['v1', 'v9', 'v4', 'v7', 'v2', 'v6']
-const SITE_PRESET: Record<string, string> = { v6: 'ice' }
+const SITE_VERSIONS = ['v14', 'v1', 'v9', 'v4', 'v7', 'v2', 'v6']
+const SITE_PRESET: Record<string, string> = { v14: 'icemint grain soft', v6: 'ice' }
 
-export function Site({ version: initial = 'v1', scheme = 'icemint', bg = '#07090c' }: { version?: string; scheme?: string; bg?: string }) {
+export function Site({ version: initial = 'v14', scheme = 'icemint', bg = '#07090c' }: { version?: string; scheme?: string; bg?: string }) {
   const [active, setActive] = useState(0)
-  const [version, setVersion] = useState(VERSION_OF(initial) ? initial : 'v1')
+  const [version, setVersion] = useState(VERSION_OF(initial) ? initial : 'v14')
   // a deep-linked version outside the curated cycle still cycles from itself
-  const cycle = useMemo(() => Array.from(new Set([VERSION_OF(initial) ? initial : 'v1', ...SITE_VERSIONS])), [initial])
+  const cycle = useMemo(() => Array.from(new Set([VERSION_OF(initial) ? initial : 'v14', ...SITE_VERSIONS])), [initial])
   const [open, setOpen] = useState<{ section: number; item: number } | null>(null)
   // layout A/B: sections in the corners, or deck only (the deck carries the blurb, panels do the rest)
   const [layout, setLayout] = useState<'corners' | 'deck'>('corners')
@@ -66,7 +66,9 @@ export function Site({ version: initial = 'v1', scheme = 'icemint', bg = '#07090
     const want = SITE_PRESET[version] ?? (PV.shader === 'heat' && PV.preset === undefined ? HEAT_OF_SCHEME[scheme] : PV.preset)
     const base = presetNamed(PV.shader, want).params
     // the page is the shader's background, so the scheme's bg is paper's colorBack
-    return { ...base, ...(PV.shader === 'heat' ? { outerGlow: 0.42, contour: 0.75 } : {}), colorBack: bg, scale: (narrow ? 0.7 : 0.85) * (base.scale as number) }
+    // heat shows the mask through paper's 57% window, liquid the whole mask, so liquid needs a smaller scale on narrow screens
+    const k = PV.shader === 'heat' ? (narrow ? 0.7 : 0.85) : narrow ? 0.45 : 0.85
+    return { ...base, ...(PV.shader === 'heat' ? { outerGlow: 0.42, contour: 0.75 } : {}), colorBack: bg, scale: k * (base.scale as number) }
   }, [PV, narrow, scheme, version, bg])
 
   // deck stepping: arrows / digits; every step turns one layer

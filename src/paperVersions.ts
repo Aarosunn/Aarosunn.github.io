@@ -31,8 +31,12 @@ export type PaperVersion = {
   seamSpace: 'uv' | 'geometry' | 'cube'
   /** seamSpace 'cube': |n.z| above this counts as a cap face (the extrusion's cap / wall split) */
   capCos: number
+  /** seamSpace 'cube': seam every side of every face (no merged islands, no creases in turns) instead of v11's two */
+  seamSym: boolean
   /** how the mask alpha reaches the 256² Poisson grid: box blur (v1-v11) or min filter (hairline seams stay holes) */
   poissonDown: 'blur' | 'min'
+  /** alpha threshold that counts as inside for the solver (higher = thin, blurred seams still separate cubies) */
+  poissonThresh: number
   /** heat blur radii in paper's 1750px canvas units */
   blur: { contour: number; inner: number; big: number }
   /** heat: run the big blur at size / bigDiv (2 = as paper's canvas; 4 = cheaper, for integrated GPUs) */
@@ -61,7 +65,9 @@ const base = {
   poissonIters: 30,
   seamSpace: 'uv' as const,
   capCos: 0.999,
+  seamSym: false,
   poissonDown: 'blur' as const,
+  poissonThresh: 0.5,
   blur: { contour: 5, inner: 18, big: 150 },
   bigDiv: 2 as const,
 }
