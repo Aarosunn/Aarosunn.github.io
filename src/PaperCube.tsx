@@ -130,31 +130,37 @@ const COPY = /* glsl */ `
 `
 // cubie faces
 const FACE_VERT = /* glsl */ `
-  in vec3 position; in vec3 normal; in vec2 uv; out vec3 vN; out vec2 vUv; out vec3 vLocal; out vec3 vLocalN; out vec3 vCube; out vec3 vCubeN;
+  in vec3 position; in vec3 normal; in vec2 uv; out vec3 vN; out vec2 vUv; out vec3 vLocal; out vec3 vLocalN; out vec3 vCube; out vec3 vCubeN; out vec3 vCubieC;
   uniform mat4 modelViewMatrix; uniform mat4 projectionMatrix; uniform mat3 normalMatrix; uniform mat4 modelMatrix; uniform mat4 uRootInv;
   void main() {
     vN = normalMatrix * normal; vUv = uv; vLocal = position; vLocalN = normal;
     mat4 toCube = uRootInv * modelMatrix;
     vCube = (toCube * vec4(position, 1.0)).xyz;
+    vCubieC = (toCube * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
     vCubeN = mat3(toCube) * normal;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `
 const FACE_FRAG = /* glsl */ `
   precision highp float;
-  in vec3 vN; in vec2 vUv; in vec3 vLocal; in vec3 vLocalN; in vec3 vCube; in vec3 vCubeN; out vec4 o;
+  in vec3 vN; in vec2 vUv; in vec3 vLocal; in vec3 vLocalN; in vec3 vCube; in vec3 vCubeN; in vec3 vCubieC; out vec4 o;
   uniform float mode;   // 0 heat, 2 plate per cubie face, 3 plate per whole cube face (cube space)
   uniform float k;      // plate sharpness
   uniform float uHalf;  // cube half extent in cube space (mode 3)
   uniform float uSeam;  // hairline along each cubie face border, in cubie units (cubie = 1)
-  uniform float uSeamUv; // 1: seams and plates from the geometry's uv (v1-v11 look; drifts on rounded cubies after turns), 0: from local geometry
+  uniform float uCapCos; // mode 2: a fragment counts as a cap (z face) only if |n.z| exceeds this, like the extrusion's cap / side-wall split
+  uniform float uSeamUv; // 0: from local geometry (true edges); 1: from the geometry's uv (v1-v11 look; drifts on rounded cubies after turns);
+                         // 2: the v11 mapping (extrude uv = coordinate + 0.43: one-sided seams, plate centre at +0.07) rebuilt in cube-space axes
+                         //    around each cubie's centre, so it matches v11 at rest and stays consistent through turns
   float plate(vec2 p) { float b = (1.0 - p.x * p.x) * (1.0 - p.y * p.y); return 1.0 - pow(clamp(b, 0.0, 1.0), k); }
   // the two coordinates across the face this fragment lies on (dominant local normal axis), -.5..+.5
   vec2 across(vec3 pos, vec3 n) { vec3 a = abs(n); return a.x > a.y && a.x > a.z ? pos.yz : a.y > a.z ? pos.xz : pos.xy; }
+  // the extrusion's rule: caps are the z faces, everything else (walls and every bevel strip) is a wall keyed by x or y
+  vec2 acrossExtrude(vec3 pos, vec3 n) { vec3 a = abs(n); return a.z > uCapCos ? pos.xy : a.x > a.y ? pos.yz : pos.xz; }
   void main() {
     float l = 0.35 + 0.65 * max(dot(normalize(vN), normalize(vec3(0.35, 0.8, 0.6))), 0.0);
-    // face coordinates -.5..+.5: from uv (the original look) or from geometry (true edges on rounded cubies)
-    vec2 f = uSeamUv > 0.5 ? vUv - 0.5 : across(vLocal, vLocalN);
+    // face coordinates -.5..+.5
+    vec2 f = uSeamUv > 1.5 ? acrossExtrude(vCube - vCubieC, normalize(vCubeN)) - 0.07 : uSeamUv > 0.5 ? vUv - 0.5 : across(vLocal, vLocalN);
     float e = 0.5 - max(abs(f.x), abs(f.y));
     float seam = uSeam > 0.0 ? 1.0 - smoothstep(uSeam * 0.6, uSeam, e) : 0.0;
     if (mode < 1.0) {
@@ -370,7 +376,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       reduceMax: raw(REDUCE_MAX, { t: { value: null }, texel: { value: 1 / 128 } }),
       downMin: raw(DOWNMIN, { t: { value: null }, texel: { value: 1 / 1024 }, taps: { value: 4 } }),
       copy: raw(COPY, { t: { value: null } }),
-      face: raw(FACE_FRAG, { mode: { value: 0 }, k: { value: 0.75 }, uHalf: { value: 1.5 }, uSeam: { value: 0 }, uSeamUv: { value: 1 }, uRootInv: { value: new THREE.Matrix4() } }, FACE_VERT),
+      face: raw(FACE_FRAG, { mode: { value: 0 }, k: { value: 0.75 }, uHalf: { value: 1.5 }, uSeam: { value: 0 }, uSeamUv: { value: 1 }, uCapCos: { value: 0.999 }, uRootInv: { value: new THREE.Matrix4() } }, FACE_VERT),
       final: raw(finalFragment(V.shader), finalUniforms(), FINAL_VERT),
       final2: V.fuse ? raw(finalFragment(V.fuse), finalUniforms(), FINAL_VERT) : null,
       composite: raw(COMPOSITE, { a: { value: null }, b: { value: null } }),
@@ -409,7 +415,8 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     Q.face.uniforms.k.value = V.fieldK
     Q.face.uniforms.uHalf.value = 1.5 * V.rubikGap
     Q.face.uniforms.uSeam.value = V.seam
-    Q.face.uniforms.uSeamUv.value = V.seamSpace === 'geometry' ? 0 : 1
+    Q.face.uniforms.uSeamUv.value = V.seamSpace === 'geometry' ? 0 : V.seamSpace === 'cube' ? 2 : 1
+    Q.face.uniforms.uCapCos.value = V.capCos
   }, [params, Q, V, gain, alpha])
 
   const pass = (mat: THREE.RawShaderMaterial, target: THREE.WebGLRenderTarget | null) => {

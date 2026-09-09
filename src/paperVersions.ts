@@ -27,8 +27,10 @@ export type PaperVersion = {
   rubikRound: number
   /** poisson: Jacobi iterations per frame at 256² (warm-started) */
   poissonIters: number
-  /** seams and plates from the geometry's uv (v1-v11 look) or from local geometry (true edges on rounded cubies after turns) */
-  seamSpace: 'uv' | 'geometry'
+  /** seams and plates from the geometry's uv (v1-v11 look), from local geometry (true edges), or the v11 uv mapping rebuilt in cube space (v11's look, no drift) */
+  seamSpace: 'uv' | 'geometry' | 'cube'
+  /** seamSpace 'cube': |n.z| above this counts as a cap face (the extrusion's cap / wall split) */
+  capCos: number
   /** how the mask alpha reaches the 256² Poisson grid: box blur (v1-v11) or min filter (hairline seams stay holes) */
   poissonDown: 'blur' | 'min'
   /** heat blur radii in paper's 1750px canvas units */
@@ -58,6 +60,7 @@ const base = {
   rubikRound: 0,
   poissonIters: 30,
   seamSpace: 'uv' as const,
+  capCos: 0.999,
   poissonDown: 'blur' as const,
   blur: { contour: 5, inner: 18, big: 150 },
   bigDiv: 2 as const,
@@ -111,14 +114,14 @@ export const PAPER_VERSIONS: PaperVersion[] = [
     name: 'v13',
     field: 'poisson',
     poissonIters: 60,
-    seamSpace: 'geometry',
+    seamSpace: 'cube',
     rubikRound: 0.07,
-    seam: 0.04,
+    seam: 0.03,
     halo: false,
     shade: 0.35,
     preset: 'ice',
     themes: ['default', 'backdrop', 'heatmap', 'heatmap grain', 'ice', 'mint', 'icemint', 'icemint grain'].map((name) => ({ name, shader: 'liquid' as const, preset: name })),
-    note: "v11's look (soft blurred mask, thin seams) with seams and plates measured from the geometry, so nothing drifts after turns",
+    note: "v11, pixel for pixel at rest, with its face mapping rebuilt in cube-space axes so nothing drifts after turns",
   },
 ]
 
