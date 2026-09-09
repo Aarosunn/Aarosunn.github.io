@@ -203,3 +203,7 @@ Aaron's second mid-turn screenshot reproduced with the current code once the mat
 3. Where a nearer cubie overlaps a farther one there is no painted seam at all, so the two fields met without a line. The face shader writes view depth into the mask alpha (relative to camZ over 6 units) and an `EDGE` pass cuts a hairline out of the alpha wherever depth jumps between two inside pixels, so occlusion edges look like every other seam. `seamSym` (seams on all four sides) exists as a field but changes the rest look (mean 15 / 255) and is off.
 Verified: every axis × layer × direction mid-turn at Aaron's low viewing angle, no creases, no discs; placement 0; 60 fps.
 Site: default cube is v14 with the `icemint grain soft` preset (`SITE_PRESET`), cycle starts there; liquid versions use scale ×0.45 under 900px (heat kept ×0.7) because liquid maps the whole mask, not paper's 57% window.
+
+## Site cube theme toggle (17:00)
+
+Under the deck, a small three-way toggle for the v14 site cube: ice / mint / icemint (presets `ice grain`, `mint grain`, `icemint grain soft`); key `g` cycles. Ice grain and mint grain now carry `grain: 0.7` (was 0.3) so the noise reads as grain on the untinted chrome. Lab presets share the change.

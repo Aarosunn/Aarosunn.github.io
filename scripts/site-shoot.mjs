@@ -21,6 +21,7 @@ for (const [w, h] of [[1440, 900], [1024, 700], [420, 820]]) {
   await page.waitForTimeout(900)
   await page.screenshot({ path: `shots/site/${w}-2.png` })
   if (w === 1440) { await page.keyboard.press('l'); await page.waitForTimeout(900); await page.screenshot({ path: `shots/site/${w}-deck.png` }); await page.keyboard.press('ArrowRight'); await page.waitForTimeout(900); await page.screenshot({ path: `shots/site/${w}-deck2.png` }); await page.keyboard.press('l'); await page.waitForTimeout(500) }
+  if (w === 1440) for (const [i, n] of [[0, 'ice'], [1, 'mint'], [2, 'icemint']]) { await page.click(`.site-theme button:nth-child(${i + 1})`); await page.waitForTimeout(700); await page.screenshot({ path: `shots/site/${w}-theme-${n}.png` }) }
   await page.click('.sec.on li')
   await page.waitForTimeout(900)
   await page.screenshot({ path: `shots/site/${w}-panel.png` })

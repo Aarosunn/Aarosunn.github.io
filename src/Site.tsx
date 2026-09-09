@@ -46,7 +46,9 @@ const HEAT_OF_SCHEME: Record<string, string> = { icemint: 'icemint', ice: 'icemi
 
 /** cube versions worth comparing in place; key `v` cycles. Versions whose own preset is light get a dark one here. */
 const SITE_VERSIONS = ['v14', 'v1', 'v9', 'v4', 'v7', 'v2', 'v6']
-const SITE_PRESET: Record<string, string> = { v14: 'icemint grain soft', v6: 'ice' }
+const SITE_PRESET: Record<string, string> = { v6: 'ice' }
+/** the site cube's own small theme toggle (v14): preset name -> label */
+const SITE_THEMES: [string, string][] = [['ice grain', 'ice'], ['mint grain', 'mint'], ['icemint grain soft', 'icemint']]
 
 export function Site({ version: initial = 'v14', scheme = 'icemint', bg = '#07090c' }: { version?: string; scheme?: string; bg?: string }) {
   const [active, setActive] = useState(0)
@@ -56,6 +58,7 @@ export function Site({ version: initial = 'v14', scheme = 'icemint', bg = '#0709
   const [open, setOpen] = useState<{ section: number; item: number } | null>(null)
   // layout A/B: sections in the corners, or deck only (the deck carries the blurb, panels do the rest)
   const [layout, setLayout] = useState<'corners' | 'deck'>('corners')
+  const [siteTheme, setSiteTheme] = useState(SITE_THEMES[2][0])
   const rubik = useRef<RubikHandle | null>(null)
   // the lab's v1 at its own camera (blur radii are frame-relative, so the cube stays crisp);
   // paper's `scale` shrinks the whole image on screen so the sections breathe
@@ -63,13 +66,13 @@ export function Site({ version: initial = 'v14', scheme = 'icemint', bg = '#0709
   // narrow screens are usually integrated GPUs: a 768 mask keeps the heat blurs cheap
   const PV = useMemo(() => ({ ...VERSION_OF(version)!, size: narrow ? 768 : 1024, bigDiv: narrow ? (4 as const) : (2 as const) }), [version, narrow])
   const params = useMemo(() => {
-    const want = SITE_PRESET[version] ?? (PV.shader === 'heat' && PV.preset === undefined ? HEAT_OF_SCHEME[scheme] : PV.preset)
+    const want = version === 'v14' ? siteTheme : (SITE_PRESET[version] ?? (PV.shader === 'heat' && PV.preset === undefined ? HEAT_OF_SCHEME[scheme] : PV.preset))
     const base = presetNamed(PV.shader, want).params
     // the page is the shader's background, so the scheme's bg is paper's colorBack
     // heat shows the mask through paper's 57% window, liquid the whole mask, so liquid needs a smaller scale on narrow screens
     const k = PV.shader === 'heat' ? (narrow ? 0.7 : 0.85) : narrow ? 0.45 : 0.85
     return { ...base, ...(PV.shader === 'heat' ? { outerGlow: 0.42, contour: 0.75 } : {}), colorBack: bg, scale: k * (base.scale as number) }
-  }, [PV, narrow, scheme, version, bg])
+  }, [PV, narrow, scheme, version, bg, siteTheme])
 
   // deck stepping: arrows / digits; every step turns one layer
   const step = (i: number) => {
@@ -85,6 +88,7 @@ export function Site({ version: initial = 'v14', scheme = 'icemint', bg = '#0709
     if (e.key === 'ArrowRight') step(active + 1)
     if (e.key === 'ArrowLeft') step(active - 1)
     if (e.key === 'l') setLayout((l) => (l === 'corners' ? 'deck' : 'corners'))
+    if (e.key === 'g') setSiteTheme((t) => SITE_THEMES[(SITE_THEMES.findIndex(([n]) => n === t) + 1) % SITE_THEMES.length][0])
     if (e.key === 'v') setVersion((v) => cycle[(cycle.indexOf(v) + 1) % cycle.length])
     const n = Number(e.key)
     if (n >= 1 && n <= SECTIONS.length) step(n - 1)
@@ -197,7 +201,16 @@ export function Site({ version: initial = 'v14', scheme = 'icemint', bg = '#0709
               </button>
             ))}
           </nav>
-          <span className="site-ver">cube {version} · ← → deck · v cube · c colour · l layout · click an item</span>
+          {version === 'v14' && (
+            <div className="site-theme" aria-label="cube theme">
+              {SITE_THEMES.map(([name, label]) => (
+                <button key={name} className={name === siteTheme ? 'on' : ''} onClick={() => setSiteTheme(name)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          <span className="site-ver">cube {version} · ← → deck · v cube · g grain · c colour · l layout · click an item</span>
         </div>
       </div>
     </>
