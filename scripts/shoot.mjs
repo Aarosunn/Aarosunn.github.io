@@ -18,7 +18,9 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 page.on('pageerror', (e) => console.error('pageerror', e.message))
 page.on('console', (m) => m.type() === 'error' && console.error('console', m.text()))
 await page.goto(url)
-await page.waitForFunction(() => window.__aar && window.__aar.positions().length === 27)
+await page.waitForFunction(() => window.__aar)
+await page.evaluate(() => window.__aar.setTab('cube'))
+await page.waitForFunction(() => window.__aar.positions().length === 27)
 await page.waitForTimeout(2200) // entrance
 const gpu = await page.evaluate(() => {
   const gl = document.createElement('canvas').getContext('webgl2')
