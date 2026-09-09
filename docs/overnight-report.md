@@ -7,12 +7,13 @@ Started 02:50 EDT. Everything below is committed on `main`; nothing older was ed
 1. `npx vite --port 5173` → http://localhost:5173. The **site** tab is the default: the mock portfolio.
    - arrows / 1–4 / click / wheel step the deck; every step turns a layer of the cube
    - click any list item → glass detail panel; Esc closes
-   - `v` cycles the cube version in place: v10 → v16 → v19 → v20 → v27 → v13 → v18 → v24 → v17
+   - `v` cycles the cube version in place: v10 → v16 → v34 → v19 → v20 → v27 → v13 → v18 → v24 → v17
+   - `l` toggles the layout: sections in the corners, or deck-only with the panels doing the work
    - `c` cycles the colour scheme: the cube's palette follows it (ember = red cube, paper = light page), `p` cycles tabs
    - link a state: `/?v=v27&c=ember`, `/?tab=heatcube`
    - wheel and swipe also step the deck; the cube turns a layer on every step and idles with a turn every few seconds
-2. **heat cube** tab (shader cube): 32 versions, opens on v10, rows version / preset / shape / motion; the readout shows each version's note. The `rubik` shape has `turning` (auto) and `turn`.
-3. `shots/sheet-all.png` = every version v3–v31 in one image; `shots/sheet-palettes.png` = v10 across the heat presets and v24 across the liquid presets; `shots/sheet-site*.png`, `shots/sheet-panel*.png`, `shots/sheet-schemes.png`.
+2. **heat cube** tab (shader cube): 35 versions, opens on v10, rows version / preset / shape / motion; the readout shows each version's note. The `rubik` shape has `turning` (auto) and `turn`.
+3. `shots/sheet-all.png` = every version v3–v35 in one image; `shots/sheet-palettes.png` = v10 across the heat presets and v24 across the liquid presets; `shots/sheet-site*.png`, `shots/sheet-panel*.png`, `shots/sheet-schemes.png`.
 
 ## What was built
 
@@ -28,8 +29,9 @@ Started 02:50 EDT. Everything below is committed on `main`; nothing older was ed
 |---|---|---|
 | v10 | heatmap on the Rubik's, paper's default palette, halo | the hero; the paper look on the real cube |
 | v16 / v19 | same in icemint, hairline seams, with / without halo | the site's palette |
+| v34 / v33 | rounded cubies, hairline / broad seams | the connected-rounded look you asked for |
 | v20 | hidden-line Rubik's cage | quietest, most graphic |
-| v24 | liquid metal, one Poisson shape per cubie | 27 chrome cubies, exact paper field each |
+| v24 / v35 | liquid metal, one Poisson shape per cubie, sharp / rounded | 27 chrome cubies, exact paper field each |
 | v27 | fusion: heat seams and halo over ice liquid-metal cubies | the two languages in one object |
 | v18 / v30 | gem smoke icemint, without / with its plume | glassy marble faces |
 | v3 / v4 / v5 / v6 | the three shaders on a plain box / cage | closest to the site pages themselves |
@@ -42,7 +44,7 @@ RTX 4060: every version 61 fps at 1440×900. Integrated GPU (`--igpu`): v10 39, 
 
 - Which cube goes on the site (v10 paper palette vs v16/v19 icemint vs v20 cage vs v24 chrome).
 - Halo or no halo on the site (the halo is the page's light; without it the CSS aura carries the colour).
-- Sections stay in the corners, or collapse to the deck only with panels doing the work.
+- Sections in the corners or deck-only (key `l` compares them live).
 - Whether the old cube tab (v1–v4 materials) stays as a lab or goes.
 
 ## Known limits
