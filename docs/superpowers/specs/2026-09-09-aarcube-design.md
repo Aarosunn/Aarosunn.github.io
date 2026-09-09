@@ -99,3 +99,7 @@ Aaron on v1: gaps between the sides, low quality, no background. v2: 1024 MSAA m
 - `polarity: 'cage'` (heat): faces white, seams black, white background → v20 hidden-line Rubik's lattice in icemint; the turning layer detaches as its own lattice.
 - `field: 'poisson'`: paper's actual preprocess on the GPU: mask alpha downsampled to 256², Jacobi for ∇²u = −1 (30 iterations per frame, warm-started from the previous frame so motion keeps up), max reduced 256→64→16→4→1, field = 1 − u/max. Half-float targets. v21 liquid on the rounded box (bands hug the boundary like the site), v22 smoke on the octahedron, v23 liquid Rubik's as one silhouette blob (seams only where a turn splits the outline). All 61 fps.
 - Control rows wrap (25 versions now); the site gets the aura wash and grain.
+
+## Site critique pass (03:36)
+
+Sonnet critique on the three viewports, applied: inactive sections recede (opacity .42), active heading 30px (26 narrow), lede 13px and items at 80% with .02em tracking, the accent tick on right-aligned headings needed `.sec.on.sec-code` specificity (it was orphaned at the block's left), trailing dots on right-aligned lists removed (they wrapped alone), floral opacity .26 and 24px more clearance above the deck, mobile canvas raised 10vh so the section and deck share the first screen. Left alone on purpose: the cube. `shots/sheet-all.png` = every version v3–v23 at one frame.

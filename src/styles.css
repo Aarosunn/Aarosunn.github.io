@@ -337,7 +337,7 @@ button:focus-visible {
   align-self: center;
   max-width: 300px;
   cursor: pointer;
-  opacity: 0.55;
+  opacity: 0.42;
   transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
   animation: rise 0.9s var(--ease) both;
 }
@@ -353,10 +353,11 @@ button:focus-visible {
   color: var(--text);
   margin-bottom: 8px;
   position: relative;
-  transition: color 0.4s var(--ease);
+  transition: color 0.4s var(--ease), font-size 0.4s var(--ease);
 }
 .sec.on h2 {
   color: var(--bright);
+  font-size: 30px;
 }
 .sec.on h2::before {
   content: '';
@@ -369,6 +370,7 @@ button:focus-visible {
 }
 .sec p {
   color: var(--mute);
+  font-size: 13px;
   margin-bottom: 10px;
   max-width: 34ch;
 }
@@ -377,6 +379,8 @@ button:focus-visible {
   display: grid;
   gap: 3px;
   color: var(--text);
+  opacity: 0.8;
+  letter-spacing: 0.02em;
 }
 .sec li::before {
   content: '·';
@@ -387,22 +391,22 @@ button:focus-visible {
 .sec-code { grid-area: 2 / 3; justify-self: end; align-self: start; margin-top: 6vh; text-align: right; animation-delay: 0.6s; }
 .sec-hardware { grid-area: 3 / 3; justify-self: end; align-self: end; margin-bottom: 4vh; text-align: right; animation-delay: 0.7s; }
 .sec-creatives { grid-area: 3 / 1; justify-self: start; align-self: end; margin-bottom: 4vh; animation-delay: 0.8s; }
-.sec-code h2::before, .sec-hardware h2::before { left: auto; right: -16px; }
+.sec.on.sec-code h2::before, .sec.on.sec-hardware h2::before { left: auto; right: -16px; }
 .sec-code li::before, .sec-hardware li::before { content: none; }
-.sec-code li::after, .sec-hardware li::after { content: '·'; color: var(--mute); margin-left: 8px; }
 
 .site-base {
   grid-column: 1 / -1;
   display: grid;
   justify-items: center;
-  gap: 6px;
+  gap: 10px;
+  padding-top: 24px;
   animation: rise 1s var(--ease) 0.9s both;
 }
 .floral {
   width: min(640px, 70vw);
-  height: 110px;
+  height: 96px;
   color: var(--text);
-  opacity: 0.42;
+  opacity: 0.26;
   pointer-events: none;
 }
 .deck {
@@ -453,6 +457,8 @@ button:focus-visible {
   .site-base { grid-area: 4 / 1; }
   .site-intro { display: none; }
   .site-tabs { display: none; }
+  .site ~ canvas, canvas { transform: translateY(-10vh); }
+  .sec.on h2 { font-size: 26px; }
   /* scrim so the copy stays legible over the cube */
   .site::after {
     content: '';
