@@ -586,3 +586,10 @@ body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130
 .site-tabs .tabs:hover {
   opacity: 1;
 }
+/* narrow: the panel is a bottom sheet, the cube stays put (and keeps its 10vh lift) */
+@media (max-width: 900px) {
+  body:has(.site.has-panel .panel-left) canvas,
+  body:has(.site.has-panel .panel-right) canvas {
+    transform: translateY(-10vh);
+  }
+}
