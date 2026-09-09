@@ -4,7 +4,8 @@ import { SCHEMES } from './schemes'
 import { Paper } from './Paper'
 import { PaperCube, type PaperDebug } from './PaperCube'
 import { Site } from './Site'
-import type { RubikHandle } from './RubikMask'
+import { ALGS, type RubikHandle } from './RubikMask'
+import { ALG_KEYS } from './Site'
 import { PAPER_VERSIONS, VERSION_OF, withTheme, type PaperVersion } from './paperVersions'
 import { PRESETS_OF, presetNamed } from './paperPresets'
 
@@ -72,6 +73,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'p') setTab((t) => TABS[(TABS.indexOf(t) + 1) % TABS.length])
       if (e.key === 'c') setSi((i) => (i + 1) % SCHEMES.length)
+      if (ALG_KEYS[e.key]) rubik.current?.run(ALGS[ALG_KEYS[e.key]])
     }
     window.addEventListener('keydown', onKey)
     window.__aar = {
@@ -89,6 +91,8 @@ export default function App() {
       setShaderCell: setCell,
       setShaderVersionOverride: setVOverride,
       paperTurn: (...args: Parameters<RubikHandle['turn']>) => rubik.current?.turn(...args) ?? Promise.resolve(),
+      paperRun: (alg: string, duration?: number) => rubik.current?.run(alg, duration) ?? Promise.resolve(),
+      paperState: () => rubik.current?.state() ?? '',
       paperPositions: () => rubik.current?.positions() ?? [],
       paperOrientationError: () => rubik.current?.orientationError() ?? 0,
       paperPlacementError: () => rubik.current?.placementError() ?? 0,
@@ -156,7 +160,7 @@ export default function App() {
           <span>{SHADER_NAME[PV.shader]} on the Rubik's cube</span>
           <span className="note">{PV.note}</span>
           <span>drag to orbit</span>
-          <span>keys p c</span>
+          <span>keys p c · j k l algorithms</span>
         </div>
       </div>
     </>
@@ -193,6 +197,8 @@ declare global {
       setShaderCell: (c: number) => void
       setShaderVersionOverride: (o: Partial<PaperVersion>) => void
       paperTurn: RubikHandle['turn']
+      paperRun: (alg: string, duration?: number) => Promise<void>
+      paperState: () => string
       paperPositions: () => number[][]
       paperOrientationError: () => number
       paperPlacementError: () => number

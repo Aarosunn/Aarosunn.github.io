@@ -8,8 +8,32 @@ import gsap from 'gsap'
 import { RoundedBox } from '@react-three/drei'
 
 export type Axis = 'x' | 'y' | 'z'
+export type Move = { axis: Axis; layer: -1 | 0 | 1; dir: 1 | -1; quarters: 1 | 2 }
+/** face letters in cube space: U +y, D -y, R +x, L -x, F +z, B -z; M E S slices follow L D F. A clockwise face turn
+ *  seen from outside is a negative rotation about the +axis, so the +faces carry dir -1. */
+const FACE: Record<string, [Axis, -1 | 0 | 1, 1 | -1]> = { U: ['y', 1, -1], D: ['y', -1, 1], R: ['x', 1, -1], L: ['x', -1, 1], F: ['z', 1, -1], B: ['z', -1, 1], M: ['x', 0, 1], E: ['y', 0, 1], S: ['z', 0, -1] }
+/** "R U R' U2 F'" -> moves */
+export const parseAlg = (alg: string): Move[] =>
+  alg
+    .trim()
+    .split(/\s+/)
+    .filter((t) => FACE[t[0]])
+    .map((t) => {
+      const [axis, layer, d] = FACE[t[0]]
+      return { axis, layer, dir: (t.includes("'") ? -d : d) as 1 | -1, quarters: t.includes('2') ? 2 : 1 }
+    })
+/** the famous ones, keys j k l on the site and in the lab */
+export const ALGS: Record<string, string> = {
+  'T perm': "R U R' U' R' F R2 U' R' U' R U R' F'",
+  'U perm': "R U' R U R U R U' R' U' R2",
+  Sune: "R U R' U R U2 R'",
+}
 export type RubikHandle = {
   turn: (axis?: Axis, layer?: -1 | 0 | 1, dir?: 1 | -1) => Promise<void>
+  /** an algorithm in standard notation (or moves) at speedcubing pace, the cube locked for its whole run */
+  run: (alg: string | Move[], duration?: number) => Promise<void>
+  /** logical state (slot + orientation per cubie) as a string, for identity checks */
+  state: () => string
   positions: () => number[][]
   /** largest deviation of any cubie's rotation matrix element from {-1, 0, 1} (0 = every cubie sits on an exact quarter turn) */
   orientationError: () => number
@@ -77,13 +101,10 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
       m.onBeforeRender = tagId(i)
     }
 
-    const turn = useMemo<RubikHandle['turn']>(
-      () => (axis, layer, dir) => {
-        if (busy.current) return Promise.resolve()
-        busy.current = true
-        const ax = axis ?? AXES[Math.floor(Math.random() * 3)]
-        const ly = layer ?? (([-1, 0, 1] as const)[Math.floor(Math.random() * 3)])
-        const d = dir ?? (Math.random() < 0.5 ? 1 : -1)
+    // one layer move; callers hold `busy`
+    const turnOne = useMemo(
+      () => (ax: Axis, ly: -1 | 0 | 1, d: 1 | -1, quarters: 1 | 2, duration: number, ease: string) => {
+        const angle = (d * quarters * Math.PI) / 2
         const slice = cubies.current.filter((c) => Math.round(c.pos[ax]) === ly)
         const pv = pivot.current
         pv.rotation.set(0, 0, 0)
@@ -98,22 +119,21 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
         return new Promise<void>((res) => {
           pending.current = res
           gsap.to(pv.rotation, {
-            [ax]: (d * Math.PI) / 2,
-            duration: 0.55,
-            ease: 'power3.inOut',
+            [ax]: angle,
+            duration,
+            ease,
             onComplete: () => {
               if (!alive.current) return
               const rot = new THREE.Vector3(ax === 'x' ? 1 : 0, ax === 'y' ? 1 : 0, ax === 'z' ? 1 : 0)
               pv.updateMatrixWorld(true)
               slice.forEach((c) => {
                 root.current.attach(c.mesh)
-                c.pos.applyAxisAngle(rot, (d * Math.PI) / 2).round()
+                c.pos.applyAxisAngle(rot, angle).round()
                 c.mesh.position.copy(c.pos).multiplyScalar(gap)
                 snapMesh(c.mesh)
                 c.mesh.updateMatrix()
                 c.mesh.updateMatrixWorld(true)
               })
-              busy.current = false
               pending.current = null
               onTurn?.()
               res()
@@ -123,11 +143,40 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
       },
       [gap, onTurn],
     )
+    const turn = useMemo<RubikHandle['turn']>(
+      () => (axis, layer, dir) => {
+        if (busy.current) return Promise.resolve()
+        busy.current = true
+        const ax = axis ?? AXES[Math.floor(Math.random() * 3)]
+        const ly = layer ?? (([-1, 0, 1] as const)[Math.floor(Math.random() * 3)])
+        const d = dir ?? (Math.random() < 0.5 ? 1 : -1)
+        return turnOne(ax, ly, d, 1, 0.55, 'power3.inOut').finally(() => { busy.current = false })
+      },
+      [turnOne],
+    )
+    // speedcubing pace: ~8 turns a second, a half turn a touch longer
+    const run = useMemo<RubikHandle['run']>(
+      () => async (alg, duration = 0.12) => {
+        if (busy.current) return
+        busy.current = true
+        try {
+          for (const m of typeof alg === 'string' ? parseAlg(alg) : alg) {
+            if (!alive.current) break
+            await turnOne(m.axis, m.layer, m.dir, m.quarters, duration * (m.quarters === 2 ? 1.5 : 1), 'power2.inOut')
+          }
+        } finally {
+          busy.current = false
+        }
+      },
+      [turnOne],
+    )
 
     useImperativeHandle(
       ref,
       () => ({
         turn,
+        run,
+        state: () => JSON.stringify(cubies.current.map((c) => [...c.pos.toArray(), ...new THREE.Matrix4().makeRotationFromQuaternion(c.mesh.quaternion).elements.slice(0, 11).map(Math.round)])),
         positions: () => cubies.current.map((c) => c.pos.toArray()),
         orientationError: () => Math.max(0, ...cubies.current.map((c) => orientationError(c.mesh))),
         dump: () => cubies.current.map((c) => ({ pos: c.pos.toArray(), mesh: c.mesh.position.toArray().map((n) => +n.toFixed(3)), parentOk: c.mesh.parent === root.current })),
@@ -135,7 +184,7 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
           Math.max(0, ...cubies.current.map((c) => (c.mesh.parent === root.current ? c.mesh.position.distanceTo(c.pos.clone().multiplyScalar(gap)) : 9))),
         busy: () => busy.current,
       }),
-      [turn],
+      [turn, run],
     )
 
     useEffect(() => {

@@ -9,7 +9,7 @@ import { PaperCube } from './PaperCube'
 import { VERSION_OF } from './paperVersions'
 import { presetNamed } from './paperPresets'
 import { SCHEMES } from './schemes'
-import type { RubikHandle } from './RubikMask'
+import { ALGS, type RubikHandle } from './RubikMask'
 import { Floral } from './Floral'
 import { AsciiPortrait } from './Ascii'
 
@@ -47,6 +47,8 @@ const HEAT_OF_SCHEME: Record<string, string> = { icemint: 'icemint', ice: 'icemi
 /** cube versions worth comparing in place; key `v` cycles. Versions whose own preset is light get a dark one here. */
 const SITE_VERSIONS = ['v16', 'v15', 'v14', 'v1', 'v9', 'v4', 'v7', 'v2', 'v6']
 const SITE_PRESET: Record<string, string> = { v6: 'ice' }
+/** j k l run the famous algorithms at speedcubing pace */
+export const ALG_KEYS: Record<string, string> = { j: 'T perm', k: 'U perm', l: 'Sune' }
 /** the site cube's themes (v14 / v15), key g cycles; the on-screen toggle is gone since Aaron settled on mint grain */
 const SITE_THEMES: [string, string][] = [['ice grain', 'ice'], ['mint grain', 'mint'], ['icemint grain soft', 'icemint']]
 
@@ -89,7 +91,9 @@ export function Site({ version: initial = 'v16', scheme = 'icemint', bg = '#0709
     if (e.key === 'Escape') setOpen(null)
     if (e.key === 'ArrowRight') step(active + 1)
     if (e.key === 'ArrowLeft') step(active - 1)
-    if (e.key === 'l') setLayout((l) => (l === 'corners' ? 'deck' : 'corners'))
+    if (e.key === 'x') setLayout((l) => (l === 'corners' ? 'deck' : 'corners'))
+    const alg = ALG_KEYS[e.key]
+    if (alg) rubik.current?.run(ALGS[alg])
     if (e.key === 'g') setSiteTheme((t) => SITE_THEMES[(SITE_THEMES.findIndex(([n]) => n === t) + 1) % SITE_THEMES.length][0])
     if (e.key === 'v') setVersion((v) => cycle[(cycle.indexOf(v) + 1) % cycle.length])
     const n = Number(e.key)
