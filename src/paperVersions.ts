@@ -77,6 +77,10 @@ export const PAPER_VERSIONS: PaperVersion[] = [
   { ...base, name: 'v21', shader: 'liquid', shape: 'rounded', field: 'poisson', camZ: 3.9, shade: 0.3, note: 'liquid metal with their real Poisson field (GPU Jacobi) on the rounded box' },
   { ...base, name: 'v22', shader: 'smoke', shape: 'octa', field: 'poisson', camZ: 3.9, halo: false, shade: 0.3, preset: 'icemint', note: 'gem smoke, Poisson field, octahedron, icemint, no outer smoke' },
   { ...base, name: 'v23', shader: 'liquid', shape: 'rubik', field: 'poisson', camZ: 11, shade: 0.4, preset: 'noir slow', note: 'liquid metal Rubik\'s with the silhouette Poisson field: one blob of chrome, seams from turns only' },
+  // per-cubie Poisson: seams are holes in the alpha, every cubie face is its own paper shape
+  { ...base, name: 'v24', shader: 'liquid', shape: 'rubik', field: 'poisson', seam: 0.04, camZ: 11, shade: 0.35, note: 'liquid metal Rubik\'s, true Poisson per cubie face (seams as boundaries): 27 chrome cubies' },
+  { ...base, name: 'v25', shader: 'smoke', shape: 'rubik', field: 'poisson', seam: 0.04, camZ: 11, halo: false, shade: 0.3, preset: 'icemint', note: 'gem smoke Rubik\'s, Poisson per cubie face, icemint, no outer smoke' },
+  { ...base, name: 'v26', shader: 'liquid', shape: 'rubik', field: 'poisson', seam: 0.04, camZ: 11, shade: 0.35, preset: 'noir slow', note: 'v24 in noir, slow' },
 ]
 
 export const VERSION_OF = (name: string) => PAPER_VERSIONS.find((v) => v.name === name)

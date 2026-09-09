@@ -103,3 +103,7 @@ Aaron on v1: gaps between the sides, low quality, no background. v2: 1024 MSAA m
 ## Site critique pass (03:36)
 
 Sonnet critique on the three viewports, applied: inactive sections recede (opacity .42), active heading 30px (26 narrow), lede 13px and items at 80% with .02em tracking, the accent tick on right-aligned headings needed `.sec.on.sec-code` specificity (it was orphaned at the block's left), trailing dots on right-aligned lists removed (they wrapped alone), floral opacity .26 and 24px more clearance above the deck, mobile canvas raised 10vh so the section and deck share the first screen. Left alone on purpose: the cube. `shots/sheet-all.png` = every version v3–v23 at one frame.
+
+## v24–v26: per-cubie Poisson (03:38)
+
+In field modes the face shader now cuts the seam hairline out of the alpha, so the GPU Poisson sees every cubie face as its own shape: v24 liquid metal = 27 chrome cubies with paper's exact field each, v25 gem smoke icemint per cubie, v26 v24 in noir. Continuous through turns (the solver is per-frame, warm-started). Integrated GPU (no PRIME, `--igpu`): v10 39, v16 36, v19 43, v24 61 fps; the three heat blur chains at 1024 are the cost, Poisson at 256 is cheap.

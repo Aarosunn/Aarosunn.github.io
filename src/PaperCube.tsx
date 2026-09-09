@@ -132,7 +132,10 @@ const FACE_FRAG = /* glsl */ `
       float seam = uSeam > 0.0 ? 1.0 - smoothstep(uSeam * 0.6, uSeam, e) : 0.0;
       o = vec4(mix(mode, 1.0 - mode, seam), l, 1.0, 1.0);
     } else if (mode < 2.5) {
-      o = vec4(plate(2.0 * vUv - 1.0), 1.0, l, 1.0);
+      float e = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+      float seam = uSeam > 0.0 ? 1.0 - smoothstep(uSeam * 0.6, uSeam, e) : 0.0;
+      // seams become holes in the alpha, so a Poisson field sees every cubie face as its own shape
+      o = vec4(plate(2.0 * vUv - 1.0), 1.0 - seam, l, 1.0);
     } else {
       // the whole cube face this fragment lies on, in cube space: coords perpendicular to the dominant normal axis
       vec3 n = abs(normalize(vCubeN));

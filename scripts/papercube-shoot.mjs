@@ -2,11 +2,13 @@
 // debug channels. Usage: node scripts/papercube-shoot.mjs [v3 v5 ...] [--presets] [--shapes]
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
-mkdirSync('shots/papercube', { recursive: true })
 const args = process.argv.slice(2)
 const flags = new Set(args.filter((a) => a.startsWith('--')))
 const only = args.filter((a) => !a.startsWith('--'))
-const browser = await chromium.launch({ channel: 'chromium', env: { ...process.env, __NV_PRIME_RENDER_OFFLOAD: '1', __GLX_VENDOR_LIBRARY_NAME: 'nvidia' }, args: ['--ignore-gpu-blocklist', '--use-gl=angle', '--use-angle=gl'] })
+import { mkdirSync as mk } from 'node:fs'
+mk('shots/papercube', { recursive: true })
+const igpu = flags.has('--igpu') // integrated GPU: what a laptop on battery sees
+const browser = await chromium.launch({ channel: 'chromium', env: igpu ? { ...process.env } : { ...process.env, __NV_PRIME_RENDER_OFFLOAD: '1', __GLX_VENDOR_LIBRARY_NAME: 'nvidia' }, args: ['--ignore-gpu-blocklist', '--use-gl=angle', '--use-angle=gl'] })
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 page.on('pageerror', (e) => console.error('pageerror', e.message))
 page.on('console', (m) => m.type() === 'error' && !m.text().includes('404') && console.error('console', m.text().slice(0, 400)))
