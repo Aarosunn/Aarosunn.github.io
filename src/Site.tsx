@@ -89,6 +89,8 @@ export function Site({ version: initial = 'v10' }: { version?: string }) {
       <Canvas key={version} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
         <PaperCube version={PV} params={params} spin rubik={rubik} />
       </Canvas>
+      <div className="aura" />
+      <div className="grain" />
       <div className="ui site">
         <header className="site-head">
           <div className="wordmark">aarcube</div>

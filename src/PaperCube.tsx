@@ -62,6 +62,44 @@ const COMBINE_FIELD = /* glsl */ `
     o = vec4(f, m.g, 1.0, 1.0);
   }
 `
+// poisson: field = 1 - u / max(u), like their toProcessed*
+const COMBINE_POISSON = /* glsl */ `
+  precision highp float;
+  in vec2 vUv; out vec4 o;
+  uniform sampler2D mask; uniform sampler2D u; uniform sampler2D umax;
+  void main() {
+    vec2 uv = vec2(vUv.x, 1.0 - vUv.y);
+    vec4 m = texture(mask, uv);
+    float mx = max(texture(umax, vec2(0.5)).r, 1e-5);
+    float f = mix(1.0, 1.0 - clamp(texture(u, uv).r / mx, 0.0, 1.0), m.g);
+    o = vec4(f, m.g, 1.0, 1.0);
+  }
+`
+// Jacobi step for  ∇²u = -1  inside the shape (mask G > .5), u = 0 outside. Their preprocess, on the GPU.
+const POISSON = /* glsl */ `
+  precision highp float;
+  in vec2 vUv; out vec4 o;
+  uniform sampler2D u; uniform sampler2D mask; uniform float texel; uniform float h2;
+  void main() {
+    float inside = step(0.5, texture(mask, vUv).g);
+    float s = texture(u, vUv + vec2(texel, 0.0)).r + texture(u, vUv - vec2(texel, 0.0)).r
+            + texture(u, vUv + vec2(0.0, texel)).r + texture(u, vUv - vec2(0.0, texel)).r;
+    o = vec4(vec3(inside * 0.25 * (s + h2)), 1.0);
+  }
+`
+// running max of u (for normalisation): reduce by sampling 4 texels per pass
+const REDUCE_MAX = /* glsl */ `
+  precision highp float;
+  in vec2 vUv; out vec4 o;
+  uniform sampler2D t; uniform float texel;
+  void main() {
+    float m = texture(t, vUv + vec2(-texel, -texel)).r;
+    m = max(m, texture(t, vUv + vec2(texel, -texel)).r);
+    m = max(m, texture(t, vUv + vec2(-texel, texel)).r);
+    m = max(m, texture(t, vUv + vec2(texel, texel)).r);
+    o = vec4(vec3(m), 1.0);
+  }
+`
 const COPY = /* glsl */ `
   precision highp float;
   in vec2 vUv; out vec4 o; uniform sampler2D t;
@@ -143,6 +181,8 @@ function finalFragment(shader: PaperShader) {
   return body.replace('uniform float u_time;', 'uniform float u_time; uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade;')
 }
 
+const frt = (size: number) =>
+  new THREE.WebGLRenderTarget(size, size, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false })
 const rt = (size: number, depth = false, samples = 0) =>
   new THREE.WebGLRenderTarget(size, size, {
     minFilter: THREE.LinearFilter,
@@ -170,7 +210,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, auto = 
   const SIZE = V.size
   const isHeat = V.shader === 'heat'
   // only the box has one uv square per face; other shapes get the blurred-silhouette field
-  const useBlur = V.field === 'blur' || (shape !== 'box' && shape !== 'rubik')
+  const useBlur = V.field === 'blur' || (V.field !== 'poisson' && shape !== 'box' && shape !== 'rubik')
   const root = useRef<THREE.Group>(null!)
   const maskScene = useRef<THREE.Scene>(null!)
   const { gl, camera, size } = useThree()
@@ -185,6 +225,14 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, auto = 
       bigB: rt(SIZE / 2),
       big: rt(SIZE / 2),
       combined: rt(SIZE),
+      // poisson: solved at 256 with float targets, reduced to 1 px for the max
+      pA: frt(256),
+      pB: frt(256),
+      pMask: rt(256),
+      r64: frt(64),
+      r16: frt(16),
+      r4: frt(4),
+      r1: frt(1),
     }),
     [SIZE],
   )
@@ -198,6 +246,9 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, auto = 
     const blur = raw(BLUR, { t: { value: null }, dir: { value: new THREE.Vector2() }, radius: { value: 1 }, ch: { value: new THREE.Vector4(1, 0, 0, 0) } })
     const combineHeat = raw(COMBINE_HEAT, { contour: { value: null }, big: { value: null }, inner: { value: null } })
     const combineField = raw(COMBINE_FIELD, { mask: { value: null }, blurred: { value: null }, useBlur: { value: 0 } })
+    const combinePoisson = raw(COMBINE_POISSON, { mask: { value: null }, u: { value: null }, umax: { value: null } })
+    const poisson = raw(POISSON, { u: { value: null }, mask: { value: null }, texel: { value: 1 / 256 }, h2: { value: 1 } })
+    const reduceMax = raw(REDUCE_MAX, { t: { value: null }, texel: { value: 1 / 128 } })
     const copy = raw(COPY, { t: { value: null } })
     const face = raw(FACE_FRAG, { mode: { value: 0 }, k: { value: 0.75 }, uHalf: { value: 1.5 }, uSeam: { value: 0 }, uRootInv: { value: new THREE.Matrix4() } }, FACE_VERT)
     const final = raw(
@@ -237,14 +288,14 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, auto = 
       },
       FINAL_VERT,
     )
-    return { scene, cam, mesh, blur, combineHeat, combineField, copy, face, final }
+    return { scene, cam, mesh, blur, combineHeat, combineField, combinePoisson, poisson, reduceMax, copy, face, final }
   }, [V.shader])
 
   useEffect(
     () => () => {
       Object.values(R).forEach((t) => t.dispose())
       Q.mesh.geometry.dispose()
-      ;[Q.blur, Q.combineHeat, Q.combineField, Q.copy, Q.face, Q.final].forEach((m) => m.dispose())
+      ;[Q.blur, Q.combineHeat, Q.combineField, Q.combinePoisson, Q.poisson, Q.reduceMax, Q.copy, Q.face, Q.final].forEach((m) => m.dispose())
     },
     [R, Q],
   )
@@ -269,7 +320,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, auto = 
     u.u_scale.value = num('scale', 1)
     u.u_halo.value = V.halo ? 1 : 0
     u.u_shade.value = V.shade
-    Q.face.uniforms.mode.value = isHeat ? (V.polarity === 'inverted' ? 1 : 0) : V.field === 'cube' ? 3 : 2
+    Q.face.uniforms.mode.value = isHeat ? (V.polarity === 'solid' ? 0 : 1) : V.field === 'cube' ? 3 : 2
     Q.face.uniforms.k.value = V.fieldK
     Q.face.uniforms.uHalf.value = shape === 'rubik' ? 1.5 * V.rubikGap : 0.5
     Q.face.uniforms.uSeam.value = shape === 'rubik' ? V.seam : 0
@@ -310,6 +361,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, auto = 
     const prevAlpha = gl.getClearAlpha()
     // heat solid: white outside (lum 1), no shade, not inside. inverted: black outside. field: boundary value, alpha 0
     if (isHeat) gl.setClearColor(V.polarity === 'inverted' ? new THREE.Color(0, 0, 0) : new THREE.Color(1, 0, 0), 1)
+    // cage: faces white (outside) and seams black (the shape) on a white background
     else gl.setClearColor(new THREE.Color(1, 0, 0), 1)
     gl.setRenderTarget(R.mask)
     gl.clear()
@@ -343,10 +395,40 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, auto = 
         boxBlur(R.bigA, R.bigB, R.big, px(V.blur.big, SIZE / 2), 3)
         Q.blur.uniforms.ch.value.set(1, 0, 0, 0)
       }
-      Q.combineField.uniforms.mask.value = R.mask.texture
-      Q.combineField.uniforms.blurred.value = R.big.texture
-      Q.combineField.uniforms.useBlur.value = useBlur ? 1 : 0
-      pass(Q.combineField, R.combined)
+      if (V.field === 'poisson') {
+        // downsample the mask, iterate Jacobi (warm-started from last frame), reduce the max, normalise
+        Q.blur.uniforms.ch.value.set(0, 1, 0, 0)
+        Q.blur.uniforms.radius.value = 0
+        Q.blur.uniforms.t.value = R.mask.texture
+        Q.blur.uniforms.dir.value.set(0, 0)
+        pass(Q.blur, R.pMask)
+        Q.blur.uniforms.ch.value.set(1, 0, 0, 0)
+        // pMask R now holds alpha; the solver reads .g, so point it at R via a swizzle-free trick: copy R->G
+        Q.poisson.uniforms.mask.value = R.pMask.texture
+        let a = R.pA, b = R.pB
+        for (let i = 0; i < V.poissonIters; i++) {
+          Q.poisson.uniforms.u.value = a.texture
+          pass(Q.poisson, b)
+          ;[a, b] = [b, a]
+        }
+        const chain = [R.r64, R.r16, R.r4, R.r1]
+        let src: THREE.WebGLRenderTarget = a
+        for (const dst of chain) {
+          Q.reduceMax.uniforms.t.value = src.texture
+          Q.reduceMax.uniforms.texel.value = 0.5 / dst.width
+          pass(Q.reduceMax, dst)
+          src = dst
+        }
+        Q.combinePoisson.uniforms.mask.value = R.mask.texture
+        Q.combinePoisson.uniforms.u.value = a.texture
+        Q.combinePoisson.uniforms.umax.value = R.r1.texture
+        pass(Q.combinePoisson, R.combined)
+      } else {
+        Q.combineField.uniforms.mask.value = R.mask.texture
+        Q.combineField.uniforms.blurred.value = R.big.texture
+        Q.combineField.uniforms.useBlur.value = useBlur ? 1 : 0
+        pass(Q.combineField, R.combined)
+      }
     }
 
     if (debug !== 'off') {

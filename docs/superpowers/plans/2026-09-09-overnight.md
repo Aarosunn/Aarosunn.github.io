@@ -32,3 +32,4 @@ Aaron's brief: "heat cube does not match the shaders at all, during the process 
 - 03:05 commit: PaperCube v3-v9, all three shaders on 3D at 61fps. Next: Rubik's mask (P2)
 - 03:12 commit: v10-v15 Rubik's mask, v10 heat rubik is the hero. Next: mock site (P3)
 - 03:20 commit: site mock. Next: polish versions v16+ (custom palettes, noir liquid, dark smoke, slower speeds), site version switcher, final sheet
+- 03:36 commit: presets + v16-v19 + site cycler + review fixes. Next: more iteration rounds (box shapes with aarcube presets, cage variants, speed), then P4 wrap after 06:50

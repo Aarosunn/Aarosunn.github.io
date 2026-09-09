@@ -93,3 +93,9 @@ Aaron on v1: gaps between the sides, low quality, no background. v2: 1024 MSAA m
 - Site: key `v` cycles v10 → v16 → v19 → v13 → v18 → v17 (`SITE_VERSIONS`); params derive from the version's preset, scale ×.85 (.7 narrow). Bug found: App's window keydown listener re-renders synchronously on the same event, so a listener that Site re-registers per render is swapped out mid-dispatch and never fires; Site now registers one stable listener that calls a ref.
 - Review (sonnet, read-only) fixes: RubikMask kills its tween and ignores `onComplete` after unmount; PaperCube's uniform effect depends on `shape` (stale seam/uHalf when only the shape changed); the fullscreen quad geometry is disposed.
 - Floral second pass: lanceolate leaves with arced veins, seed heads, hatch detail, one dimension line; reads as botanical x-ray line art at the base.
+
+## v20–v23: hidden-line Rubik's, GPU Poisson (03:45)
+
+- `polarity: 'cage'` (heat): faces white, seams black, white background → v20 hidden-line Rubik's lattice in icemint; the turning layer detaches as its own lattice.
+- `field: 'poisson'`: paper's actual preprocess on the GPU: mask alpha downsampled to 256², Jacobi for ∇²u = −1 (30 iterations per frame, warm-started from the previous frame so motion keeps up), max reduced 256→64→16→4→1, field = 1 − u/max. Half-float targets. v21 liquid on the rounded box (bands hug the boundary like the site), v22 smoke on the octahedron, v23 liquid Rubik's as one silhouette blob (seams only where a turn splits the outline). All 61 fps.
+- Control rows wrap (25 versions now); the site gets the aura wash and grain.

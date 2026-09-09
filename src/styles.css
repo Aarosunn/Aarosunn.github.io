@@ -170,6 +170,8 @@ canvas {
   gap: 4px;
   justify-content: flex-end;
   align-items: center;
+  flex-wrap: wrap;
+  max-width: 62vw;
 }
 .k {
   color: var(--mute);

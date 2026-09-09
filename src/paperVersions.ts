@@ -14,14 +14,16 @@ export type PaperVersion = {
   /** edge bars width in cube units (0 = none) and their mask value (1 = white / boundary, 0 = black) */
   seam: number
   seamValue: number
-  /** heat only: 'solid' = the shape is black on white (site-faithful); 'inverted' = faces white, background black */
-  polarity: 'solid' | 'inverted'
+  /** heat only: 'solid' = the shape is black on white (site-faithful); 'inverted' = faces white, background black; 'cage' = faces white, seams black, background white (hidden-line) */
+  polarity: 'solid' | 'inverted' | 'cage'
   /** let the effect exist beyond the silhouette (heat halo / outer smoke) */
   halo: boolean
   /** multiply the final colour by the lambert shade of the faces, 0..1 */
   shade: number
   /** liquid/smoke: R field from each geometry face's uv (analytic Poisson-ish), from the whole cube face in cube space (rubik plates), or from a blurred silhouette */
-  field: 'face' | 'cube' | 'blur'
+  field: 'face' | 'cube' | 'blur' | 'poisson'
+  /** poisson: Jacobi iterations per frame at 256² (warm-started, so ~30 keeps up with motion) */
+  poissonIters: number
   /** rubik: cubie spacing (1 = touching) */
   rubikGap: number
   /** liquid/smoke face field sharpness: field = 1 - (bx*by)^k */
@@ -44,6 +46,7 @@ const base = {
   shade: 0,
   field: 'face' as const,
   rubikGap: 1,
+  poissonIters: 30,
   fieldK: 0.75,
   blur: { contour: 5, inner: 18, big: 150 },
   camZ: 7,
@@ -69,6 +72,11 @@ export const PAPER_VERSIONS: PaperVersion[] = [
   { ...base, name: 'v17', shader: 'liquid', shape: 'rubik', field: 'cube', camZ: 11, shade: 0.4, preset: 'noir slow', note: 'liquid metal Rubik\'s, noir, slow, shaded: dark chrome' },
   { ...base, name: 'v18', shader: 'smoke', shape: 'rubik', field: 'cube', camZ: 11, halo: false, shade: 0.3, preset: 'icemint', note: 'gem smoke Rubik\'s in icemint on the dark scheme, no outer smoke' },
   { ...base, name: 'v19', shader: 'heat', shape: 'rubik', rubikGap: 1.03, seam: 0.02, camZ: 20, halo: false, shade: 0.45, preset: 'icemint slow', note: 'v16 without the halo, slower' },
+  // hidden-line Rubik's + true Poisson fields
+  { ...base, name: 'v20', shader: 'heat', shape: 'rubik', rubikGap: 1.03, seam: 0.05, camZ: 20, polarity: 'cage', preset: 'icemint', note: 'hidden-line Rubik\'s cage: white cubies occlude, black seams are the shape' },
+  { ...base, name: 'v21', shader: 'liquid', shape: 'rounded', field: 'poisson', camZ: 3.9, shade: 0.3, note: 'liquid metal with their real Poisson field (GPU Jacobi) on the rounded box' },
+  { ...base, name: 'v22', shader: 'smoke', shape: 'octa', field: 'poisson', camZ: 3.9, halo: false, shade: 0.3, preset: 'icemint', note: 'gem smoke, Poisson field, octahedron, icemint, no outer smoke' },
+  { ...base, name: 'v23', shader: 'liquid', shape: 'rubik', field: 'poisson', camZ: 11, shade: 0.4, preset: 'noir slow', note: 'liquid metal Rubik\'s with the silhouette Poisson field: one blob of chrome, seams from turns only' },
 ]
 
 export const VERSION_OF = (name: string) => PAPER_VERSIONS.find((v) => v.name === name)
