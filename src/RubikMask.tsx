@@ -57,8 +57,8 @@ const response = (zeta: number, w: number, duration: number, recoil: number): Fe
   for (let i = 0; i < 200; i++) peak = Math.max(peak, (f((i + 1) / 200) - f(i / 200)) * 200)
   return { duration, f, peak, recoil }
 }
-/** deck / idle turns: 0.5 s, 3.7° overshoot; algorithms: 0.14 s, 2.5° */
-export const FEEL = { turn: response(0.7, 7, 0.5, 0.025), fast: response(0.75, 8, 0.14, 0.012) }
+/** deck / idle turns: 0.5 s, 1.2° overshoot; algorithms: 0.18 s (~5 turns a second), 0.4° */
+export const FEEL = { turn: response(0.78, 7, 0.5, 0.018), fast: response(0.85, 8, 0.18, 0.008) }
 const AXES: Axis[] = ['x', 'y', 'z']
 // snap a cubie onto the nearest exact quarter-turn orientation by rounding its rotation matrix, so
 // error never accumulates (rounding Euler angles is not safe near gimbal lock)
@@ -179,7 +179,7 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
       },
       [turnOne],
     )
-    // speedcubing pace: ~7 turns a second, a half turn a touch longer
+    // brisk pace: ~5 turns a second, a half turn a touch longer
     const run = useMemo<RubikHandle['run']>(
       () => async (alg, duration = FEEL.fast.duration) => {
         if (busy.current) return
