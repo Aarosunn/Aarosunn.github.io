@@ -11,6 +11,7 @@ import { PaperCube } from './PaperCube'
 import { VERSION_OF, type PaperShader } from './paperVersions'
 import type { RubikHandle } from './RubikMask'
 import { Floral } from './Floral'
+import { AsciiPortrait } from './Ascii'
 
 const PRESETS_OF: Record<PaperShader, { name: string; params: object }[]> = {
   heat: [...heatmapPresets, ...PAPER_PRESETS.heat],
@@ -138,7 +139,11 @@ export function Site({ version: initial = 'v10', scheme = 'icemint', bg = '#0709
         {SECTIONS.map((s, i) => (
           <section key={s.id} className={`sec sec-${s.id} ${i === active ? 'on' : ''}`} onClick={() => step(i)}>
             <h2>{s.title}</h2>
-            {s.id === 'about' && <div className="portrait">ascii portrait, later a webcam</div>}
+            {s.id === 'about' && (
+              <div className="portrait" title="ascii portrait, later a webcam">
+                <AsciiPortrait cols={30} rows={18} cell={4} />
+              </div>
+            )}
             <p>{s.blurb}</p>
             <ul>
               {s.items.map((it, j) => {

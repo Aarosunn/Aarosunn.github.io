@@ -463,14 +463,14 @@ canvas {
   to { opacity: 1; }
 }
 .portrait {
-  width: 96px;
-  height: 96px;
-  border: 1px dashed var(--line);
-  color: var(--mute);
-  font-size: 10px;
-  line-height: 1.3;
-  padding: 6px;
+  display: inline-block;
+  color: var(--text);
   margin: 2px 0 10px;
+  opacity: 0.85;
+}
+.portrait canvas {
+  position: static;
+  display: block;
 }
 body:has(.site.has-panel .panel-left) canvas { transform: translateX(clamp(60px, 9vw, 130px)); }
 body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -9vw, -60px)); }

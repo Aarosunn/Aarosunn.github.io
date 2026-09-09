@@ -133,3 +133,7 @@ The canvas paints paper's `colorBack`, so a light scheme was black behind dark t
 ## Review-3 fixes, URL params, v32 (04:15)
 
 Third sonnet review: touch-orbiting the cube no longer counts as a swipe (target inside the canvas is ignored); the fusion's second mask honours `field: 'cube'`; dead heat entry dropped from the fusion preset table. `?tab=&c=&v=` link a specific tab / scheme / site cube (e.g. `/?v=v27&c=ember`), the site's readout lists the keys. v32 = inverted polarity heat Rubik's (the old v2 idea through the new pipeline, no halo, shaded).
+
+## ASCII portrait placeholder (04:22)
+
+`src/Ascii.tsx` (sonnet-written): a canvas ASCII bust from a procedural lit ellipse pair, seeded noise, breathing scale, 15 fps, reduced-motion aware; sits in About where the webcam portrait will go. 30×18 cells at 4 px.
