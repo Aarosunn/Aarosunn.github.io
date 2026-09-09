@@ -177,3 +177,7 @@ Moving seams from uv to geometry made them a true hairline, which the box-filter
 ## v11 restored, v12 = the geometry-true one (13:40)
 
 Aaron: "the cube looks different now, make this recent change a v12 and restore the old v11". Two version fields now carry the difference: `seamSpace` ('uv' = seams and plates from the geometry's uv, the v1–v11 look with its wider seams on rounded caps and the drift after turns; 'geometry' = true edges) and `poissonDown` ('blur' = box filter + bilinear, thin seams close and neighbouring cubies share a field; 'min' = hairlines stay holes). v11 is back on uv + blur; v12 is v11 on geometry + min. Same themes on both.
+
+## v13: v11's look without the drift (14:00)
+
+Why v11 drifts: drei RoundedBox caps have uv 0–0.86, so v11's uv seam only ever drew on two sides of each cap and its plate sat off-centre; after a turn a cubie shows different faces and the seams jump. v13 keeps the soft blurred Poisson mask and thin seams but measures seams and plates from the geometry (`seamSpace: 'geometry'`, seam .04, chosen against .035/.05/.065 by eye next to v11). `__aar.setShaderVersionOverride(partial)` lets review scripts vary version fields live. v11 and v12 stay as they are.

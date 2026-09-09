@@ -106,6 +106,20 @@ export const PAPER_VERSIONS: PaperVersion[] = [
     themes: ['default', 'backdrop', 'heatmap', 'heatmap grain', 'ice', 'mint', 'icemint', 'icemint grain'].map((name) => ({ name, shader: 'liquid' as const, preset: name })),
     note: 'v11 with seams and plates from the geometry (true edges on rounded cubies after turns) and a min-filtered Poisson mask: thinner seams, crisper plates',
   },
+  {
+    ...liquid,
+    name: 'v13',
+    field: 'poisson',
+    poissonIters: 60,
+    seamSpace: 'geometry',
+    rubikRound: 0.07,
+    seam: 0.04,
+    halo: false,
+    shade: 0.35,
+    preset: 'ice',
+    themes: ['default', 'backdrop', 'heatmap', 'heatmap grain', 'ice', 'mint', 'icemint', 'icemint grain'].map((name) => ({ name, shader: 'liquid' as const, preset: name })),
+    note: "v11's look (soft blurred mask, thin seams) with seams and plates measured from the geometry, so nothing drifts after turns",
+  },
 ]
 
 /** paper tab: the shaders on a plain-looking cube (whole-face plates hide the cubies until a layer turns) */

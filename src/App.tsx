@@ -5,7 +5,7 @@ import { Paper } from './Paper'
 import { PaperCube, type PaperDebug } from './PaperCube'
 import { Site } from './Site'
 import type { RubikHandle } from './RubikMask'
-import { PAPER_VERSIONS, VERSION_OF, withTheme } from './paperVersions'
+import { PAPER_VERSIONS, VERSION_OF, withTheme, type PaperVersion } from './paperVersions'
 import { PRESETS_OF, presetNamed } from './paperPresets'
 
 type Tab = 'site' | 'shader' | 'paper'
@@ -29,6 +29,7 @@ export default function App() {
   const [alpha, setAlpha] = useState(1)
   // review hook: merge arbitrary params over the theme (scripts iterate looks without editing presets)
   const [override, setOverride] = useState<Record<string, unknown>>({})
+  const [vOverride, setVOverride] = useState<Partial<PaperVersion>>({})
   const rubik = useRef<RubikHandle | null>(null)
   const s = SCHEMES[si]
   const base = VERSION_OF(version) ?? PAPER_VERSIONS[0]
@@ -36,7 +37,7 @@ export default function App() {
   const choices = base.themes ? base.themes.map((t) => t.name) : PRESETS_OF[base.shader].map((p) => p.name.toLowerCase())
   const choice = choices[Math.min(presetIx, choices.length - 1)]
   const theme = base.themes?.find((t) => t.name === choice)
-  const PV = withTheme(base, theme)
+  const PV = { ...withTheme(base, theme), ...vOverride }
   // every lab cube sits on the scheme's background, like the site
   // themed versions share one scale per shader so every theme sits at the same size on screen
   const params = { ...presetNamed(PV.shader, theme ? theme.preset : choice).params, colorBack: s.bg, ...(theme ? { scale: PV.shader === 'heat' ? 0.75 : 0.6 } : {}), ...override }
@@ -73,6 +74,7 @@ export default function App() {
       setShaderDebug: setDebug,
       setShaderLook: (g: number, a: number) => { setGain(g); setAlpha(a) },
       setShaderOverride: setOverride,
+      setShaderVersionOverride: setVOverride,
       paperTurn: (...args: Parameters<RubikHandle['turn']>) => rubik.current?.turn(...args) ?? Promise.resolve(),
       paperPositions: () => rubik.current?.positions() ?? [],
       paperOrientationError: () => rubik.current?.orientationError() ?? 0,
@@ -170,6 +172,7 @@ declare global {
       setShaderDebug: (v: PaperDebug) => void
       setShaderLook: (gain: number, alpha: number) => void
       setShaderOverride: (o: Record<string, unknown>) => void
+      setShaderVersionOverride: (o: Partial<PaperVersion>) => void
       paperTurn: RubikHandle['turn']
       paperPositions: () => number[][]
       paperOrientationError: () => number
