@@ -18,6 +18,8 @@ export const PAPER_PRESETS: Record<PaperShader, PaperPreset[]> = {
     heat('ember', ['#12060a', '#3a0d1f', '#7a1533', '#d43d3a', '#ff8a3d', '#ffd08a', '#fff3d6']),
     heat('graphite', ['#050608', '#15181f', '#2a2f3a', '#4a5262', '#8b95a8', '#c9d2d8', '#f2f5f7']),
     heat('icemint slow', ['#070c22', '#132a63', '#2f62c9', '#8fb8ff', '#c4eefb', '#9de8d4', '#f4fffb'], { speed: 0.55 }),
+    heat('icemint grain', ['#070c22', '#132a63', '#2f62c9', '#8fb8ff', '#c4eefb', '#9de8d4', '#f4fffb'], { noise: 0.3, speed: 0.7 }),
+    heat('icemint diagonal', ['#070c22', '#132a63', '#2f62c9', '#8fb8ff', '#c4eefb', '#9de8d4', '#f4fffb'], { angle: 40, speed: 0.7 }),
   ],
   liquid: [
     { name: 'ice', params: { colorBack: '#07090c', colorTint: '#bfe0ff', softness: 0.2, repetition: 2, shiftRed: 0.3, shiftBlue: 0.3, distortion: 0.07, contour: 0.4, angle: 70, speed: 0.6, scale: 0.6 } },

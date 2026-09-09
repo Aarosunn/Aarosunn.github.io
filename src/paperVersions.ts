@@ -30,6 +30,8 @@ export type PaperVersion = {
   fieldK: number
   /** heat blur radii in paper's 1750px canvas units */
   blur: { contour: number; inner: number; big: number }
+  /** heat: run the big blur at SIZE / bigDiv (2 = as paper's canvas; 4 = cheaper, for integrated GPUs) */
+  bigDiv: 2 | 4
   /** camera distance */
   camZ: number
   /** default preset name (lowercase) in the preset row */
@@ -52,6 +54,7 @@ const base = {
   poissonIters: 30,
   fieldK: 0.75,
   blur: { contour: 5, inner: 18, big: 150 },
+  bigDiv: 2 as const,
   camZ: 7,
 }
 
@@ -88,6 +91,8 @@ export const PAPER_VERSIONS: PaperVersion[] = [
   { ...base, name: 'v27', shader: 'heat', shape: 'rubik', rubikGap: 1.03, seam: 0.035, camZ: 20, preset: 'icemint', fuse: 'liquid', fusePreset: 'ice', shade: 0.3, note: 'fusion: heat seams and halo over liquid-metal cubie faces (ice)' },
   { ...base, name: 'v28', shader: 'heat', shape: 'rubik', rubikGap: 1.03, seam: 0.035, camZ: 20, preset: 'icemint', fuse: 'smoke', fusePreset: 'icemint', shade: 0.3, note: 'fusion: heat seams and halo over gem-smoke cubie faces (icemint)' },
   { ...base, name: 'v29', shader: 'heat', shape: 'box', seam: 0.012, camZ: 7, fuse: 'liquid', fusePreset: 'noir slow', shade: 0.3, note: 'fusion on the plain box: paper heat rim over noir liquid metal' },
+  { ...base, name: 'v30', shader: 'smoke', shape: 'rubik', field: 'poisson', seam: 0.04, camZ: 11, shade: 0.3, preset: 'icemint', note: 'gem smoke Rubik\'s per cubie with its outer plume kept, icemint on dark' },
+  { ...base, name: 'v31', shader: 'heat', shape: 'rubik', rubikGap: 1.03, seam: 0.035, camZ: 20, preset: 'icemint', bigDiv: 4, note: 'v16 with the big blur at quarter res: same look, cheaper on integrated GPUs' },
 ]
 
 export const VERSION_OF = (name: string) => PAPER_VERSIONS.find((v) => v.name === name)

@@ -62,7 +62,7 @@ export function Site({ version: initial = 'v10', scheme = 'icemint' }: { version
   // paper's `scale` shrinks the whole image on screen so the sections breathe
   const narrow = typeof window !== 'undefined' && window.innerWidth < 900
   // narrow screens are usually integrated GPUs: a 768 mask keeps the heat blurs cheap
-  const PV = useMemo(() => ({ ...VERSION_OF(version)!, size: narrow ? 768 : 1024 }), [version, narrow])
+  const PV = useMemo(() => ({ ...VERSION_OF(version)!, size: narrow ? 768 : 1024, bigDiv: narrow ? (4 as const) : (2 as const) }), [version, narrow])
   const params = useMemo(() => {
     const presets = PRESETS_OF[PV.shader]
     const want = SITE_PRESET[version] ?? (PV.shader === 'heat' && PV.preset === undefined ? HEAT_OF_SCHEME[scheme] : PV.preset)

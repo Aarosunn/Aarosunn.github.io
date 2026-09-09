@@ -295,9 +295,9 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpe
       a: rt(SIZE),
       contour: rt(SIZE),
       inner: rt(SIZE),
-      bigA: rt(SIZE / 2),
-      bigB: rt(SIZE / 2),
-      big: rt(SIZE / 2),
+      bigA: rt(SIZE / V.bigDiv),
+      bigB: rt(SIZE / V.bigDiv),
+      big: rt(SIZE / V.bigDiv),
       combined: rt(SIZE),
       // poisson: solved at 256 with float targets, reduced to 1 px for the max
       pA: frt(256),
@@ -306,7 +306,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpe
       // max reduce: halve eight times, each pass samples the 2x2 block centres
       red: [128, 64, 32, 16, 8, 4, 2, 1].map(frt),
     }),
-    [SIZE],
+    [SIZE, V.bigDiv],
   )
   // fusion needs a second mask and two screen-size outputs
   const dpr = gl.getPixelRatio()
@@ -427,7 +427,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpe
       Q.blur.uniforms.t.value = R.mask.texture
       Q.blur.uniforms.dir.value.set(0, 0)
       pass(Q.blur, R.bigA)
-      boxBlur(R.bigA, R.bigB, R.big, px(V.blur.big, SIZE / 2), 3)
+      boxBlur(R.bigA, R.bigB, R.big, px(V.blur.big, SIZE / V.bigDiv), 3)
       Q.combineHeat.uniforms.contour.value = R.contour.texture
       Q.combineHeat.uniforms.big.value = R.big.texture
       Q.combineHeat.uniforms.inner.value = R.inner.texture
@@ -440,7 +440,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, spinSpe
         Q.blur.uniforms.t.value = R.mask.texture
         Q.blur.uniforms.dir.value.set(0, 0)
         pass(Q.blur, R.bigA)
-        boxBlur(R.bigA, R.bigB, R.big, px(V.blur.big, SIZE / 2), 3)
+        boxBlur(R.bigA, R.bigB, R.big, px(V.blur.big, SIZE / V.bigDiv), 3)
         Q.blur.uniforms.ch.value.set(1, 0, 0, 0)
       }
       if (V.field === 'poisson') {
