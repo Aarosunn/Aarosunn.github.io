@@ -21,8 +21,8 @@ Aaron's brief: "heat cube does not match the shaders at all, during the process 
 - [x] seams from cubie edges, turn continuity before/mid/after, 12-turn integrity
 
 ## P3 mock site tab
-- [ ] xray floral SVG bottom, 4 section placeholders, deck-step nav stub, cube centre
-- [ ] 3 viewports screenshot
+- [x] xray floral SVG bottom, 4 section placeholders, deck-step nav stub, cube centre
+- [x] 3 viewports screenshot
 
 ## P4 wrap
 - [ ] contact sheet of all versions, spec, memory, cron deleted, summary
@@ -31,3 +31,4 @@ Aaron's brief: "heat cube does not match the shaders at all, during the process 
 - 02:50 start
 - 03:05 commit: PaperCube v3-v9, all three shaders on 3D at 61fps. Next: Rubik's mask (P2)
 - 03:12 commit: v10-v15 Rubik's mask, v10 heat rubik is the hero. Next: mock site (P3)
+- 03:20 commit: site mock. Next: polish versions v16+ (custom palettes, noir liquid, dark smoke, slower speeds), site version switcher, final sheet

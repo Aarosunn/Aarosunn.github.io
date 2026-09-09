@@ -432,6 +432,10 @@ button:focus-visible {
 .deck button:hover i {
   background: var(--mute);
 }
+.site-ver {
+  color: var(--line);
+  font-size: 11px;
+}
 
 @media (max-width: 900px) {
   .site {

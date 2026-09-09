@@ -20,6 +20,7 @@ for (const [w, h] of [[1440, 900], [1024, 700], [420, 820]]) {
   await page.keyboard.press('3')
   await page.waitForTimeout(900)
   await page.screenshot({ path: `shots/site/${w}-2.png` })
+  if (w === 1440) for (let i = 1; i < 6; i++) { await page.keyboard.press('v'); await page.waitForTimeout(1500); await page.screenshot({ path: `shots/site/${w}-ver${i}.png` }) }
   await page.close()
 }
 await browser.close()

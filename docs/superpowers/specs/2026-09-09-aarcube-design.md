@@ -85,3 +85,11 @@ Aaron on v1: gaps between the sides, low quality, no background. v2: 1024 MSAA m
 - The cube keeps v10's camera so the heat blurs stay crisp (radii are frame-relative); paper's `scale` (.5 desktop / .42 narrow) shrinks the image on screen instead. `outerGlow` .42 so the halo lights the page without drowning the copy.
 - Grid: head / two section rows / base, so sections never collide; ≤900px: only the active section, scrim over the lower half, lab tabs hidden.
 - `scripts/site-shoot.mjs`: 1440 / 1024 / 420, deck steps mid-turn.
+
+## Polish round: presets, v16–v19, site cycler, review fixes (03:35)
+
+- `src/paperPresets.ts`: aarcube presets after paper's in the preset row. Heat: icemint (navy→ice→mint→white), ember, graphite, icemint slow. Liquid: ice, noir slow (tint #a0a0a4 so the body reads), mint. Smoke: icemint, ember, graphite (dark colorBack). Versions carry a default `preset`.
+- v16 heat Rubik's hairline seams (.02) icemint · v17 liquid Rubik's noir slow shaded (dark chrome) · v18 smoke Rubik's icemint no outer smoke (glassy marble) · v19 v16 without halo, slower.
+- Site: key `v` cycles v10 → v16 → v19 → v13 → v18 → v17 (`SITE_VERSIONS`); params derive from the version's preset, scale ×.85 (.7 narrow). Bug found: App's window keydown listener re-renders synchronously on the same event, so a listener that Site re-registers per render is swapped out mid-dispatch and never fires; Site now registers one stable listener that calls a ref.
+- Review (sonnet, read-only) fixes: RubikMask kills its tween and ignores `onComplete` after unmount; PaperCube's uniform effect depends on `shape` (stale seam/uHalf when only the shape changed); the fullscreen quad geometry is disposed.
+- Floral second pass: lanceolate leaves with arced veins, seed heads, hatch detail, one dimension line; reads as botanical x-ray line art at the base.

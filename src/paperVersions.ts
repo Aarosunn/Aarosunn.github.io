@@ -30,6 +30,8 @@ export type PaperVersion = {
   blur: { contour: number; inner: number; big: number }
   /** camera distance */
   camZ: number
+  /** default preset name (lowercase) in the preset row */
+  preset?: string
   note: string
 }
 
@@ -62,6 +64,11 @@ export const PAPER_VERSIONS: PaperVersion[] = [
   { ...base, name: 'v13', shader: 'heat', shape: 'rubik', rubikGap: 1.03, seam: 0.035, camZ: 20, halo: false, shade: 0.45, note: 'v10 without the halo' },
   { ...base, name: 'v14', shader: 'liquid', shape: 'rubik', field: 'face', camZ: 11, note: 'liquid metal on the Rubik\'s cube: one plate per cubie face' },
   { ...base, name: 'v15', shader: 'smoke', shape: 'rubik', field: 'face', camZ: 11, halo: false, shade: 0.3, note: 'gem smoke on the Rubik\'s cube: one plate per cubie face, no outer smoke' },
+  // polish round: aarcube palettes, slower, thinner seams
+  { ...base, name: 'v16', shader: 'heat', shape: 'rubik', rubikGap: 1.03, seam: 0.02, camZ: 20, preset: 'icemint', note: 'v10 with hairline seams and the icemint palette' },
+  { ...base, name: 'v17', shader: 'liquid', shape: 'rubik', field: 'cube', camZ: 11, shade: 0.4, preset: 'noir slow', note: 'liquid metal Rubik\'s, noir, slow, shaded: dark chrome' },
+  { ...base, name: 'v18', shader: 'smoke', shape: 'rubik', field: 'cube', camZ: 11, halo: false, shade: 0.3, preset: 'icemint', note: 'gem smoke Rubik\'s in icemint on the dark scheme, no outer smoke' },
+  { ...base, name: 'v19', shader: 'heat', shape: 'rubik', rubikGap: 1.03, seam: 0.02, camZ: 20, halo: false, shade: 0.45, preset: 'icemint slow', note: 'v16 without the halo, slower' },
 ]
 
 export const VERSION_OF = (name: string) => PAPER_VERSIONS.find((v) => v.name === name)

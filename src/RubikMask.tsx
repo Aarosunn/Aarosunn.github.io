@@ -22,6 +22,16 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
     const pivot = useRef<THREE.Group>(null!)
     const cubies = useRef<Cubie[]>([])
     const busy = useRef(false)
+    const alive = useRef(true)
+    // a tween still in flight when we unmount must not touch dead refs
+    useEffect(() => {
+      alive.current = true
+      const pv = pivot.current
+      return () => {
+        alive.current = false
+        gsap.killTweensOf(pv.rotation)
+      }
+    }, [])
     const cells = useMemo(() => {
       const out: THREE.Vector3[] = []
       for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) out.push(new THREE.Vector3(x, y, z))
@@ -45,6 +55,7 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
             duration: 0.55,
             ease: 'power3.inOut',
             onComplete: () => {
+              if (!alive.current) return
               const rot = new THREE.Vector3(ax === 'x' ? 1 : 0, ax === 'y' ? 1 : 0, ax === 'z' ? 1 : 0)
               slice.forEach((c) => {
                 root.current.attach(c.mesh)

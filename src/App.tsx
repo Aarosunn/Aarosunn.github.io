@@ -13,7 +13,13 @@ import type { RubikHandle } from './RubikMask'
 import { PAPER_VERSIONS, VERSION_OF, type PaperShader, type PaperShape } from './paperVersions'
 import { gemSmokePresets, heatmapPresets, liquidMetalPresets } from '@paper-design/shaders-react'
 
-const PRESETS_OF: Record<PaperShader, { name: string; params: object }[]> = { heat: heatmapPresets, liquid: liquidMetalPresets, smoke: gemSmokePresets }
+import { PAPER_PRESETS } from './paperPresets'
+// paper's site presets first, then aarcube's own
+const PRESETS_OF: Record<PaperShader, { name: string; params: object }[]> = {
+  heat: [...heatmapPresets, ...PAPER_PRESETS.heat],
+  liquid: [...liquidMetalPresets, ...PAPER_PRESETS.liquid],
+  smoke: [...gemSmokePresets, ...PAPER_PRESETS.smoke],
+}
 const PAPER_SHAPES: PaperShape[] = ['box', 'rounded', 'octa', 'cage', 'rubik']
 
 // FPS sampler lives inside the canvas; reports out twice a second.
@@ -198,7 +204,7 @@ export default function App() {
     window.__aar = {
       setTab,
       setHeatHollow,
-      setHeatVersion,
+      setHeatVersion: (v: string) => { setHeatVersion(v); const pv = VERSION_OF(v); setHeatPreset(pv?.preset ? Math.max(0, PRESETS_OF[pv.shader].findIndex((p) => p.name.toLowerCase() === pv.preset)) : 0) },
       setHeatDebug,
       setHeatPreset,
       setHeatShape,
@@ -271,7 +277,7 @@ export default function App() {
           <div className="wordmark">aarcube</div>
           {tabs}
           <div className="controls">
-            <Row label="version" items={['v1', 'v2', ...PAPER_VERSIONS.map((v) => v.name)]} on={heatVersion} pick={(v) => { setHeatVersion(v); setHeatPreset(0) }} />
+            <Row label="version" items={['v1', 'v2', ...PAPER_VERSIONS.map((v) => v.name)]} on={heatVersion} pick={(v) => { setHeatVersion(v); const pv = VERSION_OF(v); setHeatPreset(pv?.preset ? Math.max(0, PRESETS_OF[pv.shader].findIndex((p) => p.name.toLowerCase() === pv.preset)) : 0) }} />
             <Row label="preset" items={presets.map((p) => p.name.toLowerCase())} on={preset.name.toLowerCase()} pick={(n) => setHeatPreset(presets.findIndex((p) => p.name.toLowerCase() === n))} />
             {!legacy && <Row label="shape" items={PAPER_SHAPES} on={heatShape ?? PV.shape} pick={setHeatShape} />}
             <div className="row">

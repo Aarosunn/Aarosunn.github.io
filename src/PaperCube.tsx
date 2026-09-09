@@ -243,6 +243,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, auto = 
   useEffect(
     () => () => {
       Object.values(R).forEach((t) => t.dispose())
+      Q.mesh.geometry.dispose()
       ;[Q.blur, Q.combineHeat, Q.combineField, Q.copy, Q.face, Q.final].forEach((m) => m.dispose())
     },
     [R, Q],
@@ -272,7 +273,7 @@ export function PaperCube({ version, shape: shapeOverride, params, spin, auto = 
     Q.face.uniforms.k.value = V.fieldK
     Q.face.uniforms.uHalf.value = shape === 'rubik' ? 1.5 * V.rubikGap : 0.5
     Q.face.uniforms.uSeam.value = shape === 'rubik' ? V.seam : 0
-  }, [params, Q, V, isHeat])
+  }, [params, Q, V, isHeat, shape])
 
   const pass = (mat: THREE.RawShaderMaterial, target: THREE.WebGLRenderTarget | null) => {
     Q.mesh.material = mat

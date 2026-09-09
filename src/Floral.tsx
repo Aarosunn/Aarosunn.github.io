@@ -24,6 +24,7 @@ function mulberry32(seed: number): () => number {
 const r1 = (n: number): number => Math.round(n * 10) / 10;
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 const pt = (a: Pt, b: Pt, t: number): Pt => [lerp(a[0], b[0], t), lerp(a[1], b[1], t)];
+const fmt = (p: Pt): string => `${r1(p[0])} ${r1(p[1])}`;
 
 // Cubic bezier point evaluation, used to sample leaf-attach points along a stem.
 function bezierAt(p0: Pt, p1: Pt, p2: Pt, p3: Pt, t: number): Pt {
@@ -31,6 +32,14 @@ function bezierAt(p0: Pt, p1: Pt, p2: Pt, p3: Pt, t: number): Pt {
   const x = mt ** 3 * p0[0] + 3 * mt ** 2 * t * p1[0] + 3 * mt * t ** 2 * p2[0] + t ** 3 * p3[0];
   const y = mt ** 3 * p0[1] + 3 * mt ** 2 * t * p1[1] + 3 * mt * t ** 2 * p2[1] + t ** 3 * p3[1];
   return [x, y];
+}
+
+// De Casteljau split of a quadratic bezier at s: lets a vein fade in two opacity steps.
+function quadSplit(p0: Pt, c: Pt, p2: Pt, s: number): { nearC: Pt; mid: Pt; farC: Pt } {
+  const nearC = pt(p0, c, s);
+  const farC = pt(c, p2, s);
+  const mid = pt(nearC, farC, s);
+  return { nearC, mid, farC };
 }
 
 // Build a curving stem from base outward at `leanDeg` from vertical (0 = straight up).
@@ -49,35 +58,78 @@ interface LeafArt {
   outline: string;
   ghost: string;
   midrib: string;
-  veins: string[];
+  veinsNear: string[];
+  veinsFar: string[];
+  hatch: string[];
   node: Pt;
 }
 
-// A leaf as two quadratic beziers meeting at a point tip, plus midrib and lateral veins.
-function leaf(rng: () => number, base: Pt, angleDeg: number, len: number, width: number, side: 1 | -1): LeafArt {
+// A fuller lanceolate leaf: two cubic beziers per side (base->widest, widest->tip),
+// widest point ~40% along, tip gently pointed, base slightly rounded outward.
+function leaf(
+  rng: () => number,
+  base: Pt,
+  angleDeg: number,
+  len: number,
+  halfWidth: number,
+  withHatch: boolean,
+): LeafArt {
   const a = (angleDeg * Math.PI) / 180;
-  const tip: Pt = [base[0] + Math.cos(a) * len, base[1] + Math.sin(a) * len];
-  const perp: Pt = [-Math.sin(a) * side, Math.cos(a) * side];
-  const mid: Pt = pt(base, tip, 0.5);
-  const c1: Pt = [mid[0] + perp[0] * width, mid[1] + perp[1] * width];
-  const c2: Pt = [mid[0] - perp[0] * width * 0.6, mid[1] - perp[1] * width * 0.6];
-  const outline = `M ${r1(base[0])} ${r1(base[1])} Q ${r1(c1[0])} ${r1(c1[1])} ${r1(tip[0])} ${r1(tip[1])} Q ${r1(c2[0])} ${r1(c2[1])} ${r1(base[0])} ${r1(base[1])} Z`;
+  const u: Pt = [Math.cos(a), Math.sin(a)];
+  const v: Pt = [-Math.sin(a), Math.cos(a)];
+  const tip: Pt = [base[0] + u[0] * len, base[1] + u[1] * len];
+  const along = (f: number): Pt => [base[0] + u[0] * len * f, base[1] + u[1] * len * f];
+  const edge = (f: number, w: number, e: 1 | -1): Pt => {
+    const p = along(f);
+    return [p[0] + v[0] * halfWidth * w * e, p[1] + v[1] * halfWidth * w * e];
+  };
+  const side = (e: 1 | -1) => ({
+    wp: edge(0.4, 1, e),
+    c1: edge(0.12, 0.55, e),
+    c2: edge(0.3, 1.08, e),
+    c3: edge(0.58, 0.88, e),
+    c4: edge(0.85, 0.18, e),
+  });
+  const s1 = side(1);
+  const s2 = side(-1);
+  const outline = `M ${fmt(base)} C ${fmt(s1.c1)} ${fmt(s1.c2)} ${fmt(s1.wp)} C ${fmt(s1.c3)} ${fmt(s1.c4)} ${fmt(tip)} C ${fmt(s2.c4)} ${fmt(s2.c3)} ${fmt(s2.wp)} C ${fmt(s2.c2)} ${fmt(s2.c1)} ${fmt(base)} Z`;
+
   const gox = (rng() - 0.5) * 3;
   const goy = (rng() - 0.5) * 3;
-  const ghost = `M ${r1(base[0] + gox)} ${r1(base[1] + goy)} Q ${r1(c1[0] + gox)} ${r1(c1[1] + goy)} ${r1(tip[0] + gox)} ${r1(tip[1] + goy)} Q ${r1(c2[0] + gox)} ${r1(c2[1] + goy)} ${r1(base[0] + gox)} ${r1(base[1] + goy)} Z`;
-  const midrib = `M ${r1(base[0])} ${r1(base[1])} L ${r1(tip[0])} ${r1(tip[1])}`;
-  const veinCount = 3 + Math.floor(rng() * 3);
-  const veins: string[] = [];
+  const shift = (p: Pt): Pt => [p[0] + gox, p[1] + goy];
+  const ghost = `M ${fmt(shift(base))} C ${fmt(shift(s1.c1))} ${fmt(shift(s1.c2))} ${fmt(shift(s1.wp))} C ${fmt(shift(s1.c3))} ${fmt(shift(s1.c4))} ${fmt(shift(tip))} C ${fmt(shift(s2.c4))} ${fmt(shift(s2.c3))} ${fmt(shift(s2.wp))} C ${fmt(shift(s2.c2))} ${fmt(shift(s2.c1))} ${fmt(shift(base))} Z`;
+
+  const midrib = `M ${fmt(base)} L ${fmt(tip)}`;
+
+  // Lateral veins: quadratic arcs bowed toward the tip, split so the outer half reads fainter.
+  const veinCount = 5 + Math.floor(rng() * 3);
+  const veinsNear: string[] = [];
+  const veinsFar: string[] = [];
   for (let j = 0; j < veinCount; j++) {
-    const t = (j + 1) / (veinCount + 1);
-    const vs = side === 1 ? (j % 2 === 0 ? 1 : -1) : j % 2 === 0 ? -1 : 1;
+    const t = 0.12 + (j / (veinCount - 1)) * 0.72;
+    const vs: 1 | -1 = j % 2 === 0 ? 1 : -1;
     const vp = pt(base, tip, t);
-    const vLen = len * 0.22 * (1 - t * 0.3);
-    const va = a + vs * ((30 + rng() * 10) * Math.PI) / 180;
+    const widthAt = t < 0.4 ? lerp(0.3, 1, t / 0.4) : lerp(1, 0.05, (t - 0.4) / 0.6);
+    const vLen = halfWidth * widthAt * 0.85;
+    const va = a + vs * ((62 * Math.PI) / 180);
     const ve: Pt = [vp[0] + Math.cos(va) * vLen, vp[1] + Math.sin(va) * vLen];
-    veins.push(`M ${r1(vp[0])} ${r1(vp[1])} L ${r1(ve[0])} ${r1(ve[1])}`);
+    const bend = vLen * 0.4;
+    const ctrl: Pt = [(vp[0] + ve[0]) / 2 + u[0] * bend, (vp[1] + ve[1]) / 2 + u[1] * bend];
+    const split = quadSplit(vp, ctrl, ve, 0.55);
+    veinsNear.push(`M ${fmt(vp)} Q ${fmt(split.nearC)} ${fmt(split.mid)}`);
+    veinsFar.push(`M ${fmt(split.mid)} Q ${fmt(split.farC)} ${fmt(ve)}`);
   }
-  return { outline, ghost, midrib, veins, node: base };
+
+  // Optional cut-away detail: three faint parallel hatch lines across one corner.
+  const hatch: string[] = [];
+  if (withHatch) {
+    for (let k = 0; k < 3; k++) {
+      const f = 0.6 + k * 0.07;
+      hatch.push(`M ${fmt(edge(f, 0.1, 1))} L ${fmt(edge(f, 0.62, 1))}`);
+    }
+  }
+
+  return { outline, ghost, midrib, veinsNear, veinsFar, hatch, node: base };
 }
 
 const cross = (p: Pt): string => `M ${r1(p[0] - 3)} ${r1(p[1])} L ${r1(p[0] + 3)} ${r1(p[1])} M ${r1(p[0])} ${r1(p[1] - 3)} L ${r1(p[0])} ${r1(p[1] + 3)}`;
@@ -87,28 +139,31 @@ export function Floral({ width = 640, height = 120, color = "currentColor", seed
     const rng = mulberry32(seed);
     const cx = width / 2;
     const baseY = height - 3;
+    const maxRise = Math.min(height - 8, 100);
     const count = rng() < 0.5 ? 2 : 3;
-    const spread = count === 3 ? [-58, 4, 62] : [-40, 40];
+    const spread = count === 3 ? [-72, -4, 70] : [-64, 64];
     const stems: { path: string; leaves: LeafArt[]; tip: Pt; buds: Pt[] }[] = [];
     const nodes: Pt[] = [];
 
     for (let i = 0; i < count; i++) {
       const lean = spread[i] + (rng() - 0.5) * 12;
-      const len = width * (0.2 + rng() * 0.11);
+      const outer = Math.abs(lean) > 25;
+      const len = outer ? width * (0.36 + rng() * 0.14) : maxRise * (0.85 + rng() * 0.15);
       const base: Pt = [cx + (rng() - 0.5) * 10, baseY];
       const s = stem(rng, base, lean, len);
-      const path = `M ${r1(s.p0[0])} ${r1(s.p0[1])} C ${r1(s.p1[0])} ${r1(s.p1[1])} ${r1(s.p2[0])} ${r1(s.p2[1])} ${r1(s.p3[0])} ${r1(s.p3[1])}`;
-      const leafCount = 3 + Math.floor(rng() * 3);
+      const path = `M ${fmt(s.p0)} C ${fmt(s.p1)} ${fmt(s.p2)} ${fmt(s.p3)}`;
+      const stemAngle = Math.atan2(s.p3[1] - s.p0[1], s.p3[0] - s.p0[0]) * (180 / Math.PI);
+      const leafCount = 4 + Math.floor(rng() * 3);
       const leaves: LeafArt[] = [];
       for (let j = 0; j < leafCount; j++) {
-        const t = 0.22 + (j / leafCount) * 0.7 + rng() * 0.05;
+        const t = 0.2 + (j / leafCount) * 0.72 + rng() * 0.04;
         const p = bezierAt(s.p0, s.p1, s.p2, s.p3, t);
         const side: 1 | -1 = j % 2 === 0 ? 1 : -1;
-        const stemAngle = Math.atan2(s.p3[1] - s.p0[1], s.p3[0] - s.p0[0]) * (180 / Math.PI);
-        const leafAngle = stemAngle + side * (55 + rng() * 15);
-        const lLen = 14 + rng() * 10;
-        const lWidth = 3 + rng() * 2;
-        leaves.push(leaf(rng, p, leafAngle, lLen, lWidth, side));
+        const droop = t * 10;
+        const leafAngle = stemAngle + side * (35 + rng() * 25) + droop;
+        const lLen = 26 + rng() * 20;
+        const halfWidth = (lLen * (0.3 + rng() * 0.15)) / 2;
+        leaves.push(leaf(rng, p, leafAngle, lLen, halfWidth, i === 0 && j === 1));
         nodes.push(p);
       }
       const buds: Pt[] = rng() < 0.6 ? [s.p3] : [];
@@ -153,7 +208,7 @@ export function Floral({ width = 640, height = 120, color = "currentColor", seed
       <g opacity={0.3} strokeWidth={0.8}>
         {art.stems.flatMap((s, si) => s.leaves.map((l, li) => <path key={`g-${si}-${li}`} d={l.ghost} />))}
       </g>
-      <g opacity={0.9} strokeWidth={1}>
+      <g opacity={0.9} strokeWidth={0.6}>
         {art.stems.map((s, si) => (
           <path key={`s-${si}`} d={s.path} />
         ))}
@@ -162,11 +217,21 @@ export function Floral({ width = 640, height = 120, color = "currentColor", seed
         {art.stems.flatMap((s, si) => s.leaves.map((l, li) => <path key={`o-${si}-${li}`} d={l.outline} />))}
       </g>
       <g opacity={0.55} strokeWidth={0.5}>
+        {art.stems.flatMap((s, si) => s.leaves.map((l, li) => <path key={`m-${si}-${li}`} d={l.midrib} />))}
+      </g>
+      <g opacity={0.5} strokeWidth={0.45}>
         {art.stems.flatMap((s, si) =>
-          s.leaves.flatMap((l, li) => [
-            <path key={`m-${si}-${li}`} d={l.midrib} />,
-            ...l.veins.map((v, vi) => <path key={`v-${si}-${li}-${vi}`} d={v} />),
-          ]),
+          s.leaves.flatMap((l, li) => l.veinsNear.map((v, vi) => <path key={`vn-${si}-${li}-${vi}`} d={v} />)),
+        )}
+      </g>
+      <g opacity={0.2} strokeWidth={0.4}>
+        {art.stems.flatMap((s, si) =>
+          s.leaves.flatMap((l, li) => l.veinsFar.map((v, vi) => <path key={`vf-${si}-${li}-${vi}`} d={v} />)),
+        )}
+      </g>
+      <g opacity={0.35} strokeWidth={0.4}>
+        {art.stems.flatMap((s, si) =>
+          s.leaves.flatMap((l, li) => l.hatch.map((h, hi) => <path key={`h-${si}-${li}-${hi}`} d={h} />)),
         )}
       </g>
       <g opacity={0.9} strokeWidth={0.8}>
