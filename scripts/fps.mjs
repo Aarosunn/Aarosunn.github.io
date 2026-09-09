@@ -6,7 +6,7 @@ await page.goto('http://localhost:5173/')
 await page.waitForFunction(() => window.__aar && window.__aar.positions().length === 27)
 await page.waitForTimeout(2500)
 const fps = () => page.evaluate(() => document.querySelector('.readout span:nth-child(6)')?.textContent)
-for (const [set, v] of [['v3','chrome'],['v3','heat'],['v3','smoke'],['v2','chrome'],['v2','heat'],['v2','smoke'],['v1','chrome'],['v1','smoke']]) {
+for (const [set, v] of [['v4','heat'],['v4','chrome'],['v4','smoke'],['v4','heatsmoke'],['v4','smokechrome'],['v3','chrome'],['v3','heat'],['v3','smoke'],['v2','chrome'],['v2','heat'],['v2','smoke'],['v1','chrome'],['v1','smoke']]) {
   await page.evaluate(([s, v]) => { window.__aar.setSet(s); window.__aar.setVariant(v) }, [set, v])
   await page.waitForTimeout(2500)
   console.log(set, v, await fps())

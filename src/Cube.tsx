@@ -3,14 +3,17 @@ import { useFrame } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
-import { makeMaterial, type Variant } from './materials/v1'
+import { makeMaterial, VARIANTS, type Variant } from './materials/v1'
 import { makeV2, type Palette, type V2Material } from './materials/v2'
 import { makeShared, makeV3 } from './materials/v3'
+import { makeV4, V4_VARIANTS, type V4Variant } from './materials/v4'
 
 export type Shape = 'classic' | 'solid'
-export type Set = 'v1' | 'v2' | 'v3'
+export type Set = 'v1' | 'v2' | 'v3' | 'v4'
 export const SHAPES: Shape[] = ['classic', 'solid']
-export const SETS: Set[] = ['v1', 'v2', 'v3']
+export const SETS: Set[] = ['v1', 'v2', 'v3', 'v4']
+export type AnyVariant = Variant | V4Variant
+export const VARIANTS_OF = (set: Set): AnyVariant[] => (set === 'v4' ? V4_VARIANTS : VARIANTS)
 
 // classic = first iteration exactly: rounded, gapped. solid = rounded corners, touching; the bevels are the seams.
 const SHAPE = {
@@ -31,7 +34,7 @@ export type CubeHandle = {
 type Props = {
   shape: Shape
   set: Set
-  variant: Variant
+  variant: AnyVariant
   palette: Palette
   auto: boolean
   float: boolean
@@ -52,9 +55,13 @@ export function Cube({ shape, set, variant, palette, auto, float, onTurn, handle
   const mats = useMemo<THREE.Material[]>(
     () =>
       set === 'v1'
-        ? [makeMaterial(variant, palette.a, palette.b, palette.bg)]
+        ? [makeMaterial(variant as Variant, palette.a, palette.b, palette.bg)]
         : Array.from({ length: 27 }, () =>
-            set === 'v2' ? makeV2(variant, palette, gap + 0.5) : makeV3(variant, palette, gap + 0.5, shared),
+            set === 'v2'
+              ? makeV2(variant as Variant, palette, gap + 0.5)
+              : set === 'v3'
+                ? makeV3(variant as Variant, palette, gap + 0.5, shared)
+                : makeV4(variant as V4Variant, palette, gap + 0.5, shared),
           ),
     [set, variant, palette, gap, shared],
   )

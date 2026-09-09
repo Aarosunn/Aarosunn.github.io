@@ -30,14 +30,14 @@ console.log(`renderer: ${gpu}`)
 const schemes = process.argv.includes('--all')
   ? ['icemint', 'ice', 'aura', 'ember', 'graphite', 'mint', 'paper']
   : ['icemint', 'paper']
-const variants = ['heat', 'chrome', 'smoke']
+const VARIANTS = { v1: ['heat', 'chrome', 'smoke'], v2: ['heat', 'chrome', 'smoke'], v3: ['heat', 'chrome', 'smoke'], v4: ['heat', 'chrome', 'smoke', 'heatsmoke', 'smokechrome'] }
 const state = () => page.$$eval('button.on', (b) => b.map((x) => x.textContent))
 
-for (const set of ['v1', 'v2', 'v3']) {
+for (const set of Object.keys(VARIANTS)) {
   await page.evaluate((v) => window.__aar.setSet(v), set)
   for (const shape of ['classic', 'solid']) {
     await page.evaluate((v) => window.__aar.setShape(v), shape)
-    for (const v of variants) {
+    for (const v of VARIANTS[set]) {
       await page.evaluate((v) => window.__aar.setVariant(v), v)
       for (const s of schemes) {
         await page.evaluate((s) => window.__aar.setScheme(s), s)
@@ -53,27 +53,30 @@ const fps = await page.evaluate(() => document.querySelector('.readout span:nth-
 console.log(fps)
 
 // Turn check per set: mid-turn frame + integrity after 12 turns.
-for (const set of ['v1', 'v2', 'v3']) {
-  await page.evaluate((v) => {
-    window.__aar.setSet(v)
+const turnCases = [['v1', 'chrome'], ['v2', 'chrome'], ['v3', 'chrome'], ...VARIANTS.v4.map((v) => ['v4', v])]
+for (const [set, variant] of turnCases) {
+  await page.evaluate(([s, v]) => {
+    window.__aar.setSet(s)
     window.__aar.setShape('solid')
     window.__aar.setScheme('icemint')
-    window.__aar.setVariant('chrome')
-  }, set)
+    window.__aar.setVariant(v)
+  }, [set, variant])
   await page.waitForTimeout(600)
+  await page.screenshot({ path: `${out}/turn-${set}-${variant}-0before.png` })
   page.evaluate(() => window.__aar.turn('y', 1, 1))
   await page.waitForTimeout(220)
-  await page.screenshot({ path: `${out}/turn-${set}-mid.png` })
+  await page.screenshot({ path: `${out}/turn-${set}-${variant}-1mid.png` })
   await page.waitForFunction(() => !window.__aar.busy())
+  await page.waitForTimeout(60)
+  await page.screenshot({ path: `${out}/turn-${set}-${variant}-2after.png` })
   for (let i = 0; i < 12; i++) await page.evaluate(() => window.__aar.turn())
   const pos = await page.evaluate(() => window.__aar.positions())
   const keys = new Set(pos.map((p) => p.join(',')))
   const ints = pos.every((p) => p.every((n) => Number.isInteger(n) && Math.abs(n) <= 1))
-  console.log(`${set}: after 12 turns, ${keys.size} unique cells, all ints=${ints}`)
+  console.log(`${set} ${variant}: after 12 turns, ${keys.size} unique cells, all ints=${ints}`)
   if (keys.size !== 27 || !ints) {
     console.error('CUBE INTEGRITY FAILED', pos)
     process.exitCode = 1
   }
-  await page.screenshot({ path: `${out}/turn-${set}-after.png` })
 }
 await browser.close()

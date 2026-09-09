@@ -3,9 +3,8 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Environment, Lightformer } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
-import { Cube, SETS, SHAPES, type CubeHandle, type Set, type Shape } from './Cube'
+import { Cube, SETS, SHAPES, VARIANTS_OF, type AnyVariant, type CubeHandle, type Set, type Shape } from './Cube'
 import { SCHEMES, type Scheme } from './schemes'
-import { VARIANTS, type Variant } from './materials/v1'
 
 // FPS sampler lives inside the canvas; reports out twice a second.
 function Fps({ onFps }: { onFps: (n: number) => void }) {
@@ -42,7 +41,7 @@ function StudioEnv({ s, dome = '#2b2e35' }: { s: Scheme; dome?: string }) {
 // Paper liquid-metal as an environment. Their stripe function (two thin strips, a wide gradient,
 // per-channel dispersion) is baked into an equirect: latitude drives the stripe, a little longitude
 // wave bends it. Rotating the environment slides the band across the metal; roughness softens it.
-function stripes(c1: number, c2: number, p: number, w: number[], blur: number, bump: number) {
+function stripes(c1: number, c2: number, p: number, w: number[], blur: number, bump: number, hold = 0) {
   const sst = (a: number, b: number, x: number) => {
     const t = Math.min(Math.max((x - a) / (b - a), 0), 1)
     return t * t * (3 - 2 * t)
@@ -57,13 +56,15 @@ function stripes(c1: number, c2: number, p: number, w: number[], blur: number, b
   ch = mix(ch, c2, sst(border, border + 2 * blur, p))
   border = w[0] + w[1]
   ch = mix(ch, c1, sst(border, border + 2 * blur, p))
-  const g = mix(c1, c2, sst(0, 1, (p - w[0] - w[1]) / w[2]))
+  // hold > 0 keeps the wide gradient bright for most of the cycle, then drops to the dark band
+  const g = mix(c1, c2, sst(hold, 1, (p - w[0] - w[1]) / w[2]))
   return mix(ch, g, sst(border, border + 0.5 * blur, p))
 }
 
 // v2: flat white body, narrow dispersion. v3: graded body (metal reads as metal), wider rainbow fringe.
-function liquidTexture(a: string, b: string, graded: boolean) {
-  const W = 512, H = 512
+// v4 (`hires`): only latitude carries the stripe, so bake a tall narrow strip; 2048 wide blocked the main thread for seconds.
+function liquidTexture(a: string, b: string, graded: boolean, hires = false) {
+  const W = hires ? 128 : 512, H = hires ? 1024 : 512
   const canvas = document.createElement('canvas')
   canvas.width = W
   canvas.height = H
@@ -75,13 +76,13 @@ function liquidTexture(a: string, b: string, graded: boolean) {
     const t = Math.min(Math.max((x - lo) / (hi - lo), 0), 1)
     return t * t * (3 - 2 * t)
   }
-  const rep = 2, softness = 0.1
+  const rep = 2, softness = hires ? 0.22 : 0.1
   const shiftR = graded ? 0.55 : 0.3, shiftB = shiftR
   const fract = (x: number) => x - Math.floor(x)
   for (let y = 0; y < H; y++) {
     const lat = y / H
     // metal reads as metal when the sky is bright and the ground is dark: a graded body, not flat white
-    const body = graded ? mix(0.97, 0.42, sst(0.35, 1, lat)) : 0.98
+    const body = graded ? (hires ? mix(0.96, 0.55, sst(0.3, 1, lat)) : mix(0.97, 0.42, sst(0.35, 1, lat))) : 0.98
     const c1 = [body, body, body * 1.02].map((v, i) => v * 0.93 + [ca.r, ca.g, ca.b][i] * 0.07)
     const c2 = (graded ? [0.03, 0.03, 0.045] : [0.08, 0.08, 0.1]).map((v, i) => v * 0.9 + [cb.r, cb.g, cb.b][i] * 0.1)
     const bump = 1 - Math.abs(lat - 0.5) * 1.6
@@ -92,9 +93,10 @@ function liquidTexture(a: string, b: string, graded: boolean) {
     const blur = softness / 15 + 0.004
     for (let x = 0; x < W; x++) {
       const dir = lat * rep + 0.025 * Math.sin((x / W) * Math.PI * 2) - 0.1
-      const r = stripes(c1[0], c2[0], fract(dir + dR), w, blur, bump)
-      const g = stripes(c1[1], c2[1], fract(dir), w, blur, bump)
-      const bl = stripes(c1[2], c2[2], fract(dir - dB), w, blur, bump)
+      const hold = hires ? 0.3 : 0
+      const r = stripes(c1[0], c2[0], fract(dir + dR), w, blur, bump, hold)
+      const g = stripes(c1[1], c2[1], fract(dir), w, blur, bump, hold)
+      const bl = stripes(c1[2], c2[2], fract(dir - dB), w, blur, bump, hold)
       const i = (y * W + x) * 4
       img.data[i] = r * 255
       img.data[i + 1] = g * 255
@@ -109,14 +111,17 @@ function liquidTexture(a: string, b: string, graded: boolean) {
   return tex
 }
 
-function LiquidEnv({ s, graded }: { s: Scheme; graded: boolean }) {
-  const tex = useMemo(() => liquidTexture(s.a, s.b, graded), [s, graded])
+function LiquidEnv({ s, graded, slow = false }: { s: Scheme; graded: boolean; slow?: boolean }) {
+  const tex = useMemo(() => liquidTexture(s.a, s.b, graded, slow), [s, graded, slow])
   useEffect(() => () => tex.dispose(), [tex])
   const scene = useThree((st) => st.scene)
   useFrame((st) => {
     const t = st.clock.elapsedTime
     // one smooth band: tilt it, and let it breathe up and down across the faces
-    scene.environmentRotation.set(-0.35 + Math.sin(t * 0.2) * 0.28, t * 0.05, Math.sin(t * 0.13) * 0.2)
+    // v4: a quarter of the speed, and a wider sweep so the band crosses the front faces most of the time
+    const k = slow ? 0.25 : 1
+    const sweep = slow ? 0.5 : 0.28
+    scene.environmentRotation.set(-0.35 + Math.sin(t * 0.2 * k) * sweep, t * 0.05 * k, Math.sin(t * 0.13 * k) * 0.2)
   })
   useEffect(
     () => () => {
@@ -131,7 +136,7 @@ export default function App() {
   const [si, setSi] = useState(0)
   const [shape, setShape] = useState<Shape>('solid')
   const [set, setSet] = useState<Set>('v2')
-  const [variant, setVariant] = useState<Variant>('chrome')
+  const [variant, setVariant] = useState<AnyVariant>('chrome')
   const [auto, setAuto] = useState(false)
   const [float, setFloat] = useState(false)
   const [turns, setTurns] = useState(0)
@@ -140,6 +145,11 @@ export default function App() {
   const s = SCHEMES[si]
 
   const onTurn = useCallback(() => setTurns((n) => n + 1), [])
+  const setRef = useRef(set)
+  setRef.current = set
+  const variants = VARIANTS_OF(set)
+  // a set without the current variant falls back to its first
+  const v = variants.includes(variant) ? variant : variants[0]
 
   // Push scheme into CSS variables.
   useEffect(() => {
@@ -152,7 +162,7 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'c') setSi((i) => (i + 1) % SCHEMES.length)
-      if (e.key === 'm') setVariant((v) => VARIANTS[(VARIANTS.indexOf(v) + 1) % VARIANTS.length])
+      if (e.key === 'm') setVariant((v) => { const vs = VARIANTS_OF(setRef.current); return vs[(vs.indexOf(v) + 1) % vs.length] })
       if (e.key === 's') setShape((v) => (v === 'classic' ? 'solid' : 'classic'))
       if (e.key === 'v') setSet((v) => SETS[(SETS.indexOf(v) + 1) % SETS.length])
       if (e.key === 't') setAuto((v) => !v)
@@ -175,7 +185,15 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const bloom = { heat: set === 'v3' ? [1.6, 0.5] : [1.2, 0.7], chrome: [0.2, 0.95], smoke: [0.3, 0.9] }[variant]
+  const bloom: Record<AnyVariant, number[]> = {
+    heat: set === 'v3' ? [1.6, 0.5] : set === 'v4' ? [0.9, 0.55] : [1.2, 0.7],
+    chrome: [0.2, 0.95],
+    smoke: [0.3, 0.9],
+    heatsmoke: [0.9, 0.5],
+    smokechrome: [0.2, 0.95],
+  }
+  const bl = bloom[v]
+  const metallic = v === 'chrome' || v === 'smokechrome'
 
   return (
     <>
@@ -185,15 +203,15 @@ export default function App() {
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
       >
         <color attach="background" args={[s.bg]} />
-        <Cube shape={shape} set={set} variant={variant} palette={s} auto={auto} float={float} onTurn={onTurn} handle={cube} />
-        {set !== 'v1' && variant === 'chrome' ? (
-          <LiquidEnv s={s} graded={set === 'v3'} />
+        <Cube shape={shape} set={set} variant={v} palette={s} auto={auto} float={float} onTurn={onTurn} handle={cube} />
+        {set !== 'v1' && metallic ? (
+          <LiquidEnv s={s} graded={set !== 'v2'} slow={set === 'v4'} />
         ) : (
-          // v2/v3 smoke is a diffuse stone with no scene lights, so it needs a brighter dome to read as glass
-          <StudioEnv s={s} dome={set !== 'v1' && variant === 'smoke' ? '#b4b6bf' : '#2b2e35'} />
+          // v2+ smoke is a diffuse stone with no scene lights, so it needs a brighter dome to read as glass
+          <StudioEnv s={s} dome={set !== 'v1' && v === 'smoke' ? '#b4b6bf' : '#2b2e35'} />
         )}
         <EffectComposer>
-          <Bloom mipmapBlur intensity={bloom[0]} luminanceThreshold={bloom[1]} luminanceSmoothing={0.3} />
+          <Bloom mipmapBlur intensity={bl[0]} luminanceThreshold={bl[1]} luminanceSmoothing={0.3} />
         </EffectComposer>
         <Fps onFps={setFps} />
       </Canvas>
@@ -214,7 +232,7 @@ export default function App() {
           <Row label="scheme" items={SCHEMES.map((x) => x.name)} on={s.name} pick={(n) => setSi(SCHEMES.findIndex((x) => x.name === n))} />
           <Row label="shape" items={SHAPES} on={shape} pick={setShape} />
           <Row label="set" items={SETS} on={set} pick={setSet} />
-          <Row label="material" items={VARIANTS} on={variant} pick={setVariant} />
+          <Row label="material" items={variants} on={v} pick={setVariant} />
           <div className="row">
             <span className="k">motion</span>
             <button onClick={() => cube.current?.turn()}>turn once</button>
@@ -231,7 +249,7 @@ export default function App() {
           <span>scheme {s.name}</span>
           <span>shape {shape}</span>
           <span>set {set}</span>
-          <span>material {variant}</span>
+          <span>material {v}</span>
           <span>turns {turns}</span>
           <span>fps {fps}</span>
           <span>keys c s v m t space</span>
@@ -258,7 +276,7 @@ declare global {
   interface Window {
     __aar: {
       setScheme: (n: string) => void
-      setVariant: (v: Variant) => void
+      setVariant: (v: AnyVariant) => void
       setShape: (v: Shape) => void
       setSet: (v: Set) => void
       setAuto: (b: boolean) => void

@@ -38,3 +38,12 @@ Both iterations coexist, switchable in the UI and via keys `s` (shape) / `v` (se
 
 ## Sets are additive (rule, 2026-09-09)
 A new iteration is a new set file (`src/materials/v4.ts`, `SETS` entry, env/bloom branch in App). An existing set is never edited in place; Aaron compares them side by side. Current: v1 (first shaders), v2 (paper trio on physical bases, rest-slot patterns), v3 (deeper heat, graded metal env with rainbow fringe, 3D marble smoke, fields in cube space so turns never pop).
+
+## v4 (2026-09-09, later) — `src/materials/v4.ts`, five variants
+Aaron's notes on v3: heat redder and dimmer; chrome not pixelated, slower, band present more of the time; smoke = v2 look but slower. Plus two fusions.
+- heat: ten-stop ramp ending in deep red, emissive multiplier 0.28–0.83 so the rim stays red instead of blowing out; bloom 0.9.
+- chrome: liquid env baked as a 128x1024 strip (2048 wide blocked the main thread for seconds on every scheme change); `hold` keeps the wide gradient bright then drops to a broad dark band; body 0.96 -> 0.55; env rotation at a quarter speed with a wider sweep; roughness 0.10; thin-film range 100–700 nm for the rainbow.
+- smoke: v2's face-centred swirl evaluated in cube space (continuous through turns) at a third of the speed.
+- heatsmoke: dark clearcoat glass, the smoke ring drives the heat ramp as emissive.
+- smokechrome: metal whose diffuse is the smoke (silver / dark oil / pale core) under the liquid env with strong iridescence.
+- Turn check now screenshots before/mid/after for every v4 variant (`shots/turn-v4-*`); all fields are continuous, edge glow rides the slice.
