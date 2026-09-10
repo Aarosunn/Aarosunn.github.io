@@ -10,10 +10,12 @@ import { PAPER_VERSIONS, VERSION_OF, withTheme, type PaperVersion } from './pape
 import { PRESETS_OF, presetNamed } from './paperPresets'
 import { FloralTab } from './FloralTab'
 import { FLORAL_OF, FLORAL_VERSIONS } from './floralVersions'
+import { TransitionTab } from './TransitionTab'
+import { TRANSITION_OF, TRANSITION_VERSIONS } from './transitionVersions'
 
-type Tab = 'site' | 'shader' | 'paper' | 'floral'
-const TABS: Tab[] = ['site', 'shader', 'paper', 'floral']
-const LABEL: Record<Tab, string> = { site: 'site', shader: 'shader cube', paper: 'paper shaders', floral: 'floral' }
+type Tab = 'site' | 'shader' | 'paper' | 'floral' | 'transition'
+const TABS: Tab[] = ['site', 'shader', 'paper', 'floral', 'transition']
+const LABEL: Record<Tab, string> = { site: 'site', shader: 'shader cube', paper: 'paper shaders', floral: 'floral', transition: 'transition' }
 const SHADER_NAME = { heat: 'heatmap', liquid: 'liquid metal', smoke: 'gem smoke' }
 const GAINS = [0.7, 0.85, 1, 1.2, 1.4]
 const OUTLINES = ['off', 'line', 'glow', 'ascii'] as const
@@ -40,6 +42,7 @@ export default function App() {
   const [floral, setFloral] = useState(FLORAL_VERSIONS[FLORAL_VERSIONS.length - 1].name)
   const [floralSeed, setFloralSeed] = useState(3)
   const [floralFlower, setFloralFlower] = useState('poppy')
+  const [transition, setTransition] = useState(TRANSITION_VERSIONS[TRANSITION_VERSIONS.length - 1].name)
   // review hook: merge arbitrary params over the theme (scripts iterate looks without editing presets)
   const [override, setOverride] = useState<Record<string, unknown>>({})
   const [vOverride, setVOverride] = useState<Partial<PaperVersion>>({})
@@ -138,6 +141,15 @@ export default function App() {
       </div>
     )
 
+  if (tab === 'transition')
+    return (
+      <div className="ui paper-ui">
+        <div className="wordmark">aarcube</div>
+        {tabs}
+        <TransitionTab v={TRANSITION_OF(transition) ?? TRANSITION_VERSIONS[0]} setVersion={setTransition} />
+      </div>
+    )
+
   if (tab === 'paper')
     return (
       <div className="ui paper-ui">
@@ -226,5 +238,7 @@ declare global {
       paperDump: () => { pos: number[]; mesh: number[]; parentOk: boolean }[]
       paperBusy: () => boolean
     }
+    /** the transition tab's own hook (it mounts before App's __aar exists) */
+    __aarTransition?: { play: () => void; reset: () => void }
   }
 }

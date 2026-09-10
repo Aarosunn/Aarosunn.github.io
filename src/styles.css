@@ -609,3 +609,14 @@ body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130
     transform: translateY(-10vh);
   }
 }
+
+/* transition tab: the canvas fills the viewport under the controls; the next page fades in over it */
+.transition-tab { position: fixed; inset: 0; }
+.transition-tab .transition-canvas { position: absolute !important; inset: 0; }
+.transition-tab .controls { z-index: 2; pointer-events: auto; }
+.transition-tab .readout { z-index: 2; }
+.next-page { position: absolute; inset: 0; z-index: 1; display: grid; place-content: center; gap: 12px; text-align: center; background: var(--bg); color: var(--text); }
+.next-page .wordmark { position: absolute; top: 28px; left: 40px; }
+.next-page h1 { font-size: 44px; font-weight: 300; margin: 0; }
+.next-page p { color: var(--mute); margin: 0; }
+.next-page button { justify-self: center; pointer-events: auto; }
