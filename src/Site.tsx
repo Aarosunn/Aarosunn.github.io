@@ -55,10 +55,10 @@ export const ALG_KEYS: Record<string, string> = { j: 'T perm', k: 'U perm', l: '
 /** the site cube's themes (v14 / v15), key g cycles; the on-screen toggle is gone since Aaron settled on mint grain */
 const SITE_THEMES: [string, string][] = [['ice grain', 'ice'], ['mint grain', 'mint'], ['icemint grain soft', 'icemint']]
 
-export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#07090c', floral = 'v17', floralSeed = 3, flower }: { version?: string; scheme?: string; bg?: string; floral?: string; floralSeed?: number; flower?: string }) {
+export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#07090c', floral = 'v18', floralSeed = 3, flower }: { version?: string; scheme?: string; bg?: string; floral?: string; floralSeed?: number; flower?: string }) {
   const xray0 = FLORAL_OF(floral)
   // the hand-placed group (v14+) sits in the base row a little closer than the tab shows it, in a taller box
-  const xray = useMemo(() => (xray0?.scene?.place ? { ...xray0, scene: { ...xray0.scene, camDist: (xray0.scene.camDist ?? 9.4) / 1.35 } } : xray0), [xray0])
+  const xray = useMemo(() => (xray0?.scene?.place ? { ...xray0, scene: { ...xray0.scene, camDist: (xray0.scene.camDist ?? 9.4) / 1.9 } } : xray0), [xray0])
   const [active, setActive] = useState(0)
   const [version, setVersion] = useState(VERSION_OF(initial) ? initial : 'v17')
   // a deep-linked version outside the curated cycle still cycles from itself
@@ -192,7 +192,7 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
           </aside>
         )}
         <div className="site-base">
-          {xray?.placement === 'bottom' ? null : xray ? (xray.kind === 'mesh' ? <XrayFlower3D v={xray} flower={flower} seed={floralSeed} height={xray.scene?.place ? 160 : undefined} className={`floral xray ${xray.scene?.place ? 'group' : ''}`} scheme={scheme} /> : <XrayFloral v={xray} seed={floralSeed} className="floral xray" scheme={scheme} />) : <Floral className="floral" seed={11 + 7 * Math.max(0, SCHEMES.findIndex((x) => x.name === scheme))} />}
+          {xray?.placement === 'bottom' ? null : xray ? (xray.kind === 'mesh' ? <XrayFlower3D v={xray} flower={flower} seed={floralSeed} height={xray.scene?.place ? 210 : undefined} className={`floral xray ${xray.scene?.place ? 'group' : ''}`} scheme={scheme} /> : <XrayFloral v={xray} seed={floralSeed} className="floral xray" scheme={scheme} />) : <Floral className="floral" seed={11 + 7 * Math.max(0, SCHEMES.findIndex((x) => x.name === scheme))} />}
           {layout === 'deck' && (
             <div className="deck-blurb">
               <h2>{SECTIONS[active].title}</h2>
