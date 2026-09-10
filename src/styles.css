@@ -377,6 +377,7 @@ button:focus-visible {
   opacity: 0.26;
   pointer-events: none;
 }
+.floral.xray.group { height: 160px; margin-top: -24px; }
 .floral.xray {
   height: 140px;
   opacity: 0.9;

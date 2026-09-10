@@ -286,3 +286,7 @@ Aaron tinkered on the tab (zoom 1.5, finer steps, arrow keys) and pasted `{ flow
 ## v17: the orchid as Aaron posed it (00:40, 2026-09-10)
 
 Aaron: v16 "looked a bit wrong", new line `{ flower: 'orchid', at: [-0.1, -0.43, 0.39], scale: 0.73, rot: [-0.06, 0.09, 0], gain: 1 }` → v17 = v16 with that orchid. A pasted line carries one flower; anything else he moved on the tab is not in it, which is the likely mismatch. Shot `shots/flowers/v17.png`.
+
+## The group on the site (00:50, 2026-09-10)
+
+Aaron: "port it to the site page replacing the current floral". `Site` now defaults `floral` to v17: the base row shows the hand-placed group instead of the old wireframe (`Floral.tsx` stays as the fallback for an unknown `?floral=`). A placed scene sits in a 160 px box pulled up 24 px into the row's padding, with the camera 1.35× closer than the version says (the tab shows it at its own zoom); a 200 px box pushed the deck nav below the fold at 1440×900. Measured: floral 669–829, deck nav 839–876, no page scroll. Shot `shots/floral/site-v17.png`.
