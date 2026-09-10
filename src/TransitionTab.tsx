@@ -55,7 +55,7 @@ export function TransitionTab({ v, setVersion, screen, setScreen, scheme }: { v:
   const screens = v.screens ?? ['flight', ...SOLVE_VERSIONS.map((x) => x.name), ...CUBE_VERSIONS.filter((x) => !x.alg).map((x) => x.name)]
   useEffect(() => { if (!screens.includes(screen)) setScreen(screens[0]) }, [v.name]) // eslint-disable-line react-hooks/exhaustive-deps
   const grid = useRef<ScreenHandle | null>(null)
-  const [recoil, setRecoil] = useState(true)
+  const [recoil, setRecoil] = useState(false) // Aaron: no recoil on transitions
   const group = useRef<THREE.Group | null>(null)
   const [playing, setPlaying] = useState(0)
   const [page, setPage] = useState(0) // the next page's opacity

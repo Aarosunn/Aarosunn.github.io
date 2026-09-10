@@ -23,6 +23,7 @@ export type TransitionVersion = {
 export const TRANSITION_VERSIONS: TransitionVersion[] = [
   { name: 'v1', spin: [1, 2], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1.4, fadeAt: 0.72, fade: 0.7, note: 'one turn over, two around, accelerating into the camera until a face overfills the screen; the page fades in over the last quarter' },
   { name: 'v2', spin: [1, 2], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1.4, fadeAt: 0.72, fade: 0.7, screens: ['a1 rows', 'a2 columns', 'a3 slices'], note: 'v2: the screen is a real cube and the next project is solved onto the front face by an algorithm, three to choose from; unseen faces are printed with the next project before they come round' },
+  { name: 'v3', spin: [1, 2], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1.4, fadeAt: 0.72, fade: 0.7, screens: ['w1 branching', 'w2 out to in', 'w3 in to out'], note: 'v3: the weld runs along the seam lines like a laser, starting each line it crosses: from random points, from the edges inward, or from the centre outward' },
 ]
 
 export const TRANSITION_OF = (name: string) => TRANSITION_VERSIONS.find((v) => v.name === name)
@@ -69,7 +70,11 @@ export type CubeMove = { axis: 'x' | 'y'; layers: number[]; dir: 1 | -1 }
  *  a face turn would shape-shift a stretched cube). Hidden faces are printed with the next project just before they come
  *  round, oriented to arrive upright, so any legal sequence delivers the page the right way up. */
 /** the turn itself (duration, step response, recoil) is `FEEL.screen` in RubikMask: the site cube's mechanism with a speedcuber's numbers */
-export type CubeVersion = { name: string; moves?: CubeMove[]; alg?: string; stagger: number; open: number; gap: number; weld: number; note: string }
+/** weldMode: 'radial' = rings from three random points (v2); 'lines' = lasers running along the seam lines from three random
+ *  points, starting a crossing line when they reach it; 'edges' = the same from the eight points where the seams meet the
+ *  screen edge, burning inward; 'centre' = from the four crossings outward */
+export type WeldMode = 'radial' | 'lines' | 'edges' | 'centre'
+export type CubeVersion = { name: string; moves?: CubeMove[]; alg?: string; stagger: number; open: number; gap: number; weld: number; weldMode?: WeldMode; note: string }
 const CUBE = { stagger: 0.03, open: 0.35, gap: 8, weld: 1.6 }
 export const CUBE_VERSIONS: CubeVersion[] = [
   { name: 'c1 row by row', ...CUBE, moves: [{ axis: 'y', layers: [1], dir: -1 }, { axis: 'y', layers: [0], dir: -1 }, { axis: 'y', layers: [-1], dir: -1 }], note: 'a real cube: U, then E, then D turn the same way, the right face comes to the front one row of stickers at a time; laser weld, slower' },
@@ -82,5 +87,11 @@ CUBE_VERSIONS.push(
   { name: 'a1 rows', ...ALG, alg: 'U E D R E D', note: 'solving: six legal turns, mostly rows with one column, the next page fills in 2 · 2 · 2 · 3 · 6 · 9 cells' },
   { name: 'a2 columns', ...ALG, alg: 'R M U M E L', note: 'solving: columns first then rows, the page fills in 1 · 1 · 2 · 4 · 6 · 9' },
   { name: 'a3 slices', ...ALG, alg: 'L E M D R D', note: 'solving: a mixed sequence with two slice turns, the page fills in 1 · 2 · 4 · 4 · 6 · 9' },
+)
+const W3 = { ...ALG, alg: 'U E D R E D' }
+CUBE_VERSIONS.push(
+  { name: 'w1 branching', ...W3, weldMode: 'lines', note: 'a1 with a laser weld that runs along the seam lines from three random points and starts each line it crosses' },
+  { name: 'w2 out to in', ...W3, weldMode: 'edges', note: 'a1 with lasers starting where the seams meet the screen edge, burning inward along the lines and meeting in the middle' },
+  { name: 'w3 in to out', ...W3, weldMode: 'centre', note: 'a1 with lasers starting at the four crossings, burning outward along the lines to the edges' },
 )
 export const CUBE_OF = (name: string) => CUBE_VERSIONS.find((v) => v.name === name)

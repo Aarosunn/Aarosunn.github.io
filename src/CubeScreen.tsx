@@ -10,7 +10,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'rea
 import { Canvas, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import gsap from 'gsap'
-import type { CubeMove, CubeVersion } from './transitionVersions'
+import type { CubeMove, CubeVersion, WeldMode } from './transitionVersions'
 import { FEEL } from './RubikMask'
 import { SCHEMES } from './schemes'
 import { pageTexture, PROJECTS, type ScreenHandle } from './ScreenSolve'
@@ -57,10 +57,18 @@ function turn(cube: Cubie[], axis: 'x' | 'y' | 'z', layer: number, dir: 1 | -1) 
 const BEAD_VERT = /* glsl */ `varying vec2 vUv; varying vec2 vPos; void main() { vUv = uv; vPos = (modelMatrix * vec4(position, 1.0)).xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`
 const LASER_FRAG = /* glsl */ `
   uniform vec3 uColor; uniform float uHeat; uniform float uBead; uniform vec2 uP0; uniform vec2 uP1; uniform vec2 uP2; uniform float uR;
+  // along-the-line mode: burn distance = shortest path along the seam lines from the nearest start; direct starts on this
+  // seam (uS0..2, along it in px), and the two crossings at a third and two thirds with their own path distances uD1, uD2
+  uniform float uGraph; uniform float uL; uniform vec3 uS; uniform float uD1; uniform float uD2;
   varying vec2 vUv; varying vec2 vPos;
   void main() {
     float edge = 1.0 - abs(vUv.y - 0.5) * 2.0;
-    float d = min(distance(vPos, uP0), min(distance(vPos, uP1), distance(vPos, uP2)));
+    float d;
+    if (uGraph > 0.5) {
+      float a = vUv.x * uL;
+      d = min(abs(a - uS.x), min(abs(a - uS.y), abs(a - uS.z)));
+      d = min(d, min(abs(a - uL / 3.0) + uD1, abs(a - 2.0 * uL / 3.0) + uD2));
+    } else d = min(distance(vPos, uP0), min(distance(vPos, uP1), distance(vPos, uP2)));
     float front = exp(-pow((d - uR) / 22.0, 2.0)) * 1.6 + exp(-max(d - uR, 0.0) / 60.0) * 0.5;
     float un = smoothstep(uR - 4.0, uR + 4.0, d);
     float scar = uHeat * 0.22 * edge * un; float hot = uBead * front * edge * un * 1.6;
@@ -125,7 +133,7 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: 
     const g = root.current
     const col = new THREE.Color(colors.a)
     seams.current = [0, 1, 2, 3].map(() => {
-      const mat = new THREE.ShaderMaterial({ uniforms: { uColor: { value: col }, uHeat: { value: 0 }, uBead: { value: 0 }, uP0: { value: new THREE.Vector2() }, uP1: { value: new THREE.Vector2() }, uP2: { value: new THREE.Vector2() }, uR: { value: 0 } }, vertexShader: BEAD_VERT, fragmentShader: LASER_FRAG, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })
+      const mat = new THREE.ShaderMaterial({ uniforms: { uColor: { value: col }, uHeat: { value: 0 }, uBead: { value: 0 }, uP0: { value: new THREE.Vector2() }, uP1: { value: new THREE.Vector2() }, uP2: { value: new THREE.Vector2() }, uR: { value: 0 }, uGraph: { value: 0 }, uL: { value: 1 }, uS: { value: new THREE.Vector3(1e8, 1e8, 1e8) }, uD1: { value: 1e8 }, uD2: { value: 1e8 } }, vertexShader: BEAD_VERT, fragmentShader: LASER_FRAG, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat)
       g.add(mesh)
       return mesh
@@ -208,13 +216,43 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: 
         }, [], at + feel.duration + 0.001)
         landed = at + feel.duration
       })
-      // 3. the laser weld: three random points on the seams, rings growing until the grid is gone
-      const pts = [0, 1, 2].map(() => { const onH = Math.random() < 0.5; const n = 1 + Math.floor(Math.random() * 2); const a = Math.random() - 0.5; return onH ? new THREE.Vector2(a * W, H / 2 - (n * H) / 3) : new THREE.Vector2(-W / 2 + (n * W) / 3, a * H) })
-      const reach = Math.max(...pts.map((p) => Math.hypot(W / 2 + Math.abs(p.x), H / 2 + Math.abs(p.y)))) * 0.75
+      // 3. the laser weld. 'radial': three random points on the seams, rings growing until the grid is gone. The line
+      //    modes: lasers run along the seams from their starts and start every line they cross; the burn distance of a
+      //    seam point is its shortest path along the lines to any start (starts on the seam directly, or via the seam's
+      //    two crossings, whose path distances come from the tiny four-node grid graph)
+      const mode: WeldMode = v.weldMode ?? 'radial'
       const w0 = landed + 0.1
-      tl.call(() => seams.current.forEach((s) => { s.material.uniforms.uP0.value.copy(pts[0]); s.material.uniforms.uP1.value.copy(pts[1]); s.material.uniforms.uP2.value.copy(pts[2]); s.material.uniforms.uBead.value = 1 }), [], w0)
       const r = { v: 0 }
-      tl.to(r, { v: reach, duration: v.weld, ease: 'power1.out', onUpdate: () => seams.current.forEach((s) => { s.material.uniforms.uR.value = r.v }) }, w0)
+      if (mode === 'radial') {
+        const pts = [0, 1, 2].map(() => { const onH = Math.random() < 0.5; const n = 1 + Math.floor(Math.random() * 2); const a = Math.random() - 0.5; return onH ? new THREE.Vector2(a * W, H / 2 - (n * H) / 3) : new THREE.Vector2(-W / 2 + (n * W) / 3, a * H) })
+        const reach = Math.max(...pts.map((p) => Math.hypot(W / 2 + Math.abs(p.x), H / 2 + Math.abs(p.y)))) * 0.75
+        tl.call(() => seams.current.forEach((s) => { s.material.uniforms.uGraph.value = 0; s.material.uniforms.uP0.value.copy(pts[0]); s.material.uniforms.uP1.value.copy(pts[1]); s.material.uniforms.uP2.value.copy(pts[2]); s.material.uniforms.uBead.value = 1 }), [], w0)
+        tl.to(r, { v: reach, duration: v.weld, ease: 'power1.out', onUpdate: () => seams.current.forEach((s) => { s.material.uniforms.uR.value = r.v }) }, w0)
+      } else {
+        // seams 0,1 horizontal (along = x from the left, length W), 2,3 vertical (along = y from the bottom, length H);
+        // crossing node (a, b) = horizontal a × vertical b: on horizontal a at W/3 (b 0) and 2W/3 (b 1); on vertical b at 2H/3 (a 0) and H/3 (a 1)
+        const L = (k: number) => (k < 2 ? W : H)
+        const starts: { k: number; s: number }[] =
+          mode === 'lines' ? [0, 1, 2].map(() => { const k = Math.floor(Math.random() * 4); return { k, s: Math.random() * L(k) } })
+          : mode === 'edges' ? [0, 1, 2, 3].flatMap((k) => [{ k, s: 0 }, { k, s: L(k) }])
+          : [{ k: 0, s: W / 3 }, { k: 0, s: (2 * W) / 3 }, { k: 1, s: W / 3 }, { k: 1, s: (2 * W) / 3 }]
+        const nodeAt = (k: number, i: 0 | 1) => (k < 2 ? (i === 0 ? W / 3 : (2 * W) / 3) : i === 0 ? (2 * H) / 3 : H / 3) // along-seam coordinate of the seam's two crossings
+        const nodeId = (k: number, i: 0 | 1) => (k < 2 ? k * 2 + i : i * 2 + (k - 2)) // (a, b) -> a*2+b; on vertical b, crossing i is with horizontal a = i
+        const D = [1e9, 1e9, 1e9, 1e9]
+        starts.forEach(({ k, s }) => ([0, 1] as const).forEach((i) => { D[nodeId(k, i)] = Math.min(D[nodeId(k, i)], Math.abs(s - nodeAt(k, i))) }))
+        const E: [number, number, number][] = [[0, 1, W / 3], [2, 3, W / 3], [0, 2, H / 3], [1, 3, H / 3]]
+        for (let it = 0; it < 4; it++) E.forEach(([a, b, w]) => { D[a] = Math.min(D[a], D[b] + w); D[b] = Math.min(D[b], D[a] + w) })
+        const per = seams.current.map((_, k) => {
+          const own = starts.filter((st) => st.k === k).map((st) => st.s).slice(0, 3)
+          while (own.length < 3) own.push(1e8)
+          return { own, d1: D[nodeId(k, 0)], d2: D[nodeId(k, 1)] }
+        })
+        // reach: the farthest seam point from any start, sampled
+        let reach = 0
+        per.forEach((q, k) => { for (let i = 0; i <= 48; i++) { const a = (i / 48) * L(k); const d = Math.min(...q.own.map((s) => Math.abs(a - s)), Math.abs(a - nodeAt(k, 0)) + q.d1, Math.abs(a - nodeAt(k, 1)) + q.d2); reach = Math.max(reach, d) } })
+        tl.call(() => seams.current.forEach((s, k) => { const u = s.material.uniforms; u.uGraph.value = 1; u.uL.value = L(k); u.uS.value.set(per[k].own[0], per[k].own[1], per[k].own[2]); u.uD1.value = per[k].d1; u.uD2.value = per[k].d2; u.uBead.value = 1 }), [], w0)
+        tl.to(r, { v: reach, duration: v.weld, ease: 'none', onUpdate: () => seams.current.forEach((s) => { s.material.uniforms.uR.value = r.v }) }, w0)
+      }
       tl.to(gp, { g: 0, duration: v.weld, ease: 'power2.inOut', onUpdate: () => setGap(gp.g) }, w0)
       tl.call(() => seams.current.forEach((s) => { s.material.uniforms.uHeat.value = 0; s.material.uniforms.uBead.value = 0 }), [], w0 + v.weld)
     }),

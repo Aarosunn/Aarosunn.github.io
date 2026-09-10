@@ -43,7 +43,7 @@ export default function App() {
   const [floralSeed, setFloralSeed] = useState(3)
   const [floralFlower, setFloralFlower] = useState('poppy')
   const [transition, setTransition] = useState(q.get('tv') ?? TRANSITION_VERSIONS[TRANSITION_VERSIONS.length - 1].name)
-  const [screen, setScreen] = useState(q.get('screen') ?? (q.get('tv') === 'v2' ? 'a1 rows' : 'flight'))
+  const [screen, setScreen] = useState(q.get('screen') ?? (q.get('tv') === 'v2' ? 'a1 rows' : q.get('tv') === 'v3' ? 'w1 branching' : 'flight'))
   // review hook: merge arbitrary params over the theme (scripts iterate looks without editing presets)
   const [override, setOverride] = useState<Record<string, unknown>>({})
   const [vOverride, setVOverride] = useState<Partial<PaperVersion>>({})
