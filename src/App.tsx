@@ -43,6 +43,7 @@ export default function App() {
   const [floralSeed, setFloralSeed] = useState(3)
   const [floralFlower, setFloralFlower] = useState('poppy')
   const [transition, setTransition] = useState(TRANSITION_VERSIONS[TRANSITION_VERSIONS.length - 1].name)
+  const [screen, setScreen] = useState(q.get('screen') ?? 'flight')
   // review hook: merge arbitrary params over the theme (scripts iterate looks without editing presets)
   const [override, setOverride] = useState<Record<string, unknown>>({})
   const [vOverride, setVOverride] = useState<Partial<PaperVersion>>({})
@@ -146,7 +147,7 @@ export default function App() {
       <div className="ui paper-ui">
         <div className="wordmark">aarcube</div>
         {tabs}
-        <TransitionTab v={TRANSITION_OF(transition) ?? TRANSITION_VERSIONS[0]} setVersion={setTransition} />
+        <TransitionTab v={TRANSITION_OF(transition) ?? TRANSITION_VERSIONS[0]} setVersion={setTransition} screen={screen} setScreen={setScreen} scheme={s.name} />
       </div>
     )
 
@@ -239,6 +240,6 @@ declare global {
       paperBusy: () => boolean
     }
     /** the transition tab's own hook (it mounts before App's __aar exists) */
-    __aarTransition?: { play: () => void; reset: () => void }
+    __aarTransition?: { play: () => void; reset: () => void; next: () => Promise<void>; busy: () => boolean }
   }
 }

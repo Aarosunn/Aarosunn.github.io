@@ -4,7 +4,8 @@ import { Canvas } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
-import { TRANSITION_VERSIONS, type TransitionVersion } from './transitionVersions'
+import { SOLVE_OF, SOLVE_VERSIONS, TRANSITION_VERSIONS, type TransitionVersion } from './transitionVersions'
+import { ScreenSolve, type ScreenHandle } from './ScreenSolve'
 
 const FOV = 35
 const CAM_Z = 9
@@ -45,7 +46,9 @@ function Flight({ v, group, playing, onDone, onProgress }: { v: TransitionVersio
   return null
 }
 
-export function TransitionTab({ v, setVersion }: { v: TransitionVersion; setVersion: (n: string) => void }) {
+export function TransitionTab({ v, setVersion, screen, setScreen, scheme }: { v: TransitionVersion; setVersion: (n: string) => void; screen: string; setScreen: (n: string) => void; scheme: string }) {
+  const solve = SOLVE_OF(screen)
+  const grid = useRef<ScreenHandle | null>(null)
   const group = useRef<THREE.Group | null>(null)
   const [playing, setPlaying] = useState(0)
   const [page, setPage] = useState(0) // the next page's opacity
@@ -53,13 +56,13 @@ export function TransitionTab({ v, setVersion }: { v: TransitionVersion; setVers
   const play = () => { setDone(false); setPage(0); setPlaying((n) => n + 1) }
   const reset = () => { setPlaying(0); setPage(0); setDone(false); if (group.current) { group.current.position.z = 0; group.current.rotation.copy(REST) } }
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === ' ') { e.preventDefault(); play() } if (e.key === 'r') reset() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === ' ') { e.preventDefault(); play() } if (e.key === 'r') reset(); if (e.key === 'n') grid.current?.next() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   const onProgress = (t: number) => setPage(Math.min(1, Math.max(0, (t - v.fadeAt) / (1 - v.fadeAt))))
   const onDone = () => { setPage(1); setDone(true) }
-  useEffect(() => { window.__aarTransition = { play, reset } }, [v])
+  useEffect(() => { window.__aarTransition = { play, reset, next: () => grid.current?.next() ?? Promise.resolve(), busy: () => grid.current?.busy() ?? false } }, [v, screen])
   return (
     <div className="transition-tab">
       <div className="controls">
@@ -70,27 +73,33 @@ export function TransitionTab({ v, setVersion }: { v: TransitionVersion; setVers
           ))}
         </div>
         <div className="row">
-          <button onClick={play}>{playing ? 'replay' : 'play'} (space)</button>
-          <button onClick={reset}>reset (r)</button>
+          <span className="k">screen</span>
+          <button className={solve ? '' : 'on'} onClick={() => setScreen('flight')}>flight</button>
+          {SOLVE_VERSIONS.map((x) => (
+            <button key={x.name} className={x.name === screen ? 'on' : ''} onClick={() => setScreen(x.name)}>{x.name}</button>
+          ))}
+        </div>
+        <div className="row">
+          {solve ? <button onClick={() => grid.current?.next()}>next project (n)</button> : <><button onClick={play}>{playing ? 'replay' : 'play'} (space)</button><button onClick={reset}>reset (r)</button></>}
         </div>
       </div>
-      <Canvas className="transition-canvas" dpr={[1, 2]} camera={{ position: [0, 0, CAM_Z], fov: FOV }} gl={{ antialias: true }}>
+      {solve ? <ScreenSolve key={solve.name} ref={grid} v={solve} scheme={scheme} /> : <Canvas className="transition-canvas" dpr={[1, 2]} camera={{ position: [0, 0, CAM_Z], fov: FOV }} gl={{ antialias: true }}>
         <hemisphereLight args={['#e8ecf2', '#20242a', 1.1]} />
         <directionalLight position={[4, 6, 8]} intensity={1.6} />
         <directionalLight position={[-6, -2, 3]} intensity={0.4} />
         <GreyCube group={group} />
         <Flight v={v} group={group} playing={playing} onDone={onDone} onProgress={onProgress} />
-      </Canvas>
+      </Canvas>}
       {/* the next page: a placeholder that fades in over the filled screen */}
-      <div className="next-page" style={{ opacity: page, pointerEvents: done ? 'auto' : 'none' }}>
+      {!solve && <div className="next-page" style={{ opacity: page, pointerEvents: done ? 'auto' : 'none' }}>
         <div className="wordmark">aarcube</div>
         <h1>next page</h1>
         <p>placeholder: whatever the cube opens onto. click to go back.</p>
         <button onClick={reset}>back</button>
-      </div>
+      </div>}
       <div className="readout">
-        <span className="note">{v.note}</span>
-        <span>{`spin ${v.spin[0]}×/${v.spin[1]}× · ${v.duration}s · ${v.approachEase} · fills ×${v.overshoot} · page fades from ${Math.round(v.fadeAt * 100)}% over ${v.fade}s`}</span>
+        <span className="note">{solve ? solve.note : v.note}</span>
+        {solve ? <span>{`flip ${solve.flip}s · stagger ${solve.stagger}s · gap ${solve.gap}px · bead ${solve.bead}s · cool ${solve.cool}s`}</span> : <span>{`spin ${v.spin[0]}×/${v.spin[1]}× · ${v.duration}s · ${v.approachEase} · fills ×${v.overshoot} · page fades from ${Math.round(v.fadeAt * 100)}% over ${v.fade}s`}</span>}
       </div>
     </div>
   )
