@@ -68,7 +68,7 @@ const LASER_FRAG = /* glsl */ `
   }
 `
 
-const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string }>(function Cube({ v, scheme }, ref) {
+const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: boolean }>(function Cube({ v, scheme, recoil }, ref) {
   const { size, camera } = useThree()
   const W = size.width, H = size.height
   const cw = W / 3, ch = H / 3
@@ -197,7 +197,7 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string }>(functi
           const angle = (live.dir * Math.PI) / 2
           live.pivots.forEach((pv) => { pv.rotation[live.axis] = angle * feel.f(t.p) })
           const speed = (feel.f(Math.min(t.p + 1e-3, 1)) - feel.f(t.p)) * 1e3
-          if (live.body) live.body.rotation[live.axis] = (-Math.sign(angle) * feel.recoil * Math.max(0, speed)) / feel.peak
+          if (live.body) live.body.rotation[live.axis] = recoil ? (-Math.sign(angle) * feel.recoil * Math.max(0, speed)) / feel.peak : 0
         } }, at)
         tl.call(() => {
           mv.layers.forEach((layer) => turn(st.cube, mv.axis, layer, mv.dir))
@@ -218,14 +218,14 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string }>(functi
       tl.to(gp, { g: 0, duration: v.weld, ease: 'power2.inOut', onUpdate: () => setGap(gp.g) }, w0)
       tl.call(() => seams.current.forEach((s) => { s.material.uniforms.uHeat.value = 0; s.material.uniforms.uBead.value = 0 }), [], w0 + v.weld)
     }),
-  }), [v, textures, W, H])
+  }), [v, textures, W, H, recoil])
   return <group ref={root} />
 })
 
-export const CubeScreen = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string }>(function CubeScreen({ v, scheme }, ref) {
+export const CubeScreen = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil?: boolean }>(function CubeScreen({ v, scheme, recoil = true }, ref) {
   return (
     <Canvas className="transition-canvas" dpr={[1, 2]} camera={{ fov: FOV, position: [0, 0, 1000] }} gl={{ antialias: true }}>
-      <Cube ref={ref} v={v} scheme={scheme} />
+      <Cube ref={ref} v={v} scheme={scheme} recoil={recoil} />
     </Canvas>
   )
 })

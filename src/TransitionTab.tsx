@@ -55,6 +55,7 @@ export function TransitionTab({ v, setVersion, screen, setScreen, scheme }: { v:
   const screens = v.screens ?? ['flight', ...SOLVE_VERSIONS.map((x) => x.name), ...CUBE_VERSIONS.filter((x) => !x.alg).map((x) => x.name)]
   useEffect(() => { if (!screens.includes(screen)) setScreen(screens[0]) }, [v.name]) // eslint-disable-line react-hooks/exhaustive-deps
   const grid = useRef<ScreenHandle | null>(null)
+  const [recoil, setRecoil] = useState(true)
   const group = useRef<THREE.Group | null>(null)
   const [playing, setPlaying] = useState(0)
   const [page, setPage] = useState(0) // the next page's opacity
@@ -84,11 +85,18 @@ export function TransitionTab({ v, setVersion, screen, setScreen, scheme }: { v:
             <button key={name} className={name === screen ? 'on' : ''} onClick={() => setScreen(name)}>{name}</button>
           ))}
         </div>
+        {cube && (
+          <div className="row">
+            <span className="k">recoil</span>
+            <button className={recoil ? 'on' : ''} onClick={() => setRecoil(true)}>on</button>
+            <button className={recoil ? '' : 'on'} onClick={() => setRecoil(false)}>off</button>
+          </div>
+        )}
         <div className="row">
           {solve ? <button onClick={() => grid.current?.next()}>next project (n)</button> : <><button onClick={play}>{playing ? 'replay' : 'play'} (space)</button><button onClick={reset}>reset (r)</button></>}
         </div>
       </div>
-      {cube ? <CubeScreen key={cube.name} ref={grid} v={cube} scheme={scheme} /> : solve ? <ScreenSolve key={solve.name} ref={grid} v={solve} scheme={scheme} /> : <Canvas className="transition-canvas" dpr={[1, 2]} camera={{ position: [0, 0, CAM_Z], fov: FOV }} gl={{ antialias: true }}>
+      {cube ? <CubeScreen key={cube.name} ref={grid} v={cube} scheme={scheme} recoil={recoil} /> : solve ? <ScreenSolve key={solve.name} ref={grid} v={solve} scheme={scheme} /> : <Canvas className="transition-canvas" dpr={[1, 2]} camera={{ position: [0, 0, CAM_Z], fov: FOV }} gl={{ antialias: true }}>
         <hemisphereLight args={['#e8ecf2', '#20242a', 1.1]} />
         <directionalLight position={[4, 6, 8]} intensity={1.6} />
         <directionalLight position={[-6, -2, 3]} intensity={0.4} />
