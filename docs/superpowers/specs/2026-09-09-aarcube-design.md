@@ -278,3 +278,7 @@ Aaron: "move them slightly closer together, have the lotus face right and rose f
 ## Pose sliders on the floral tab (00:10, 2026-09-10)
 
 Aaron: "give me a way to position the lotus how I see fit". For a version with `scene.place`, the tab shows a pose row: pick a flower, then sliders for its centre (x y z), rotation (rx ry rz in degrees, about the bloom centre) and scale; the readout prints the resulting `place` entry as it would go into `floralVersions.ts`, with a copy button. Poses are tab state only (reset clears them); the committed version changes when the entry is pasted back. Vite gotcha again: a truncating write while the dev server watches can cache an empty transform (`does not provide an export named …`); `touch` the file.
+
+## v16: the lotus as Aaron posed it (00:30, 2026-09-10)
+
+Aaron tinkered on the tab (zoom 1.5, finer steps, arrow keys) and pasted `{ flower: 'lotus', at: [0.18, -0.18, 0.09], scale: 0.69, rot: [-1.49, 0.4, 0.35], gain: 0.3, wire: 0.4 }` → v16, a copy of v15 with that entry; v15 stays as his base. Shot `shots/flowers/v16.png`.
