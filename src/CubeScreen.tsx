@@ -172,9 +172,9 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string }>(functi
       // 2. the turns, one move after another: the move's layers hang under pivots at the cube's centre and roll a quarter
       //    turn; on landing the state takes the turn, hidden stickers get their print, and the cube is rebuilt on the grid
       //    with the depth the next move's axis needs
-      //    the turn is the site cube's: same duration, same step response, same body recoil (the rest of the cube
-      //    leans against the layer while it accelerates), so tuning FEEL.turn tunes both
-      const feel = FEEL.turn
+      //    the turn is FEEL.screen: the site cube's mechanism (step response + body recoil, the rest of the cube leaning
+      //    against the layer while it accelerates) with a speedcuber's numbers, tuned separately from the site cube
+      const feel = FEEL.screen
       const live: { pivots: THREE.Group[]; body: THREE.Group | null; axis: CubeMove['axis']; dir: number } = { pivots: [], body: null, axis: 'y', dir: 1 }
       let landed = v.open
       moves.forEach((mv, k) => {

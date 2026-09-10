@@ -331,3 +331,7 @@ Aaron: "you didnt actually make it into v2, everything right now is just stuffed
 ## Cube screen turns = the site cube's turns (05:30, 2026-09-10)
 
 Aaron: "make the turns the same speed as the main cube and the same recoil, so when we change the values for one perspective of the cube it matches". The cube screen now drives every layer turn exactly as `RubikMask` does: a proxy tween with `ease: 'none'` over `FEEL.turn.duration`, the layer angle = `FEEL.turn.f(t)`, and the rest of the cube under a body pivot leaning against the layer by `recoil · speed / peak` (reset on landing). `CubeVersion.flip` is gone; `FEEL.turn` in `src/RubikMask.tsx` is the single knob for both. An a-pass now runs ~5.3 s (timed by polling `busy()`).
+
+## Transitions get their own feel (05:45, 2026-09-10)
+
+Aaron: "lets make transitions for sections different, separate them again, make recoil on transitions smaller, and way faster like a speedcuber (little wait between turns)". `FEEL.screen = response(0.86, 9, 0.15, 0.004)` in `RubikMask.tsx`: the same mechanism as the site cube's turn (step response + body recoil) with a speedcuber's numbers, 150 ms a turn and a quarter of the recoil, tuned on its own; the cube screen uses it, and the wait between turns is 30 ms on every c and a version. An a-pass now runs ~2.9 s, the six turns done in ~1.4 s.

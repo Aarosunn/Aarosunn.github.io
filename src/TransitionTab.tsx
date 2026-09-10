@@ -104,7 +104,7 @@ export function TransitionTab({ v, setVersion, screen, setScreen, scheme }: { v:
       </div>}
       <div className="readout">
         <span className="note">{solve ? solve.note : v.note}</span>
-        {cube ? <span>{`${cube.alg ? `${cube.alg} · ` : ''}turn ${FEEL.turn.duration}s + recoil (the site cube's FEEL.turn) · between ${cube.stagger}s · open ${cube.open}s · gap ${cube.gap}px · weld ${cube.weld}s`}</span> : solve ? <span>{`flip ${solve.flip}s · stagger ${solve.stagger}s · gap ${solve.gap}px · bead ${solve.bead}s · cool ${solve.cool}s`}</span> : <span>{`spin ${v.spin[0]}×/${v.spin[1]}× · ${v.duration}s · ${v.approachEase} · fills ×${v.overshoot} · page fades from ${Math.round(v.fadeAt * 100)}% over ${v.fade}s`}</span>}
+        {cube ? <span>{`${cube.alg ? `${cube.alg} · ` : ''}turn ${FEEL.screen.duration}s + recoil ${FEEL.screen.recoil} (FEEL.screen) · between ${cube.stagger}s · open ${cube.open}s · gap ${cube.gap}px · weld ${cube.weld}s`}</span> : solve ? <span>{`flip ${solve.flip}s · stagger ${solve.stagger}s · gap ${solve.gap}px · bead ${solve.bead}s · cool ${solve.cool}s`}</span> : <span>{`spin ${v.spin[0]}×/${v.spin[1]}× · ${v.duration}s · ${v.approachEase} · fills ×${v.overshoot} · page fades from ${Math.round(v.fadeAt * 100)}% over ${v.fade}s`}</span>}
       </div>
     </div>
   )
