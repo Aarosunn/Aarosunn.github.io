@@ -27,8 +27,15 @@ export const TRANSITION_OF = (name: string) => TRANSITION_VERSIONS.find((v) => v
 /** the screen-as-cube solve: how the nine tiles bring the next project in (the transition tab's `screen` row) */
 export type SolveVersion = {
   name: string
-  /** the order the tiles land in (cell index 0..8, row-major from the top-left) */
+  /** the order the tiles land in (cell index 0..8, row-major from the top-left), or `moves`: layers that roll
+   *  together, one move after another (r0..r2 rows rolling up, c0..c2 columns rolling sideways); each tile once */
   order: number[]
+  moves?: ('r0' | 'r1' | 'r2' | 'c0' | 'c1' | 'c2')[][]
+  /** seconds the break-apart takes to open (0 = a hard cut) */
+  open?: number
+  /** the weld: two bead passes (default) or a laser: three random points on the grid grow rings that erase the seams over `weld` s */
+  laser?: boolean
+  weld?: number
   /** seconds per flip and between launches */
   flip: number
   stagger: number
@@ -46,4 +53,9 @@ export const SOLVE_VERSIONS: SolveVersion[] = [
   { name: 's2 sweep', order: SWEEP, flip: 0.26, stagger: 0.09, gap: 8, bead: 0.22, cool: 0.5, note: 'sweep: a diagonal wave from the top-left to the bottom-right' },
   { name: 's3 scatter', order: SCATTER, flip: 0.26, stagger: 0.09, gap: 8, bead: 0.22, cool: 0.5, note: 'scatter: a fixed irregular order, a speed-solver\'s hands' },
 ]
+SOLVE_VERSIONS.push(
+  { name: 's4 rows', order: [], moves: [['r0'], ['r1'], ['r2']], flip: 0.46, stagger: 0.24, open: 0.3, gap: 8, bead: 0, cool: 0, laser: true, weld: 0.95, note: 'rows: the three rows roll up one after another, a real layer turn each; the break opens over a beat; a laser weld grows from three random points and erases the grid' },
+  { name: 's5 two and one', order: [], moves: [['r0', 'r2'], ['r1']], flip: 0.46, stagger: 0.3, open: 0.3, gap: 8, bead: 0, cool: 0, laser: true, weld: 0.95, note: 'two and one: the outer rows roll together in one move, the middle row follows; laser weld' },
+  { name: 's6 columns', order: [], moves: [['c0'], ['c1'], ['c2']], flip: 0.46, stagger: 0.24, open: 0.3, gap: 8, bead: 0, cool: 0, laser: true, weld: 0.95, note: 'columns: the three columns roll sideways one after another (the phone\'s natural move); laser weld' },
+)
 export const SOLVE_OF = (name: string) => SOLVE_VERSIONS.find((v) => v.name === name)

@@ -9,6 +9,7 @@ import { Canvas, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import gsap from 'gsap'
 import type { SolveVersion } from './transitionVersions'
+import { FEEL } from './RubikMask'
 import { SCHEMES } from './schemes'
 
 export type ScreenHandle = { next: () => Promise<void>; busy: () => boolean }
@@ -53,16 +54,26 @@ function pageTexture(p: (typeof PROJECTS)[number], w: number, h: number, colors:
   return tex
 }
 
-const BEAD_VERT = /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`
+const BEAD_VERT = /* glsl */ `varying vec2 vUv; varying vec2 vPos; void main() { vUv = uv; vPos = (modelMatrix * vec4(position, 1.0)).xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`
 // a seam: a faint scar (uHeat) plus a hot bead at uT along the seam with a trailing glow
 const BEAD_FRAG = /* glsl */ `
-  uniform vec3 uColor; uniform float uHeat; uniform float uT; uniform float uBead; varying vec2 vUv;
+  uniform vec3 uColor; uniform float uHeat; uniform float uT; uniform float uBead;
+  uniform float uLaser; uniform vec2 uP0; uniform vec2 uP1; uniform vec2 uP2; uniform float uR;
+  varying vec2 vUv; varying vec2 vPos;
   void main() {
-    float d = vUv.x - uT;
-    float bead = exp(-d * d * 900.0) * 2.2 + exp(-max(-d, 0.0) * 12.0) * step(0.0, -d) * 0.9;
     float edge = 1.0 - abs(vUv.y - 0.5) * 2.0;
-    float scar = uHeat * 0.22 * edge;
-    float hot = uBead * bead * edge;
+    float scar; float hot;
+    if (uLaser < 0.5) {
+      float d = vUv.x - uT;
+      float bead = exp(-d * d * 900.0) * 2.2 + exp(-max(-d, 0.0) * 12.0) * step(0.0, -d) * 0.9;
+      scar = uHeat * 0.22 * edge; hot = uBead * bead * edge;
+    } else {
+      // laser: the nearest of three points; inside its ring the seam is gone, at the ring it is white-hot
+      float d = min(distance(vPos, uP0), min(distance(vPos, uP1), distance(vPos, uP2)));
+      float front = exp(-pow((d - uR) / 22.0, 2.0)) * 1.6 + exp(-max(d - uR, 0.0) / 60.0) * 0.5;
+      float un = smoothstep(uR - 4.0, uR + 4.0, d);
+      scar = uHeat * 0.22 * edge * un; hot = uBead * front * edge * un * 1.6;
+    }
     gl_FragColor = vec4(uColor * (scar + hot) + vec3(hot * hot * 0.5), 1.0);
   }
 `
@@ -93,6 +104,14 @@ const Grid = forwardRef<ScreenHandle, { v: SolveVersion; scheme: string }>(funct
     for (let k = 0; k < uv.count; k++) uv.setXY(k, (i + uv.getX(k)) / 3, (2 - j + uv.getY(k)) / 3)
     return g
   }
+  const armed = useRef(new Map<Tile, boolean>())
+  /** the incoming face sits a tile away on the axis it rotates in on: below for an upward flip (`up`), right for a sideways one */
+  const arm = (t: Tile, up: boolean, cw: number, ch: number) => {
+    armed.current.set(t, up)
+    t.front.position.set(0, 0, up ? ch / 2 : cw / 2)
+    if (up) { t.side.position.set(0, -ch / 2, 0); t.side.rotation.set(Math.PI / 2, 0, 0) } else { t.side.position.set(cw / 2, 0, 0); t.side.rotation.set(0, Math.PI / 2, 0) }
+    t.pivot.position.z = -(up ? ch / 2 : cw / 2)
+  }
   /** lay the tiles out for a gap (px); the seam quads sit in the gaps */
   const layout = (gap: number) => {
     state.current.gap = gap
@@ -101,11 +120,7 @@ const Grid = forwardRef<ScreenHandle, { v: SolveVersion; scheme: string }>(funct
       t.pivot.position.set(-W / 2 + cw / 2 + t.i * (cw + gap), H / 2 - ch / 2 - t.j * (ch + gap), 0)
       t.front.scale.set(cw / (W / 3), ch / (H / 3), 1)
       t.side.scale.copy(t.front.scale)
-      // the incoming face sits a tile away on the axis it rotates in on: below for an upward flip, right for a sideways one
-      const up = (t.i + t.j) % 2 === 0
-      t.front.position.set(0, 0, up ? ch / 2 : cw / 2)
-      if (up) { t.side.position.set(0, -ch / 2, 0); t.side.rotation.set(Math.PI / 2, 0, 0) } else { t.side.position.set(cw / 2, 0, 0); t.side.rotation.set(0, Math.PI / 2, 0) }
-      t.pivot.position.z = -(up ? ch / 2 : cw / 2)
+      arm(t, armed.current.get(t) ?? ((t.i + t.j) % 2 === 0), cw, ch)
     })
     seams.current.forEach((s, k) => {
       const n = (k % 2) + 1
@@ -129,7 +144,7 @@ const Grid = forwardRef<ScreenHandle, { v: SolveVersion; scheme: string }>(funct
     tiles.current = made
     const col = new THREE.Color(colors.a)
     seams.current = (['h', 'h', 'v', 'v'] as const).map((dir) => {
-      const mat = new THREE.ShaderMaterial({ uniforms: { uColor: { value: col }, uHeat: { value: 0 }, uT: { value: -1 }, uBead: { value: 0 } }, vertexShader: BEAD_VERT, fragmentShader: BEAD_FRAG, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })
+      const mat = new THREE.ShaderMaterial({ uniforms: { uColor: { value: col }, uHeat: { value: 0 }, uT: { value: -1 }, uBead: { value: 0 }, uLaser: { value: 0 }, uP0: { value: new THREE.Vector2() }, uP1: { value: new THREE.Vector2() }, uP2: { value: new THREE.Vector2() }, uR: { value: 0 } }, vertexShader: BEAD_VERT, fragmentShader: BEAD_FRAG, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat)
       g.add(mesh)
       return { mesh, mat, dir }
@@ -146,30 +161,63 @@ const Grid = forwardRef<ScreenHandle, { v: SolveVersion; scheme: string }>(funct
       const st = state.current
       const nextIx = (st.project + 1) % PROJECTS.length
       tiles.current.forEach((t) => { (t.side.material as THREE.MeshBasicMaterial).map = textures[nextIx]; (t.side.material as THREE.Material).needsUpdate = true })
-      // 1. the seams appear at once
-      layout(v.gap)
-      seams.current.forEach((s) => { s.mat.uniforms.uHeat.value = 1; s.mat.uniforms.uBead.value = 0; s.mat.uniforms.uT.value = -1 })
+      const cw = (W - 2 * v.gap) / 3, ch = (H - 2 * v.gap) / 3
       const tl = gsap.timeline({ onComplete: () => { st.project = nextIx; st.busy = false; resolve() } })
-      // 2. the flips, one or two in motion at a time
-      v.order.forEach((cell, k) => {
-        const t = tiles.current[cell]
-        const up = (t.i + t.j) % 2 === 0
-        const at = k * v.stagger
-        tl.to(t.pivot.rotation, { [up ? 'x' : 'y']: up ? -Math.PI / 2 : -Math.PI / 2, duration: v.flip, ease: 'power2.inOut' }, at)
-        // landed: the incoming face becomes the front
-        tl.call(() => { t.pivot.rotation.set(0, 0, 0); (t.front.material as THREE.MeshBasicMaterial).map = textures[nextIx]; (t.front.material as THREE.Material).needsUpdate = true }, [], at + v.flip)
-      })
-      const landed = (v.order.length - 1) * v.stagger + v.flip
-      // 3. the weld: a bead runs the horizontal seams, then the vertical ones; the scars cool as the gaps close
-      seams.current.forEach((s) => {
-        const at = landed + (s.dir === 'h' ? 0 : v.bead)
-        tl.set(s.mat.uniforms.uBead, { value: 1 }, at)
-        tl.fromTo(s.mat.uniforms.uT, { value: 0 }, { value: 1, duration: v.bead, ease: 'none' }, at)
-        tl.to(s.mat.uniforms.uBead, { value: 0, duration: 0.15 }, at + v.bead)
-        tl.to(s.mat.uniforms.uHeat, { value: 0, duration: v.cool, ease: 'power2.in' }, at + v.bead)
-      })
-      const gapProxy = { g: v.gap }
-      tl.to(gapProxy, { g: 0, duration: v.cool * 0.7, ease: 'power2.inOut', onUpdate: () => layout(gapProxy.g) }, landed + v.bead)
+      const gapProxy = { g: 0 }
+      // 1. the break-apart: the seams appear at once, or open over a beat
+      seams.current.forEach((s) => { s.mat.uniforms.uHeat.value = 1; s.mat.uniforms.uBead.value = 0; s.mat.uniforms.uT.value = -1; s.mat.uniforms.uLaser.value = v.laser ? 1 : 0; s.mat.uniforms.uR.value = 0 })
+      if (v.open) tl.to(gapProxy, { g: v.gap, duration: v.open, ease: 'power2.out', onUpdate: () => layout(gapProxy.g) }, 0)
+      else { gapProxy.g = v.gap; layout(v.gap) }
+      const open = v.open ?? 0
+      const land = (t: Tile) => { t.pivot.rotation.set(0, 0, 0); (t.front.material as THREE.MeshBasicMaterial).map = textures[nextIx]; (t.front.material as THREE.Material).needsUpdate = true }
+      const feel = (p: number) => FEEL.turn.f(p)
+      let landed = open
+      if (v.moves) {
+        // 2a. layer moves: every tile of a row rolls up together, of a column sideways, one move after another
+        v.moves.forEach((move, k) => {
+          const at = open + k * (v.flip + v.stagger)
+          move.forEach((layer) => {
+            const row = layer[0] === 'r', n = +layer[1]
+            tiles.current.filter((t) => (row ? t.j : t.i) === n).forEach((t) => {
+              tl.call(() => arm(t, row, cw, ch), [], at)
+              tl.to(t.pivot.rotation, { [row ? 'x' : 'y']: -Math.PI / 2, duration: v.flip, ease: feel }, at)
+              tl.call(() => land(t), [], at + v.flip)
+            })
+          })
+          landed = at + v.flip
+        })
+      } else {
+        // 2b. single tiles, one or two in motion at a time, in the version's order
+        v.order.forEach((cell, k) => {
+          const t = tiles.current[cell]
+          const up = (t.i + t.j) % 2 === 0
+          const at = open + k * v.stagger
+          tl.to(t.pivot.rotation, { [up ? 'x' : 'y']: -Math.PI / 2, duration: v.flip, ease: 'power2.inOut' }, at)
+          tl.call(() => land(t), [], at + v.flip)
+        })
+        landed = open + (v.order.length - 1) * v.stagger + v.flip
+      }
+      if (v.laser) {
+        // 3a. laser weld: three random points on the seams, rings growing until the grid is gone; the gap closes with them
+        const pts = [0, 1, 2].map(() => { const onH = Math.random() < 0.5; const n = 1 + Math.floor(Math.random() * 2); const a = (Math.random() - 0.5); return onH ? new THREE.Vector2(a * W, H / 2 - (n * H) / 3) : new THREE.Vector2(-W / 2 + (n * W) / 3, a * H) })
+        const reach = Math.max(...pts.map((p) => Math.max(Math.hypot(W / 2 + Math.abs(p.x), H / 2 + Math.abs(p.y))))) * 0.75
+        const weld = v.weld ?? 0.9
+        tl.call(() => seams.current.forEach((s) => { s.mat.uniforms.uP0.value.copy(pts[0]); s.mat.uniforms.uP1.value.copy(pts[1]); s.mat.uniforms.uP2.value.copy(pts[2]); s.mat.uniforms.uBead.value = 1 }), [], landed + 0.05)
+        const r = { v: 0 }
+        tl.to(r, { v: reach, duration: weld, ease: 'power1.out', onUpdate: () => seams.current.forEach((s) => { s.mat.uniforms.uR.value = r.v }) }, landed + 0.05)
+        tl.to(gapProxy, { g: 0, duration: weld, ease: 'power2.inOut', onUpdate: () => layout(gapProxy.g) }, landed + 0.05)
+        tl.call(() => seams.current.forEach((s) => { s.mat.uniforms.uHeat.value = 0; s.mat.uniforms.uBead.value = 0 }), [], landed + 0.05 + weld)
+      } else {
+        // 3b. the weld: a bead runs the horizontal seams, then the vertical ones; the scars cool as the gaps close
+        seams.current.forEach((s) => {
+          const at = landed + (s.dir === 'h' ? 0 : v.bead)
+          tl.set(s.mat.uniforms.uBead, { value: 1 }, at)
+          tl.fromTo(s.mat.uniforms.uT, { value: 0 }, { value: 1, duration: v.bead, ease: 'none' }, at)
+          tl.to(s.mat.uniforms.uBead, { value: 0, duration: 0.15 }, at + v.bead)
+          tl.to(s.mat.uniforms.uHeat, { value: 0, duration: v.cool, ease: 'power2.in' }, at + v.bead)
+        })
+        tl.to(gapProxy, { g: 0, duration: v.cool * 0.7, ease: 'power2.inOut', onUpdate: () => layout(gapProxy.g) }, landed + v.bead)
+      }
     }),
   }), [v, textures, W, H])
   return <group ref={root} />

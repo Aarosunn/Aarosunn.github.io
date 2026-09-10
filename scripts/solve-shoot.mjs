@@ -18,7 +18,7 @@ for (const [w, h, name] of [[1440, 900, 'land'], [420, 820, 'port']]) {
   const files = []
   const t0 = Date.now()
   await page.evaluate(() => { window.__aarTransition.next() })
-  for (const ms of [0, 150, 350, 600, 850, 1100, 1400, 1900]) {
+  for (const ms of (process.env.MS ? process.env.MS.split(",").map(Number) : [0, 150, 350, 600, 850, 1100, 1400, 1900])) {
     const wait = ms - (Date.now() - t0)
     if (wait > 0) await page.waitForTimeout(wait)
     const path = `shots/solve/${tag}-${name}-${String(ms).padStart(4, '0')}.png`
