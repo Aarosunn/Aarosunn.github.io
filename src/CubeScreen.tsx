@@ -10,13 +10,13 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'rea
 import { Canvas, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import gsap from 'gsap'
-import type { CubeVersion } from './transitionVersions'
+import type { CubeMove, CubeVersion } from './transitionVersions'
 import { FEEL } from './RubikMask'
 import { SCHEMES } from './schemes'
 import { pageTexture, PROJECTS, type ScreenHandle } from './ScreenSolve'
 
 const FOV = 30
-type Sticker = { tex: number; col: number; row: number; up: THREE.Vector3; right: THREE.Vector3; n: THREE.Vector3 }
+type Sticker = { id: number; tex: number; col: number; row: number; up: THREE.Vector3; right: THREE.Vector3; n: THREE.Vector3 }
 type Cubie = { pos: THREE.Vector3; stickers: Sticker[] }
 /** the six faces as seen from outside: normal, the page's up and right in cube space, which project */
 const FACES = [
@@ -30,13 +30,20 @@ const FACES = [
 const v3 = (a: number[]) => new THREE.Vector3(a[0], a[1], a[2])
 function solvedCube(): Cubie[] {
   const out: Cubie[] = []
+  let id = 0
   for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
     const pos = new THREE.Vector3(x, y, z)
-    const stickers = FACES.map((f, tex) => ({ f, tex })).filter(({ f }) => pos.dot(v3(f.n)) === 1).map(({ f, tex }) => ({ tex, col: pos.dot(v3(f.right)) + 1, row: 1 - pos.dot(v3(f.up)), up: v3(f.up), right: v3(f.right), n: v3(f.n) }))
+    const stickers = FACES.map((f, tex) => ({ f, tex })).filter(({ f }) => pos.dot(v3(f.n)) === 1).map(({ f, tex }) => ({ id: id++, tex, col: pos.dot(v3(f.right)) + 1, row: 1 - pos.dot(v3(f.up)), up: v3(f.up), right: v3(f.right), n: v3(f.n) }))
     out.push({ pos, stickers })
   }
   return out
 }
+const cloneCube = (cube: Cubie[]): Cubie[] => cube.map((c) => ({ pos: c.pos.clone(), stickers: c.stickers.map((s) => ({ ...s, up: s.up.clone(), right: s.right.clone(), n: s.n.clone() })) }))
+/** cube notation (U D E R L M, ' and 2) to moves; same convention as the site cube: a clockwise face turn is a negative rotation about its +axis */
+const NOTE: Record<string, [axis: 'x' | 'y', layer: number, dir: 1 | -1]> = { U: ['y', 1, -1], D: ['y', -1, 1], E: ['y', 0, 1], R: ['x', 1, -1], L: ['x', -1, 1], M: ['x', 0, 1] }
+export const parseCubeAlg = (alg: string): CubeMove[] =>
+  alg.trim().split(/\s+/).filter((t) => NOTE[t[0]]).flatMap((t) => { const [axis, layer, d] = NOTE[t[0]]; const dir = (t.includes("'") ? -d : d) as 1 | -1; const mv = { axis, layers: [layer], dir }; return t.includes('2') ? [mv, { ...mv }] : [mv] })
+const expand = (v: CubeVersion): CubeMove[] => (v.alg ? parseCubeAlg(v.alg) : v.moves ?? [])
 const round = (v: THREE.Vector3) => v.set(Math.round(v.x), Math.round(v.y), Math.round(v.z))
 /** a quarter turn of one layer applied to the state */
 function turn(cube: Cubie[], axis: 'x' | 'y' | 'z', layer: number, dir: 1 | -1) {
@@ -73,14 +80,14 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string }>(functi
   const textures = useMemo(() => PROJECTS.map((p) => pageTexture(p, W, H, colors)), [W, H, colors])
   useEffect(() => () => textures.forEach((t) => t.dispose()), [textures])
   const root = useRef<THREE.Group>(null!)
-  const state = useRef({ cube: solvedCube(), busy: false, depth: cw })
+  const state = useRef({ cube: solvedCube(), busy: false, depth: cw, project: 0 })
   const groups = useRef<THREE.Group[]>([])
   const seams = useRef<THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>[]>([])
   const body = useMemo(() => new THREE.MeshBasicMaterial({ color: '#0b0e13' }), [])
   /** the cubies as objects for the current state and depth (depth = the coming turn's axis extent) */
   const build = (depth: number) => {
     const g = root.current
-    groups.current.forEach((c) => { c.traverse((o) => { if (o instanceof THREE.Mesh) { o.geometry.dispose(); if (o.material !== body) (o.material as THREE.Material).dispose() } }); g.remove(c) })
+    groups.current.forEach((c) => { c.traverse((o) => { if (o instanceof THREE.Mesh) { o.geometry.dispose(); if (o.material !== body) (o.material as THREE.Material).dispose() } }); c.parent?.remove(c) })
     state.current.depth = depth
     const ext = (a: THREE.Vector3) => (Math.abs(a.x) ? cw : Math.abs(a.y) ? ch : depth)
     groups.current = state.current.cube.map((c) => {
@@ -133,29 +140,65 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string }>(functi
       const st = state.current
       if (st.busy) return resolve()
       st.busy = true
-      const axis = v.moves[0].axis
-      build(axis === 'y' ? cw : ch)
-      const centre = new THREE.Vector3(0, 0, -1.5 * st.depth)
-      const tl = gsap.timeline({ onComplete: () => { st.busy = false; resolve() } })
+      const moves = expand(v)
+      const nextIx = (st.project + 1) % textures.length
+      // print the next project on the stickers that will end up on the front, each one while it is hidden: simulate the
+      // sequence on a copy, note when each sticker first leaves the front, and its in-plane offset at the end
+      const sim = cloneCube(st.cube)
+      const hiddenAt = new Map<number, number>()
+      sim.forEach((cb) => cb.stickers.forEach((s) => { if (s.n.z !== 1) hiddenAt.set(s.id, -1) }))
+      moves.forEach((mv, i) => { mv.layers.forEach((l) => turn(sim, mv.axis, l, mv.dir)); sim.forEach((cb) => cb.stickers.forEach((s) => { if (s.n.z !== 1 && !hiddenAt.has(s.id)) hiddenAt.set(s.id, i) })) })
+      const stamp = new Map<number, { col: number; row: number; k: number; at: number }>()
+      sim.forEach((cb) => cb.stickers.forEach((s) => {
+        if (s.n.z !== 1) return
+        const k = Math.round((Math.PI / 2 - Math.atan2(s.up.y, s.up.x)) / (Math.PI / 2))
+        stamp.set(s.id, { col: cb.pos.x + 1, row: 1 - cb.pos.y, k, at: hiddenAt.get(s.id) ?? moves.length })
+      }))
+      const restamp = (step: number) => st.cube.forEach((cb) => cb.stickers.forEach((s) => {
+        const p = stamp.get(s.id)
+        if (!p || p.at !== step) return
+        const q = new THREE.Quaternion().setFromAxisAngle(s.n, (p.k * Math.PI) / 2)
+        round(s.up.applyQuaternion(q)); round(s.right.applyQuaternion(q))
+        s.tex = nextIx; s.col = p.col; s.row = p.row
+      }))
+      restamp(-1)
+      const depthFor = (axis: CubeMove['axis']) => (axis === 'y' ? cw : ch)
+      build(depthFor(moves[0]?.axis ?? 'y'))
+      const tl = gsap.timeline({ onComplete: () => { st.project = nextIx; st.busy = false; resolve() } })
       // 1. the break: the gaps open and the seams light
       const gp = { g: 0 }
       seams.current.forEach((s) => { s.material.uniforms.uHeat.value = 1; s.material.uniforms.uBead.value = 0; s.material.uniforms.uR.value = 0 })
       tl.to(gp, { g: v.gap, duration: v.open, ease: 'power2.out', onUpdate: () => setGap(gp.g) }, 0)
-      // 2. the layer turns: each layer's cubies under a pivot at the cube's centre, the pivot rolls a quarter turn
+      // 2. the turns, one move after another: the move's layers hang under pivots at the cube's centre and roll a quarter
+      //    turn; on landing the state takes the turn, hidden stickers get their print, and the cube is rebuilt on the grid
+      //    with the depth the next move's axis needs
+      const live: { pivots: THREE.Group[]; axis: CubeMove['axis']; dir: number } = { pivots: [], axis: 'y', dir: 1 }
       let landed = v.open
-      v.moves.forEach((mv, k) => {
+      moves.forEach((mv, k) => {
         const at = v.open + k * (v.flip + v.stagger)
-        mv.layers.forEach((layer) => {
-          const pivot = new THREE.Group()
-          pivot.position.copy(centre)
-          tl.call(() => { root.current.add(pivot); groups.current.filter((grp) => (grp.userData.cubie as Cubie).pos[mv.axis] === layer).forEach((grp) => pivot.attach(grp)) }, [], at)
-          tl.to(pivot.rotation, { [mv.axis]: (mv.dir * Math.PI) / 2, duration: v.flip, ease: (p: number) => FEEL.turn.f(p) }, at)
-        })
+        tl.call(() => {
+          build(depthFor(mv.axis))
+          const centre = new THREE.Vector3(0, 0, -1.5 * st.depth)
+          live.axis = mv.axis; live.dir = mv.dir
+          live.pivots = mv.layers.map((layer) => {
+            const pivot = new THREE.Group()
+            pivot.position.copy(centre)
+            root.current.add(pivot)
+            groups.current.filter((grp) => (grp.userData.cubie as Cubie).pos[mv.axis] === layer).forEach((grp) => pivot.attach(grp))
+            return pivot
+          })
+        }, [], at)
+        const t = { p: 0 }
+        tl.fromTo(t, { p: 0 }, { p: 1, duration: v.flip, ease: (p: number) => FEEL.turn.f(p), onUpdate: () => live.pivots.forEach((pv) => { pv.rotation[live.axis] = (t.p * live.dir * Math.PI) / 2 }) }, at)
+        tl.call(() => {
+          mv.layers.forEach((layer) => turn(st.cube, mv.axis, layer, mv.dir))
+          restamp(k)
+          live.pivots.forEach((pv) => root.current.remove(pv))
+          build(depthFor(moves[k + 1]?.axis ?? mv.axis))
+        }, [], at + v.flip + 0.001)
         landed = at + v.flip
       })
-      // 3. landed: the state takes the turns and the cube is rebuilt on the grid
-      tl.call(() => { v.moves.forEach((mv) => mv.layers.forEach((layer) => turn(st.cube, mv.axis, layer, mv.dir))); root.current.children.filter((o) => o !== root.current && !groups.current.includes(o as THREE.Group) && !seams.current.includes(o as never)).forEach((p) => root.current.remove(p)); build(st.depth) }, [], landed + 0.02)
-      // 4. the laser weld: three random points on the seams, rings growing until the grid is gone
+      // 3. the laser weld: three random points on the seams, rings growing until the grid is gone
       const pts = [0, 1, 2].map(() => { const onH = Math.random() < 0.5; const n = 1 + Math.floor(Math.random() * 2); const a = Math.random() - 0.5; return onH ? new THREE.Vector2(a * W, H / 2 - (n * H) / 3) : new THREE.Vector2(-W / 2 + (n * W) / 3, a * H) })
       const reach = Math.max(...pts.map((p) => Math.hypot(W / 2 + Math.abs(p.x), H / 2 + Math.abs(p.y)))) * 0.75
       const w0 = landed + 0.1

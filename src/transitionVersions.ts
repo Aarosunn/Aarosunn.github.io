@@ -62,7 +62,10 @@ export const SOLVE_OF = (name: string) => SOLVE_VERSIONS.find((v) => v.name === 
 
 /** the screen as a real cube: legal layer turns that bring a neighbouring face (the next project) to the front */
 export type CubeMove = { axis: 'x' | 'y'; layers: number[]; dir: 1 | -1 }
-export type CubeVersion = { name: string; moves: CubeMove[]; flip: number; stagger: number; open: number; gap: number; weld: number; note: string }
+/** `moves`: layers turning together, one move after another; or `alg` in cube notation (U D E R L M, with ' and 2; no F/S/B:
+ *  a face turn would shape-shift a stretched cube). Hidden faces are printed with the next project just before they come
+ *  round, oriented to arrive upright, so any legal sequence delivers the page the right way up. */
+export type CubeVersion = { name: string; moves?: CubeMove[]; alg?: string; flip: number; stagger: number; open: number; gap: number; weld: number; note: string }
 const CUBE = { flip: 0.5, stagger: 0.22, open: 0.35, gap: 8, weld: 1.6 }
 export const CUBE_VERSIONS: CubeVersion[] = [
   { name: 'c1 row by row', ...CUBE, moves: [{ axis: 'y', layers: [1], dir: -1 }, { axis: 'y', layers: [0], dir: -1 }, { axis: 'y', layers: [-1], dir: -1 }], note: 'a real cube: U, then E, then D turn the same way, the right face comes to the front one row of stickers at a time; laser weld, slower' },
@@ -70,4 +73,10 @@ export const CUBE_VERSIONS: CubeVersion[] = [
   { name: 'c3 whole cube', ...CUBE, moves: [{ axis: 'y', layers: [1, 0, -1], dir: -1 }], note: 'a real cube: a y rotation, all three layers at once; the right face comes to the front in one move' },
   { name: 'c4 columns', ...CUBE, moves: [{ axis: 'x', layers: [-1], dir: 1 }, { axis: 'x', layers: [0], dir: 1 }, { axis: 'x', layers: [1], dir: 1 }], note: 'a real cube: L\', M\', R turn the same way, the top face comes down to the front one column at a time' },
 ]
+const ALG = { flip: 0.38, stagger: 0.08, open: 0.35, gap: 8, weld: 1.6 }
+CUBE_VERSIONS.push(
+  { name: 'a1 rows', ...ALG, alg: 'U E D R E D', note: 'solving: six legal turns, mostly rows with one column, the next page fills in 2 · 2 · 2 · 3 · 6 · 9 cells' },
+  { name: 'a2 columns', ...ALG, alg: 'R M U M E L', note: 'solving: columns first then rows, the page fills in 1 · 1 · 2 · 4 · 6 · 9' },
+  { name: 'a3 slices', ...ALG, alg: 'L E M D R D', note: 'solving: a mixed sequence with two slice turns, the page fills in 1 · 2 · 4 · 4 · 6 · 9' },
+)
 export const CUBE_OF = (name: string) => CUBE_VERSIONS.find((v) => v.name === name)

@@ -16,6 +16,8 @@ for (const [w, h, name] of [[1440, 900, 'land'], [420, 820, 'port']]) {
   await page.waitForFunction(() => document.querySelector('.transition-tab canvas')?.width > 300)
   await page.waitForTimeout(600)
   const files = []
+  // N=2: run next() once to completion first, then frame the second run (checks the print on already-turned faces)
+  for (let i = 1; i < +(process.env.N ?? 1); i++) { await page.evaluate(() => { window.__aarTransition.next() }); await page.waitForFunction(() => !window.__aarTransition.busy(), null, { timeout: 15000 }); await page.waitForTimeout(200) }
   const t0 = Date.now()
   await page.evaluate(() => { window.__aarTransition.next() })
   for (const ms of (process.env.MS ? process.env.MS.split(",").map(Number) : [0, 150, 350, 600, 850, 1100, 1400, 1900])) {
