@@ -172,31 +172,41 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string }>(functi
       // 2. the turns, one move after another: the move's layers hang under pivots at the cube's centre and roll a quarter
       //    turn; on landing the state takes the turn, hidden stickers get their print, and the cube is rebuilt on the grid
       //    with the depth the next move's axis needs
-      const live: { pivots: THREE.Group[]; axis: CubeMove['axis']; dir: number } = { pivots: [], axis: 'y', dir: 1 }
+      //    the turn is the site cube's: same duration, same step response, same body recoil (the rest of the cube
+      //    leans against the layer while it accelerates), so tuning FEEL.turn tunes both
+      const feel = FEEL.turn
+      const live: { pivots: THREE.Group[]; body: THREE.Group | null; axis: CubeMove['axis']; dir: number } = { pivots: [], body: null, axis: 'y', dir: 1 }
       let landed = v.open
       moves.forEach((mv, k) => {
-        const at = v.open + k * (v.flip + v.stagger)
+        const at = v.open + k * (feel.duration + v.stagger)
         tl.call(() => {
           build(depthFor(mv.axis))
           const centre = new THREE.Vector3(0, 0, -1.5 * st.depth)
           live.axis = mv.axis; live.dir = mv.dir
+          const pivotAt = () => { const p = new THREE.Group(); p.position.copy(centre); root.current.add(p); return p }
           live.pivots = mv.layers.map((layer) => {
-            const pivot = new THREE.Group()
-            pivot.position.copy(centre)
-            root.current.add(pivot)
+            const pivot = pivotAt()
             groups.current.filter((grp) => (grp.userData.cubie as Cubie).pos[mv.axis] === layer).forEach((grp) => pivot.attach(grp))
             return pivot
           })
+          live.body = pivotAt()
+          groups.current.filter((grp) => !mv.layers.includes((grp.userData.cubie as Cubie).pos[mv.axis])).forEach((grp) => live.body!.attach(grp))
         }, [], at)
         const t = { p: 0 }
-        tl.fromTo(t, { p: 0 }, { p: 1, duration: v.flip, ease: (p: number) => FEEL.turn.f(p), onUpdate: () => live.pivots.forEach((pv) => { pv.rotation[live.axis] = (t.p * live.dir * Math.PI) / 2 }) }, at)
+        tl.fromTo(t, { p: 0 }, { p: 1, duration: feel.duration, ease: 'none', onUpdate: () => {
+          const angle = (live.dir * Math.PI) / 2
+          live.pivots.forEach((pv) => { pv.rotation[live.axis] = angle * feel.f(t.p) })
+          const speed = (feel.f(Math.min(t.p + 1e-3, 1)) - feel.f(t.p)) * 1e3
+          if (live.body) live.body.rotation[live.axis] = (-Math.sign(angle) * feel.recoil * Math.max(0, speed)) / feel.peak
+        } }, at)
         tl.call(() => {
           mv.layers.forEach((layer) => turn(st.cube, mv.axis, layer, mv.dir))
           restamp(k)
           live.pivots.forEach((pv) => root.current.remove(pv))
+          if (live.body) root.current.remove(live.body)
           build(depthFor(moves[k + 1]?.axis ?? mv.axis))
-        }, [], at + v.flip + 0.001)
-        landed = at + v.flip
+        }, [], at + feel.duration + 0.001)
+        landed = at + feel.duration
       })
       // 3. the laser weld: three random points on the seams, rings growing until the grid is gone
       const pts = [0, 1, 2].map(() => { const onH = Math.random() < 0.5; const n = 1 + Math.floor(Math.random() * 2); const a = Math.random() - 0.5; return onH ? new THREE.Vector2(a * W, H / 2 - (n * H) / 3) : new THREE.Vector2(-W / 2 + (n * W) / 3, a * H) })

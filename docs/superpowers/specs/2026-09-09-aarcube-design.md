@@ -327,3 +327,7 @@ Aaron: "yes that's the idea"; c4 sometimes lands the page upside down; the weld 
 ## Transition tab: v2 is its own version (05:15, 2026-09-10)
 
 Aaron: "you didnt actually make it into v2, everything right now is just stuffed in v1". The version row is the idea level: v1 = the flight with the tile and cube screens (s1–s6, c1–c4) under it; v2 = the solving idea with a1–a3 under it (`TransitionVersion.screens`; `?tv=v2`). Switching version lands on its first screen.
+
+## Cube screen turns = the site cube's turns (05:30, 2026-09-10)
+
+Aaron: "make the turns the same speed as the main cube and the same recoil, so when we change the values for one perspective of the cube it matches". The cube screen now drives every layer turn exactly as `RubikMask` does: a proxy tween with `ease: 'none'` over `FEEL.turn.duration`, the layer angle = `FEEL.turn.f(t)`, and the rest of the cube under a body pivot leaning against the layer by `recoil · speed / peak` (reset on landing). `CubeVersion.flip` is gone; `FEEL.turn` in `src/RubikMask.tsx` is the single knob for both. An a-pass now runs ~5.3 s (timed by polling `busy()`).
