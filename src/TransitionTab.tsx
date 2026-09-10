@@ -4,8 +4,9 @@ import { Canvas } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
-import { SOLVE_OF, SOLVE_VERSIONS, TRANSITION_VERSIONS, type TransitionVersion } from './transitionVersions'
+import { CUBE_OF, CUBE_VERSIONS, SOLVE_OF, SOLVE_VERSIONS, TRANSITION_VERSIONS, type TransitionVersion } from './transitionVersions'
 import { ScreenSolve, type ScreenHandle } from './ScreenSolve'
+import { CubeScreen } from './CubeScreen'
 
 const FOV = 35
 const CAM_Z = 9
@@ -47,7 +48,8 @@ function Flight({ v, group, playing, onDone, onProgress }: { v: TransitionVersio
 }
 
 export function TransitionTab({ v, setVersion, screen, setScreen, scheme }: { v: TransitionVersion; setVersion: (n: string) => void; screen: string; setScreen: (n: string) => void; scheme: string }) {
-  const solve = SOLVE_OF(screen)
+  const cube = CUBE_OF(screen)
+  const solve = SOLVE_OF(screen) ?? cube
   const grid = useRef<ScreenHandle | null>(null)
   const group = useRef<THREE.Group | null>(null)
   const [playing, setPlaying] = useState(0)
@@ -75,7 +77,7 @@ export function TransitionTab({ v, setVersion, screen, setScreen, scheme }: { v:
         <div className="row">
           <span className="k">screen</span>
           <button className={solve ? '' : 'on'} onClick={() => setScreen('flight')}>flight</button>
-          {SOLVE_VERSIONS.map((x) => (
+          {[...SOLVE_VERSIONS, ...CUBE_VERSIONS].map((x) => (
             <button key={x.name} className={x.name === screen ? 'on' : ''} onClick={() => setScreen(x.name)}>{x.name}</button>
           ))}
         </div>
@@ -83,7 +85,7 @@ export function TransitionTab({ v, setVersion, screen, setScreen, scheme }: { v:
           {solve ? <button onClick={() => grid.current?.next()}>next project (n)</button> : <><button onClick={play}>{playing ? 'replay' : 'play'} (space)</button><button onClick={reset}>reset (r)</button></>}
         </div>
       </div>
-      {solve ? <ScreenSolve key={solve.name} ref={grid} v={solve} scheme={scheme} /> : <Canvas className="transition-canvas" dpr={[1, 2]} camera={{ position: [0, 0, CAM_Z], fov: FOV }} gl={{ antialias: true }}>
+      {cube ? <CubeScreen key={cube.name} ref={grid} v={cube} scheme={scheme} /> : solve ? <ScreenSolve key={solve.name} ref={grid} v={solve} scheme={scheme} /> : <Canvas className="transition-canvas" dpr={[1, 2]} camera={{ position: [0, 0, CAM_Z], fov: FOV }} gl={{ antialias: true }}>
         <hemisphereLight args={['#e8ecf2', '#20242a', 1.1]} />
         <directionalLight position={[4, 6, 8]} intensity={1.6} />
         <directionalLight position={[-6, -2, 3]} intensity={0.4} />
@@ -99,7 +101,7 @@ export function TransitionTab({ v, setVersion, screen, setScreen, scheme }: { v:
       </div>}
       <div className="readout">
         <span className="note">{solve ? solve.note : v.note}</span>
-        {solve ? <span>{`flip ${solve.flip}s · stagger ${solve.stagger}s · gap ${solve.gap}px · bead ${solve.bead}s · cool ${solve.cool}s`}</span> : <span>{`spin ${v.spin[0]}×/${v.spin[1]}× · ${v.duration}s · ${v.approachEase} · fills ×${v.overshoot} · page fades from ${Math.round(v.fadeAt * 100)}% over ${v.fade}s`}</span>}
+        {cube ? <span>{`turn ${cube.flip}s · between ${cube.stagger}s · open ${cube.open}s · gap ${cube.gap}px · weld ${cube.weld}s`}</span> : solve ? <span>{`flip ${solve.flip}s · stagger ${solve.stagger}s · gap ${solve.gap}px · bead ${solve.bead}s · cool ${solve.cool}s`}</span> : <span>{`spin ${v.spin[0]}×/${v.spin[1]}× · ${v.duration}s · ${v.approachEase} · fills ×${v.overshoot} · page fades from ${Math.round(v.fadeAt * 100)}% over ${v.fade}s`}</span>}
       </div>
     </div>
   )

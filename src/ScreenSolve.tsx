@@ -16,13 +16,16 @@ export type ScreenHandle = { next: () => Promise<void>; busy: () => boolean }
 const FOV = 30
 
 /** placeholder projects, one page each */
-const PROJECTS = [
+export const PROJECTS = [
   { title: 'aarcube', meta: 'code · 2026', blurb: 'paper shaders on a Rubik\'s cube. the cube is the menu, the menu is the cube.' },
   { title: 'synth voice', meta: 'hardware · 2025', blurb: 'a wavetable voice on an FPGA, four oscillators, one very hot chip.' },
   { title: 'title sequence', meta: 'creatives · 2025', blurb: 'a TouchDesigner title sequence cut to a track nobody has heard yet.' },
+  { title: 'small runtime', meta: 'code · 2025', blurb: 'a language runtime small enough to read in an afternoon.' },
+  { title: 'camera rig', meta: 'hardware · 2026', blurb: 'a hand-tracking camera rig that knows which finger is which.' },
+  { title: 'ascii portrait', meta: 'creatives · 2026', blurb: 'a portrait in text that watches back.' },
 ]
 /** one project drawn as a page at the viewport's size */
-function pageTexture(p: (typeof PROJECTS)[number], w: number, h: number, colors: { bg: string; text: string; bright: string; mute: string; a: string }) {
+export function pageTexture(p: (typeof PROJECTS)[number], w: number, h: number, colors: { bg: string; text: string; bright: string; mute: string; a: string }) {
   const c = document.createElement('canvas')
   const s = 2
   c.width = w * s; c.height = h * s
