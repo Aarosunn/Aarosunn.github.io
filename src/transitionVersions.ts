@@ -15,11 +15,14 @@ export type TransitionVersion = {
   /** the next page's fade: when it starts (fraction of the flight) and how long it takes (s) */
   fadeAt: number
   fade: number
+  /** what the screen row offers under this version (default: the flight plus every s / c screen) */
+  screens?: string[]
   note: string
 }
 
 export const TRANSITION_VERSIONS: TransitionVersion[] = [
   { name: 'v1', spin: [1, 2], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1.4, fadeAt: 0.72, fade: 0.7, note: 'one turn over, two around, accelerating into the camera until a face overfills the screen; the page fades in over the last quarter' },
+  { name: 'v2', spin: [1, 2], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1.4, fadeAt: 0.72, fade: 0.7, screens: ['a1 rows', 'a2 columns', 'a3 slices'], note: 'v2: the screen is a real cube and the next project is solved onto the front face by an algorithm, three to choose from; unseen faces are printed with the next project before they come round' },
 ]
 
 export const TRANSITION_OF = (name: string) => TRANSITION_VERSIONS.find((v) => v.name === name)

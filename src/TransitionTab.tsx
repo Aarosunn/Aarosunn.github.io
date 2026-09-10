@@ -50,6 +50,9 @@ function Flight({ v, group, playing, onDone, onProgress }: { v: TransitionVersio
 export function TransitionTab({ v, setVersion, screen, setScreen, scheme }: { v: TransitionVersion; setVersion: (n: string) => void; screen: string; setScreen: (n: string) => void; scheme: string }) {
   const cube = CUBE_OF(screen)
   const solve = SOLVE_OF(screen) ?? cube
+  // the screen row under this version; switching version lands on its first screen
+  const screens = v.screens ?? ['flight', ...SOLVE_VERSIONS.map((x) => x.name), ...CUBE_VERSIONS.filter((x) => !x.alg).map((x) => x.name)]
+  useEffect(() => { if (!screens.includes(screen)) setScreen(screens[0]) }, [v.name]) // eslint-disable-line react-hooks/exhaustive-deps
   const grid = useRef<ScreenHandle | null>(null)
   const group = useRef<THREE.Group | null>(null)
   const [playing, setPlaying] = useState(0)
@@ -76,9 +79,8 @@ export function TransitionTab({ v, setVersion, screen, setScreen, scheme }: { v:
         </div>
         <div className="row">
           <span className="k">screen</span>
-          <button className={solve ? '' : 'on'} onClick={() => setScreen('flight')}>flight</button>
-          {[...SOLVE_VERSIONS, ...CUBE_VERSIONS].map((x) => (
-            <button key={x.name} className={x.name === screen ? 'on' : ''} onClick={() => setScreen(x.name)}>{x.name}</button>
+          {screens.map((name) => (
+            <button key={name} className={name === screen ? 'on' : ''} onClick={() => setScreen(name)}>{name}</button>
           ))}
         </div>
         <div className="row">
