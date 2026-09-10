@@ -282,3 +282,7 @@ Aaron: "give me a way to position the lotus how I see fit". For a version with `
 ## v16: the lotus as Aaron posed it (00:30, 2026-09-10)
 
 Aaron tinkered on the tab (zoom 1.5, finer steps, arrow keys) and pasted `{ flower: 'lotus', at: [0.18, -0.18, 0.09], scale: 0.69, rot: [-1.49, 0.4, 0.35], gain: 0.3, wire: 0.4 }` → v16, a copy of v15 with that entry; v15 stays as his base. Shot `shots/flowers/v16.png`.
+
+## v17: the orchid as Aaron posed it (00:40, 2026-09-10)
+
+Aaron: v16 "looked a bit wrong", new line `{ flower: 'orchid', at: [-0.1, -0.43, 0.39], scale: 0.73, rot: [-0.06, 0.09, 0], gain: 1 }` → v17 = v16 with that orchid. A pasted line carries one flower; anything else he moved on the tab is not in it, which is the likely mismatch. Shot `shots/flowers/v17.png`.
