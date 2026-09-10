@@ -18,8 +18,9 @@ export function FloralTab({ v, seed, flower, scheme, setVersion, setSeed, setFlo
   // pose: hand-adjust one placed flower with sliders; the readout prints the entry to paste into floralVersions.ts
   const [poseOf, setPoseOf] = useState<Record<string, Placed3>>({})
   const [posing, setPosing] = useState(0)
+  const [zoom, setZoom] = useState(1.5) // tab-only: camera closer for posing
   const placed = v.scene?.place
-  const shown: FloralVersion = useMemo(() => (placed ? { ...v, scene: { ...v.scene!, place: placed.map((p) => poseOf[`${v.name}/${p.flower}`] ?? p) } } : v), [v, placed, poseOf])
+  const shown: FloralVersion = useMemo(() => (placed ? { ...v, scene: { ...v.scene!, camDist: (v.scene!.camDist ?? 9.4) / zoom, place: placed.map((p) => poseOf[`${v.name}/${p.flower}`] ?? p) } } : v), [v, placed, poseOf, zoom])
   const cur = shown.scene?.place?.[posing]
   const setPose = (patch: Partial<Placed3>) => cur && setPoseOf((o) => ({ ...o, [`${v.name}/${cur.flower}`]: { ...cur, ...patch } }))
   const rot = cur?.rot ?? [0, 0, 0]
@@ -48,12 +49,13 @@ export function FloralTab({ v, seed, flower, scheme, setVersion, setSeed, setFlo
                 <button key={p.flower} className={i === posing ? 'on' : ''} onClick={() => setPosing(i)}>{p.flower}</button>
               ))}
               <button onClick={() => setPoseOf({})}>reset</button>
+              <Slider k="zoom" value={zoom} min={0.6} max={3} step={0.01} onChange={setZoom} />
             </div>
             {cur && (
               <div className="row">
-                {(['x', 'y', 'z'] as const).map((k, i) => <Slider key={k} k={k} value={cur.at[i]} min={-1.6} max={1.6} step={0.01} onChange={(n) => { const at = [...cur.at] as Placed3['at']; at[i] = n; setPose({ at }) }} />)}
-                {(['rx', 'ry', 'rz'] as const).map((k, i) => <Slider key={k} k={k} value={rot[i] * DEG} min={-180} max={180} step={1} onChange={(n) => { const r = [...rot] as [number, number, number]; r[i] = n / DEG; setPose({ rot: r }) }} />)}
-                <Slider k="scale" value={cur.scale} min={0.2} max={1.5} step={0.01} onChange={(n) => setPose({ scale: n })} />
+                {(['x', 'y', 'z'] as const).map((k, i) => <Slider key={k} k={k} value={cur.at[i]} min={-1.2} max={1.2} step={0.005} onChange={(n) => { const at = [...cur.at] as Placed3['at']; at[i] = n; setPose({ at }) }} />)}
+                {(['rx', 'ry', 'rz'] as const).map((k, i) => <Slider key={k} k={k} value={rot[i] * DEG} min={-180} max={180} step={0.5} onChange={(n) => { const r = [...rot] as [number, number, number]; r[i] = n / DEG; setPose({ rot: r }) }} />)}
+                <Slider k="scale" value={cur.scale} min={0.2} max={1.5} step={0.005} onChange={(n) => setPose({ scale: n })} />
               </div>
             )}
           </>
@@ -65,7 +67,7 @@ export function FloralTab({ v, seed, flower, scheme, setVersion, setSeed, setFlo
           ))}
         </div>}
       </div>
-      <div className={`floral-stage ${v.placement === 'bottom' ? 'floral-stage-page' : ''}`}>
+      <div className={`floral-stage ${v.placement === 'bottom' ? 'floral-stage-page' : ''} ${placed ? 'floral-stage-pose' : ''}`}>
         {v.placement === 'bottom' ? (
           // as on the site: a page-wide strip along the bottom
           <XrayFlower3D key={`${v.name}-${seed}`} v={v} seed={seed} width={1360} height={240} scheme={scheme} upright />
@@ -79,6 +81,7 @@ export function FloralTab({ v, seed, flower, scheme, setVersion, setSeed, setFlo
       <div className="readout">
         <span className="note">{v.note}</span>
         {cur && <code className="place">{placeLine(cur)} <button onClick={() => navigator.clipboard.writeText(placeLine(cur))}>copy</button></code>}
+        {cur && <span>click a slider, then arrow keys step it (page up / down for a tenth of the range); zoom is the tab's only</span>}
         <span>{v.scene?.place ? `/?floral=${v.name} shows it on the site` : mesh ? `/?floral=${v.name}&flower=${flower}&seed=${seed} shows it on the site` : `at 2× above, at the site's size below · /?floral=${v.name}&seed=${seed} shows it on the site`}</span>
       </div>
     </div>

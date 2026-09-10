@@ -146,8 +146,10 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+.floral-stage-pose { margin-top: 72px; }
 .pose { display: inline-flex; align-items: center; gap: 4px; margin-left: 10px; }
-.pose input[type='range'] { width: 90px; accent-color: var(--text); }
+.pose input[type='range'] { width: 200px; accent-color: var(--text); }
+.pose input[type='range']:focus-visible { outline: 1px solid var(--text); outline-offset: 3px; }
 .pose .val { color: var(--mute); min-width: 4ch; font-variant-numeric: tabular-nums; }
 .readout .place { color: var(--text); margin-bottom: 6px; white-space: pre-wrap; text-align: right; }
 .readout .note {
