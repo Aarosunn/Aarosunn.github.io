@@ -76,7 +76,7 @@ const LASER_FRAG = /* glsl */ `
   }
 `
 
-const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: boolean }>(function Cube({ v, scheme, recoil }, ref) {
+const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: boolean; weld: boolean }>(function Cube({ v, scheme, recoil, weld }, ref) {
   const { size, camera } = useThree()
   const W = size.width, H = size.height
   const cw = W / 3, ch = H / 3
@@ -223,6 +223,14 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: 
       const mode: WeldMode = v.weldMode ?? 'radial'
       const w0 = landed + 0.1
       const r = { v: 0 }
+      if (!weld) {
+        // no weld: the gaps close and the seams fade, the page is simply whole again
+        seams.current.forEach((s) => { s.material.uniforms.uBead.value = 0 })
+        const h = { v: 1 }
+        tl.to(h, { v: 0, duration: 0.5, ease: 'power2.inOut', onUpdate: () => seams.current.forEach((s) => { s.material.uniforms.uHeat.value = h.v }) }, w0)
+        tl.to(gp, { g: 0, duration: 0.5, ease: 'power2.inOut', onUpdate: () => setGap(gp.g) }, w0)
+        return
+      }
       if (mode === 'radial') {
         const pts = [0, 1, 2].map(() => { const onH = Math.random() < 0.5; const n = 1 + Math.floor(Math.random() * 2); const a = Math.random() - 0.5; return onH ? new THREE.Vector2(a * W, H / 2 - (n * H) / 3) : new THREE.Vector2(-W / 2 + (n * W) / 3, a * H) })
         const reach = Math.max(...pts.map((p) => Math.hypot(W / 2 + Math.abs(p.x), H / 2 + Math.abs(p.y)))) * 0.75
@@ -256,14 +264,14 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: 
       tl.to(gp, { g: 0, duration: v.weld, ease: 'power2.inOut', onUpdate: () => setGap(gp.g) }, w0)
       tl.call(() => seams.current.forEach((s) => { s.material.uniforms.uHeat.value = 0; s.material.uniforms.uBead.value = 0 }), [], w0 + v.weld)
     }),
-  }), [v, textures, W, H, recoil])
+  }), [v, textures, W, H, recoil, weld])
   return <group ref={root} />
 })
 
-export const CubeScreen = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil?: boolean }>(function CubeScreen({ v, scheme, recoil = true }, ref) {
+export const CubeScreen = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil?: boolean; weld?: boolean }>(function CubeScreen({ v, scheme, recoil = true, weld = true }, ref) {
   return (
     <Canvas className="transition-canvas" dpr={[1, 2]} camera={{ fov: FOV, position: [0, 0, 1000] }} gl={{ antialias: true }}>
-      <Cube ref={ref} v={v} scheme={scheme} recoil={recoil} />
+      <Cube ref={ref} v={v} scheme={scheme} recoil={recoil} weld={weld} />
     </Canvas>
   )
 })

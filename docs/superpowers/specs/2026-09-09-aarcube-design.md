@@ -343,3 +343,7 @@ Aaron: likes the three algorithms and no recoil (recoil toggle defaults off); "f
 ## w4: branching weld, fast start, slow end (06:30, 2026-09-10)
 
 Aaron: "I like w1 branching, but faster start and slow down near end" → w4 under v3: w1 with `weldEase: 'power2.out'` on the erase radius (the lasers cover most of the grid in the first half second and creep to the last corners). w1 kept.
+
+## Weld on / off (06:45, 2026-09-10)
+
+Aaron: "add a weld on and off toggle, for v3, where it just merges seamlessly after the turns". The tab's toggle row now has `weld on / off` next to recoil; off skips the laser and, once the turns land, closes the gaps and fades the seam scars over half a second. Timed: a pass with the weld off runs ~2.3 s.
