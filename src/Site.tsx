@@ -107,6 +107,8 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
   // the whole sequence's phase: 'out' while going or coming (nothing else may start), 'in' on the page, null at home
   const phase = useRef<'out' | 'in' | null>(null)
   const [section, setSection] = useState<number | null>(null)
+  // one array per section: a fresh array each render would rebuild the screen cube's textures and reset it mid-trip
+  const projects = useMemo(() => (section === null ? PROJECTS : projectsOf(SECTIONS[section].id)), [section])
   const [flying, setFlying] = useState(false)
   const away = flying || section !== null
   const [hidden, setHidden] = useState(false) // the page around the cube, faded out before take-off and back in on landing home
@@ -265,7 +267,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       {/* the section page: the screen as a cube, faded in over the landing; the wordmark (or escape) flies home */}
       {section !== null && (
         <div className="section-page" ref={overlay}>
-          <CubeScreen key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} blank projects={projectsOf(SECTIONS[section].id)} />
+          <CubeScreen key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} blank projects={projects} />
           <div className="grain" />
           <button className="wordmark home" onClick={home} aria-label="home">aarcube</button>
           <div className="page-hint"><span>{SECTIONS[section].title.toLowerCase()}</span><button onClick={() => grid.current?.next()}>next (n)</button><button onClick={home}>home (esc)</button></div>

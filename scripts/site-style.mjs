@@ -1,0 +1,23 @@
+// The section page next to the home page, with the palette sampled from both -> shots/sheet-site-style.png
+import { chromium } from 'playwright'
+import { execSync } from 'node:child_process'
+const browser = await chromium.launch({ channel: 'chromium', env: { ...process.env, __NV_PRIME_RENDER_OFFLOAD: '1', __GLX_VENDOR_LIBRARY_NAME: 'nvidia' }, args: ['--ignore-gpu-blocklist', '--use-gl=angle', '--use-angle=gl'] })
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+await page.goto('http://localhost:5173/')
+await page.waitForFunction(() => window.__aarNav && document.querySelector('canvas')?.width > 300)
+await page.waitForTimeout(3000)
+await page.screenshot({ path: 'shots/site/style-home.png' })
+const vars = await page.evaluate(() => { const s = getComputedStyle(document.documentElement); return Object.fromEntries(['bg', 'bg2', 'line', 'mute', 'text', 'bright', 'b'].map((k) => [k, s.getPropertyValue('--' + k).trim()])) })
+page.evaluate(() => { window.__aarNav.go(1) })
+await page.waitForTimeout(3200)
+await page.screenshot({ path: 'shots/site/style-landed.png' })
+await page.waitForFunction(() => !window.__aarNav.busy(), null, { timeout: 20000 })
+await page.waitForTimeout(600)
+const buf = await page.screenshot({ path: 'shots/site/style-page.png' })
+await page.screenshot({ path: 'shots/site/style-hero.png', clip: { x: 740, y: 130, width: 600, height: 580 } })
+const q = await browser.newPage()
+const px = await q.evaluate((b64) => new Promise((res) => { const im = new Image(); im.onload = () => { const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.drawImage(im, 0, 0); const at = (x, y) => '#' + Array.from(g.getImageData(x, y, 1, 1).data).slice(0, 3).map((v) => v.toString(16).padStart(2, '0')).join(''); res({ pageBg: at(300, 700), heroPanel: at(800, 200), gridLine: at(Math.round(1440 * 0.52 + 1440 * 0.4 / 8), 300), ring: at(Math.round(1440 * 0.72), Math.round(900 * 0.47 - Math.min(1440 * 0.4, 900 * 0.62) * 0.18)) }) }; im.src = 'data:image/png;base64,' + b64 }), buf.toString('base64'))
+console.log('site vars', JSON.stringify(vars))
+console.log('page px  ', JSON.stringify(px))
+await browser.close()
+execSync('node scripts/sheet.mjs shots/sheet-site-style.png home=shots/site/style-home.png landed=shots/site/style-landed.png page=shots/site/style-page.png --cols 3 --w 2400', { stdio: 'inherit' })

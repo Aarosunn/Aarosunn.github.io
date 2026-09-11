@@ -15,8 +15,9 @@ export type Scheme = {
   b: string
 }
 
-/** the blank tile the site cube drains to as it lands, and the screen cube starts from (Site / CubeScreen) */
-export const TILE = '#bfe6da'
+/** the blank tile the site cube drains to as it lands, and the screen cube starts from (Site / CubeScreen): the cube's own
+ *  dark teal plate tone (sampled from the site: its dark quartile is about 4,46,42), so the landing reads as the cube dimming to a screen */
+export const TILE = '#0a2b28'
 
 export const SCHEMES: Scheme[] = [
   {

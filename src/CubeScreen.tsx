@@ -107,7 +107,7 @@ const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: bo
   const W = size.width, H = size.height
   const cw = W / 3, ch = H / 3
   // the page in the site's scheme: its background, its text greys, the mint (scheme b, the cube's own hue) as the accent
-  const colors = useMemo<PageColors>(() => { const sc = SCHEMES.find((x) => x.name === scheme) ?? SCHEMES[0]; return { bg: sc.bg, text: sc.text, bright: sc.bright, mute: sc.mute, a: sc.b } }, [scheme])
+  const colors = useMemo<PageColors>(() => { const sc = SCHEMES.find((x) => x.name === scheme) ?? SCHEMES[0]; return { bg: sc.bg, bg2: sc.bg2, line: sc.line, text: sc.text, bright: sc.bright, mute: sc.mute, a: sc.b } }, [scheme])
   useEffect(() => {
     const cam = camera as THREE.PerspectiveCamera
     cam.fov = FOV; cam.position.set(0, 0, H / 2 / Math.tan((FOV * Math.PI) / 360)); cam.near = 1; cam.far = cam.position.z * 6; cam.updateProjectionMatrix()
@@ -122,7 +122,7 @@ const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: bo
   // square: the landed cube's face (tiles of the short side's third); the root scales from there to the viewport's thirds
   const square = () => (W >= H ? [H / W, 1] : [1, W / H])
   const root = useRef<THREE.Group>(null!)
-  const state = useRef({ cube: solvedCube(blank), busy: false, depth: cw, project: blank ? -1 : 0 })
+  const state = useRef({ cube: solvedCube(blank), busy: false, depth: cw, project: blank ? -1 : 0, landed: false })
   const groups = useRef<THREE.Group[]>([])
   const seams = useRef<THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>[]>([])
   const body = useMemo(() => new THREE.MeshBasicMaterial({ color: '#0b0e13' }), [])
@@ -176,7 +176,7 @@ const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: bo
     })
     build(cw)
     // a blank cube is the landed site cube: square tiles with the seams open
-    if (blank) { const [sx, sy] = square(); g.scale.set(sx, sy, 1); setGap(landedGap()); seams.current.forEach((s) => { s.material.uniforms.uHeat.value = 0 }) }
+    if (blank && !state.current.landed) { state.current.landed = true; const [sx, sy] = square(); g.scale.set(sx, sy, 1); setGap(landedGap()); seams.current.forEach((s) => { s.material.uniforms.uHeat.value = 0 }) }
     return () => { seams.current.forEach((s) => { s.material.dispose(); s.geometry.dispose(); g.remove(s) }); groups.current.forEach((c) => g.remove(c)) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [W, H, textures, colors.a])

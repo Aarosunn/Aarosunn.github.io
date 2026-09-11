@@ -24,7 +24,8 @@ export const PROJECTS = [
   { title: 'camera rig', meta: 'hardware · 2026', blurb: 'a hand-tracking camera rig that knows which finger is which.' },
   { title: 'ascii portrait', meta: 'creatives · 2026', blurb: 'a portrait in text that watches back.' },
 ]
-export type PageColors = { bg: string; text: string; bright: string; mute: string; a: string }
+/** the page in the site's own palette: bg, the panel tone (bg2), hairlines (line), the text greys, and the mint only as a thin accent */
+export type PageColors = { bg: string; bg2: string; line: string; text: string; bright: string; mute: string; a: string }
 /** one project drawn as a page at the viewport's size */
 export function pageTexture(p: (typeof PROJECTS)[number], w: number, h: number, colors: PageColors, t = 1) {
   const c = document.createElement('canvas')
@@ -46,14 +47,15 @@ export function paintPage(c: HTMLCanvasElement, p: (typeof PROJECTS)[number], w:
   // a hero block on the right with a faint grid, like a placeholder still
   const portrait = h > w
   const hero = portrait ? { x: w * 0.08, y: h * 0.42, w: w * 0.84, h: h * 0.4 } : { x: w * 0.52, y: h * 0.16, w: w * 0.4, h: h * 0.62 }
-  g.fillStyle = '#0a1210'; g.fillRect(hero.x, hero.y, hero.w, hero.h)
-  g.strokeStyle = colors.a + '55'; g.lineWidth = 1
+  g.fillStyle = colors.bg2; g.fillRect(hero.x, hero.y, hero.w, hero.h)
+  g.strokeStyle = colors.line; g.lineWidth = 1
   // the grid draws in: each line grows along its length, one after another
   const drawn = (k: number, n: number) => Math.min(1, Math.max(0, t * (n + 2) - k))
   for (let i = 1; i < 8; i++) { const f = drawn(i - 1, 7); if (f <= 0) continue; g.beginPath(); g.moveTo(hero.x + (hero.w * i) / 8, hero.y); g.lineTo(hero.x + (hero.w * i) / 8, hero.y + hero.h * f); g.stroke() }
   for (let i = 1; i < 6; i++) { const f = drawn(i - 1, 5); if (f <= 0) continue; g.beginPath(); g.moveTo(hero.x, hero.y + (hero.h * i) / 6); g.lineTo(hero.x + hero.w * f, hero.y + (hero.h * i) / 6); g.stroke() }
+  // the mint as the site uses it: a hairline ring and a small tick, not a filled shape
   const grow = 1 - Math.pow(1 - Math.min(1, Math.max(0, (t - 0.3) / 0.7)), 3)
-  if (grow > 0) { g.fillStyle = colors.a; g.beginPath(); g.arc(hero.x + hero.w * 0.5, hero.y + hero.h * 0.5, Math.min(hero.w, hero.h) * 0.18 * grow, 0, Math.PI * 2); g.fill() }
+  if (grow > 0) { const cx = hero.x + hero.w * 0.5, cy = hero.y + hero.h * 0.5, R = Math.min(hero.w, hero.h) * 0.18; g.strokeStyle = colors.a + 'aa'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, R * grow, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * grow); g.stroke(); g.fillStyle = colors.a; g.fillRect(cx - 4, cy, 8 * grow, 1) }
   const left = w * 0.08
   const top = portrait ? h * 0.14 : h * 0.3
   g.fillStyle = colors.mute; g.font = `400 ${portrait ? 12 : 13}px "Geist Mono", ui-monospace, monospace`
@@ -98,7 +100,7 @@ type Seam = { mesh: THREE.Mesh; mat: THREE.ShaderMaterial; dir: 'h' | 'v' }
 const Grid = forwardRef<ScreenHandle, { v: SolveVersion; scheme: string }>(function Grid({ v, scheme }, ref) {
   const { size, camera } = useThree()
   const W = size.width, H = size.height
-  const colors = useMemo(() => { const sc = SCHEMES.find((x) => x.name === scheme) ?? SCHEMES[0]; return { bg: sc.bg, text: sc.text, bright: sc.bright, mute: sc.mute, a: sc.b } }, [scheme])
+  const colors = useMemo(() => { const sc = SCHEMES.find((x) => x.name === scheme) ?? SCHEMES[0]; return { bg: sc.bg, bg2: sc.bg2, line: sc.line, text: sc.text, bright: sc.bright, mute: sc.mute, a: sc.b } }, [scheme])
   // the z=0 plane maps to the viewport exactly: world units are CSS pixels
   useEffect(() => {
     const cam = camera as THREE.PerspectiveCamera
