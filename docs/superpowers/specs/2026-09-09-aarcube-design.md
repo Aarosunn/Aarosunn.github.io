@@ -363,3 +363,7 @@ Aaron: "w4 branching is definitely the best… incorporate the transition stuff 
 ## Fade the page before the flight, and the ascii with it (22:50, 2026-09-10)
 
 Aaron: "there needs to be a fade out and in of the surrounding components before the cube flies and when it returns, also make the ascii also fade out". The timeline now opens with a 0.6 s beat (`PRE`): the site UI fades (CSS transition on `.ui.site`, class `away` from a `hidden` state) and the ascii outline with it (new `u_asciiMul` uniform on the paper pass, driven through the fly handle's `ascii(k)`), the cube resting alone on the page; the flight starts after. Reversed, a callback at the take-off point fires as the cube lands home and brings the page back while the glyphs fade in over the same 0.6 s. Sheets `shots/sheet-site-go-land/port.png`: at 300 ms the sections and glyphs are half gone, at 600 ms the cube alone, home lands at ~2.3 s with the page returning around it.
+
+## Longer fades (23:00, 2026-09-10)
+
+Aaron: "the fade out and in are too short" → `PRE` 0.6 → 1.2 s, the CSS transition on `.ui.site` to match. Sheet: the page and glyphs go over the first 1.2 s (half gone at 400 ms, gone by 1.2 s), the cube alone from 1.2 s, flying from then; home lands at ~2.3 s and the page is fully back by ~3.5 s.
