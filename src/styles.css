@@ -377,8 +377,10 @@ button:focus-visible {
   opacity: 0.26;
   pointer-events: none;
 }
-/* the hand-placed group: its height is GROUP_H in Site.tsx (shrinks with a short viewport) */
-.floral.xray.group { margin-top: -74px; }
+/* the hand-placed group: --fh is its layout footprint (222 px on a 900 px screen, shrinking with a short viewport); the
+   canvas is 1.5× taller than that (GROUP_OVER in Site.tsx, the camera that much farther) and hangs over both ends by
+   negative margins, so the flowers keep their size with headroom above and below instead of being cut at the canvas edge */
+.floral.xray.group { --fh: clamp(120px, calc(100vh - 678px), 222px); height: calc(var(--fh) * 1.5); margin-top: calc(-74px - var(--fh) * 0.25); margin-bottom: calc(var(--fh) * -0.25); }
 .site-base:has(.floral.xray.group) { padding-top: 12px; }
 /* a short window (a laptop with browser chrome): the About portrait is what keeps the left column from shrinking */
 @media (max-height: 840px) { .site .portrait { display: none; } }

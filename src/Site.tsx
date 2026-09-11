@@ -60,9 +60,10 @@ const FOV = 30 // the mask camera's vertical fov (Canvas below)
 const PRE = 1
 const LEAD = 0.5
 const UI_EASE = 'expo.out'
-/** the hand-placed floral group's box: 222 px on a 900 px screen, shrinking with a shorter viewport so the base row (and the
- *  flowers' lowest petals) never run off the bottom; the group's framing follows the vertical fov, so it scales, not crops */
-const GROUP_H = 'clamp(120px, calc(100vh - 678px), 222px)'
+/** the hand-placed floral group's canvas is `GROUP_OVER` times taller than its layout footprint (`--fh` in styles.css, 222 px on a
+ *  900 px screen, shrinking with a shorter viewport so the base row never runs off the bottom) and the camera that much
+ *  farther, so the flowers keep their size with headroom above and below: their petals were being cut by the canvas edge */
+const GROUP_OVER = 1.5
 /** a section's projects: those tagged with its id in PROJECTS; a section with none shows them all */
 const projectsOf = (id: string) => { const own = PROJECTS.filter((p) => p.meta.startsWith(id)); return own.length ? own : PROJECTS }
 
@@ -80,7 +81,7 @@ const SITE_THEMES: [string, string][] = [['ice grain', 'ice'], ['mint grain', 'm
 export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#07090c', floral = 'v18', floralSeed = 3, flower }: { version?: string; scheme?: string; bg?: string; floral?: string; floralSeed?: number; flower?: string }) {
   const xray0 = FLORAL_OF(floral)
   // the hand-placed group (v14+) sits in the base row a little closer than the tab shows it, in a taller box
-  const xray = useMemo(() => (xray0?.scene?.place ? { ...xray0, scene: { ...xray0.scene, camDist: (xray0.scene.camDist ?? 9.4) / 1.9 } } : xray0), [xray0])
+  const xray = useMemo(() => (xray0?.scene?.place ? { ...xray0, scene: { ...xray0.scene, camDist: ((xray0.scene.camDist ?? 9.4) / 1.9) * GROUP_OVER } } : xray0), [xray0])
   const [active, setActive] = useState(0)
   const [version, setVersion] = useState(VERSION_OF(initial) ? initial : 'v18')
   // a deep-linked version outside the curated cycle still cycles from itself
@@ -287,7 +288,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
           </aside>
         )}
         <div className="site-base">
-          {xray?.placement === 'bottom' ? null : xray ? (xray.kind === 'mesh' ? <XrayFlower3D v={xray} flower={flower} seed={floralSeed} height={xray.scene?.place ? GROUP_H : undefined} className={`floral xray ${xray.scene?.place ? 'group' : ''}`} scheme={scheme} /> : <XrayFloral v={xray} seed={floralSeed} className="floral xray" scheme={scheme} />) : <Floral className="floral" seed={11 + 7 * Math.max(0, SCHEMES.findIndex((x) => x.name === scheme))} />}
+          {xray?.placement === 'bottom' ? null : xray ? (xray.kind === 'mesh' ? <XrayFlower3D v={xray} flower={flower} seed={floralSeed} height={xray.scene?.place ? 'css' : undefined} className={`floral xray ${xray.scene?.place ? 'group' : ''}`} scheme={scheme} /> : <XrayFloral v={xray} seed={floralSeed} className="floral xray" scheme={scheme} />) : <Floral className="floral" seed={11 + 7 * Math.max(0, SCHEMES.findIndex((x) => x.name === scheme))} />}
           {layout === 'deck' && (
             <div className="deck-blurb">
               <h2>{SECTIONS[active].title}</h2>

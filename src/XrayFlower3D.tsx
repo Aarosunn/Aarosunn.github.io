@@ -216,7 +216,7 @@ function Look({ at }: { at: [number, number, number] }) {
   return null
 }
 
-export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, height = XF_H, className, scheme: pageScheme, upright = false }: { v: FloralVersion; flower?: string; seed?: number; width?: number; height?: number | string; className?: string; scheme?: string; upright?: boolean }) {
+export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, height = XF_H, className, scheme: pageScheme, upright = false }: { v: FloralVersion; flower?: string; seed?: number; width?: number; height?: number | 'css'; className?: string; scheme?: string; upright?: boolean }) {
   const scheme = v.scheme ?? pageScheme
   const spec = FLOWER_OF(flower)
   const f = useMemo(() => buildFlower(seed, spec, upright, v.buds !== false, 1, v.pollen !== false), [seed, spec, upright, v.buds, v.pollen])
@@ -253,10 +253,10 @@ export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, heig
   const scene = !!v.scene
   const cam = { position: (scene ? [0, strip ? 1.0 : 1.1, camDist] : [0, 0, upright ? 4.9 : 6.8]) as [number, number, number], fov: 30 }
   // a hand-placed group sits a little higher in its box (its lowest petals were cut by the site's base row)
-  const lookAt: [number, number, number] = [0, strip ? 0.05 : v.scene?.place ? -0.36 : -0.25, 0]
+  const lookAt: [number, number, number] = [0, strip ? 0.05 : v.scene?.place ? -0.27 : -0.25, 0]
   const blur = v.blur ?? 0
   return (
-    <div className={`xf3d ${className ?? ''}`} style={{ position: 'relative', width, height }}>
+    <div className={`xf3d ${className ?? ''}`} style={{ position: 'relative', width, height: height === 'css' ? undefined : height }}>
       <Canvas dpr={[1, 2]} camera={cam} gl={{ antialias: true, alpha: true }} style={{ position: 'absolute', inset: 0, filter: blur > 0 ? `blur(${blur}px)` : undefined, opacity: v.dim ?? 1 }} frameloop="always">
         {scene && <Look at={lookAt} />}
         {v.foliage !== false && (scene ? planted.map((p, i) => <group key={i} position={p.position} scale={p.scale} rotation={p.rotation}><group position={p.offset}><Foliage f={p.f} v={v} colors={colors} gainMul={p.gain} /></group></group>) : <Foliage f={f} v={v} colors={colors} />)}
