@@ -128,7 +128,7 @@ export default function App() {
   if (tab === 'site')
     return (
       <>
-        <Site scheme={s.name} bg={s.bg} version={q.get('v') ?? undefined} floral={q.get('floral') ?? undefined} floralSeed={Number(q.get('seed') ?? 3)} flower={q.get('flower') ?? undefined} />
+        <Site scheme={s.name} bg={s.bg} version={q.get('v') ?? undefined} floral={q.get('floral') ?? undefined} floralSeed={Number(q.get('seed') ?? 3)} flower={q.get('flower') ?? undefined} site={q.get('sv') ?? undefined} />
         <div className="site-tabs">{tabs}</div>
       </>
     )

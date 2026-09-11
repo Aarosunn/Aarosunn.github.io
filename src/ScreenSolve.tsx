@@ -25,7 +25,10 @@ export const PROJECTS = [
   { title: 'ascii portrait', meta: 'creatives · 2026', blurb: 'a portrait in text that watches back.' },
 ]
 /** the page in the site's own palette: bg, the panel tone (bg2), hairlines (line), the text greys, and the mint only as a thin accent */
-export type PageColors = { bg: string; bg2: string; line: string; text: string; bright: string; mute: string; a: string }
+export type PageColors = { bg: string; bg2: string; line: string; text: string; bright: string; mute: string; a: string; disc: 'fill' | 'ring' }
+/** the two page looks: 'classic' (the first pages: own greys, the accent as a filled disc) and 'site' (the site's palette, hairline grid, a ring) */
+export const pageColors = (sc: { bg: string; bg2: string; line: string; text: string; bright: string; mute: string; a: string; b: string }, look: 'classic' | 'site'): PageColors =>
+  look === 'classic' ? { bg: '#0b0e13', bg2: '#0e1219', line: sc.a + '55', text: '#c9cdd8', bright: '#f2f3f7', mute: '#6b7185', a: sc.a, disc: 'fill' } : { bg: sc.bg, bg2: sc.bg2, line: sc.line, text: sc.text, bright: sc.bright, mute: sc.mute, a: sc.b, disc: 'ring' }
 /** one project drawn as a page at the viewport's size */
 export function pageTexture(p: (typeof PROJECTS)[number], w: number, h: number, colors: PageColors, t = 1) {
   const c = document.createElement('canvas')
@@ -55,7 +58,9 @@ export function paintPage(c: HTMLCanvasElement, p: (typeof PROJECTS)[number], w:
   for (let i = 1; i < 6; i++) { const f = drawn(i - 1, 5); if (f <= 0) continue; g.beginPath(); g.moveTo(hero.x, hero.y + (hero.h * i) / 6); g.lineTo(hero.x + hero.w * f, hero.y + (hero.h * i) / 6); g.stroke() }
   // the mint as the site uses it: a hairline ring and a small tick, not a filled shape
   const grow = 1 - Math.pow(1 - Math.min(1, Math.max(0, (t - 0.3) / 0.7)), 3)
-  if (grow > 0) { const cx = hero.x + hero.w * 0.5, cy = hero.y + hero.h * 0.5, R = Math.min(hero.w, hero.h) * 0.18; g.strokeStyle = colors.a + 'aa'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, R * grow, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * grow); g.stroke(); g.fillStyle = colors.a; g.fillRect(cx - 4, cy, 8 * grow, 1) }
+  if (grow > 0) { const cx = hero.x + hero.w * 0.5, cy = hero.y + hero.h * 0.5, R = Math.min(hero.w, hero.h) * 0.18
+    if (colors.disc === 'fill') { g.fillStyle = colors.a; g.beginPath(); g.arc(cx, cy, R * grow, 0, Math.PI * 2); g.fill() }
+    else { g.strokeStyle = colors.a + 'aa'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, R * grow, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * grow); g.stroke(); g.fillStyle = colors.a; g.fillRect(cx - 4, cy, 8 * grow, 1) } }
   const left = w * 0.08
   const top = portrait ? h * 0.14 : h * 0.3
   g.fillStyle = colors.mute; g.font = `400 ${portrait ? 12 : 13}px "Geist Mono", ui-monospace, monospace`
@@ -100,7 +105,7 @@ type Seam = { mesh: THREE.Mesh; mat: THREE.ShaderMaterial; dir: 'h' | 'v' }
 const Grid = forwardRef<ScreenHandle, { v: SolveVersion; scheme: string }>(function Grid({ v, scheme }, ref) {
   const { size, camera } = useThree()
   const W = size.width, H = size.height
-  const colors = useMemo(() => { const sc = SCHEMES.find((x) => x.name === scheme) ?? SCHEMES[0]; return { bg: sc.bg, bg2: sc.bg2, line: sc.line, text: sc.text, bright: sc.bright, mute: sc.mute, a: sc.b } }, [scheme])
+  const colors = useMemo(() => { const sc = SCHEMES.find((x) => x.name === scheme) ?? SCHEMES[0]; return pageColors(sc, 'classic') }, [scheme])
   // the z=0 plane maps to the viewport exactly: world units are CSS pixels
   useEffect(() => {
     const cam = camera as THREE.PerspectiveCamera

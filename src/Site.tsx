@@ -10,6 +10,7 @@ import gsap from 'gsap'
 import { PaperCube, type FlyHandle } from './PaperCube'
 import { CubeScreen, type CubeHandle } from './CubeScreen'
 import { CUBE_OF, TRANSITION_OF } from './transitionVersions'
+import { SITE_TRANSITION_OF, SITE_TRANSITIONS, type SiteVersion } from './siteVersions'
 import { PROJECTS } from './ScreenSolve'
 import { VERSION_OF } from './paperVersions'
 import { presetNamed } from './paperPresets'
@@ -49,10 +50,9 @@ const SECTIONS: Section[] = [
   },
 ]
 
-/** the section transition: the site cube spins and flies into the camera (the transition tab's v1 flight), the
- *  section page fades in over the landing; the page is the screen-as-cube with Aaron's picks (w4 branching eased weld,
- *  no recoil); home reverses the same flight */
-const FLIGHT = TRANSITION_OF('v5')!
+/** the section transition (a site version, `SITE_VERSIONS`: s1 the face overfills and the page fades in, s2 the cube lands
+ *  square, dims, stretches and solves the page in); the page is the screen-as-cube with Aaron's picks (w4 branching eased
+ *  weld, no recoil); home reverses the same flight */
 const PAGE = CUBE_OF('w4 branching eased')!
 const FOV = 30 // the mask camera's vertical fov (Canvas below)
 /** before take-off the page around the cube fades out (and the ascii outline with it, `UI_EASE` = the CSS --ease); the flight
@@ -83,7 +83,10 @@ export const ALG_KEYS: Record<string, string> = { j: 'T perm', k: 'U perm', l: '
 /** the site cube's themes (v14 / v15), key g cycles; the on-screen toggle is gone since Aaron settled on mint grain */
 const SITE_THEMES: [string, string][] = [['ice grain', 'ice'], ['mint grain', 'mint'], ['icemint grain soft', 'icemint']]
 
-export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#07090c', floral = 'v18', floralSeed = 3, flower }: { version?: string; scheme?: string; bg?: string; floral?: string; floralSeed?: number; flower?: string }) {
+export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#07090c', floral = 'v18', floralSeed = 3, flower, site: siteInitial = 's1' }: { version?: string; scheme?: string; bg?: string; floral?: string; floralSeed?: number; flower?: string; site?: string }) {
+  // the section transition's version (key t cycles); FLIGHT is its flight
+  const [sv, setSv] = useState<SiteVersion>(SITE_TRANSITION_OF(siteInitial) ?? SITE_TRANSITIONS[0])
+  const FLIGHT = TRANSITION_OF(sv.flight)!
   const xray0 = FLORAL_OF(floral)
   // the hand-placed group (v14+) sits in the base row a little closer than the tab shows it, in a taller box
   const xray = useMemo(() => (xray0?.scene?.place ? { ...xray0, scene: { ...xray0.scene, camDist: ((xray0.scene.camDist ?? 9.4) / 1.9) * GROUP_OVER } } : xray0), [xray0])
@@ -134,7 +137,9 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     const dist = h.half / Math.tan((FOV * Math.PI) / 360) / FLIGHT.overshoot
     const to = cam.position.clone().addScaledVector(cam.getWorldDirection(new THREE.Vector3()), dist)
     const zoom = { k: 1 }
-    const kFill = Math.min(window.innerWidth / window.innerHeight, 1) / h.scale0
+    // 'stretch' lands the square face on the viewport's short side; 'fade' overfills the viewport (the window grows to its long side)
+    const aspect = window.innerWidth / window.innerHeight
+    const kFill = (sv.join === 'stretch' ? Math.min(aspect, 1) : Math.max(aspect, 1)) / h.scale0
     const flat = { k: 0 }
     const dur = reduced ? 0.01 : FLIGHT.duration
     const pre = reduced ? 0.01 : PRE
@@ -147,6 +152,8 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     const landing = new Promise<void>((res) => { landed = res })
     const t = gsap.timeline({
       onComplete: () => landed(),
+      // 'fade': the page fades in over the flight's last stretch (and out again on the way home)
+      onUpdate: () => { if (sv.join === 'fade' && overlay.current) overlay.current.style.opacity = String(Math.min(1, Math.max(0, (t.time() - lead - FLIGHT.fadeAt * dur) / ((1 - FLIGHT.fadeAt) * dur)))) },
       onReverseComplete: () => { tl.current = null; phase.current = null; h.zoom(1); h.ascii(1); h.flat(0, TILE); setHidden(false); setStill(false); setSection(null); setFlying(false) },
     })
     // 1. the surroundings fade (CSS, `hidden`) and the ascii outline with them; 2. the flight from `lead`; reversed, the
@@ -155,14 +162,16 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     t.to(root.rotation, { x: e.x + Math.PI * 2 * FLIGHT.spin[0], y: ey + Math.PI * 2 * FLIGHT.spin[1], z: e.z, duration: dur, ease: FLIGHT.spinEase }, lead)
     t.to(root.position, { x: to.x, y: to.y, z: to.z, duration: dur, ease: FLIGHT.approachEase }, lead)
     t.to(zoom, { k: kFill, duration: dur, ease: FLIGHT.approachEase, onUpdate: () => h.zoom(zoom.k) }, lead)
-    // the look drains to flat tiles as it lands
-    t.to(flat, { k: 1, duration: reduced ? 0.01 : DRAIN, ease: 'power1.inOut', onUpdate: () => h.flat(flat.k, TILE) }, lead + dur - (reduced ? 0.01 : DRAIN))
+    // 'stretch': the look drains to flat tiles as it lands
+    if (sv.join === 'stretch') t.to(flat, { k: 1, duration: reduced ? 0.01 : DRAIN, ease: 'power1.inOut', onUpdate: () => h.flat(flat.k, TILE) }, lead + dur - (reduced ? 0.01 : DRAIN))
     tl.current = t
     await landing
-    // the screen cube takes over: same square tiles, same seams; it stretches to the viewport and solves the page in
-    await new Promise<void>((res) => gsap.to(overlay.current, { opacity: 1, duration: SWAP, ease: 'none', onComplete: res }))
-    await grid.current?.stretch(true, STRETCH)
-    await grid.current?.next()
+    if (sv.join === 'stretch') {
+      // the screen cube takes over: same square tiles, same seams; it stretches to the viewport and solves the page in
+      await new Promise<void>((res) => gsap.to(overlay.current, { opacity: 1, duration: SWAP, ease: 'none', onComplete: res }))
+      await grid.current?.stretch(true, STRETCH)
+      await grid.current?.next()
+    }
     phase.current = 'in'
     setFlying(false)
   }
@@ -171,15 +180,17 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     if (!t || phase.current !== 'in') return
     phase.current = 'out'
     setFlying(true)
-    // the page solves away to blank tiles, the cube shrinks square, the site cube shows through, then flies home
-    await grid.current?.clear()
-    await grid.current?.stretch(false, STRETCH)
-    await new Promise<void>((res) => gsap.to(overlay.current, { opacity: 0, duration: SWAP, ease: 'none', onComplete: res }))
+    if (sv.join === 'stretch') {
+      // the page solves away to blank tiles, the cube shrinks square, the site cube shows through, then flies home
+      await grid.current?.clear()
+      await grid.current?.stretch(false, STRETCH)
+      await new Promise<void>((res) => gsap.to(overlay.current, { opacity: 0, duration: SWAP, ease: 'none', onComplete: res }))
+    }
     t.reverse()
   }
   const goRef = useRef({ go, home })
   goRef.current = { go, home }
-  useEffect(() => { window.__aarNav = { go: (i) => goRef.current.go(i), home: () => goRef.current.home(), next: () => grid.current?.next() ?? Promise.resolve(), busy: () => phase.current === 'out' || (grid.current?.busy() ?? false), section: () => section, rotY: () => fly.current?.root.rotation.y ?? 0, dbg: () => grid.current?.dbg() } }, [section])
+  useEffect(() => { window.__aarNav = { go: (i) => goRef.current.go(i), home: () => goRef.current.home(), next: () => grid.current?.next() ?? Promise.resolve(), busy: () => phase.current === 'out' || (grid.current?.busy() ?? false), section: () => section, rotY: () => fly.current?.root.rotation.y ?? 0, dbg: () => grid.current?.dbg(), setVersion: (n: string) => { const v = SITE_TRANSITION_OF(n); if (v) setSv(v) }, version: () => sv.name } }, [section, sv])
   // the lab's v1 at its own camera (blur radii are frame-relative, so the cube stays crisp);
   // paper's `scale` shrinks the whole image on screen so the sections breathe
   const narrow = typeof window !== 'undefined' && window.innerWidth < 900
@@ -212,6 +223,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     }
     if (e.key === 'Escape') setOpen(null)
     if (e.key === 'Enter') go(active)
+    if (e.key === 't') setSv((v) => SITE_TRANSITIONS[(SITE_TRANSITIONS.findIndex((x) => x.name === v.name) + 1) % SITE_TRANSITIONS.length])
     if (e.key === 'ArrowRight') step(active + 1)
     if (e.key === 'ArrowLeft') step(active - 1)
     if (e.key === 'x') setLayout((l) => (l === 'corners' ? 'deck' : 'corners'))
@@ -267,10 +279,10 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       {/* the section page: the screen as a cube, faded in over the landing; the wordmark (or escape) flies home */}
       {section !== null && (
         <div className="section-page" ref={overlay}>
-          <CubeScreen key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} blank projects={projects} />
-          <div className="grain" />
+          <CubeScreen key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} blank={sv.join === 'stretch'} look={sv.page} heroDraw={sv.page === 'site'} projects={projects} />
+          {sv.grain && <div className="grain" />}
           <button className="wordmark home" onClick={home} aria-label="home">aarcube</button>
-          <div className="page-hint"><span>{SECTIONS[section].title.toLowerCase()}</span><button onClick={() => grid.current?.next()}>next (n)</button><button onClick={home}>home (esc)</button></div>
+          <div className="page-hint"><span>{SECTIONS[section].title.toLowerCase()} · {sv.name}</span><button onClick={() => grid.current?.next()}>next (n)</button><button onClick={home}>home (esc)</button></div>
         </div>
       )}
       {xray?.placement === 'bottom' && <BottomBed v={xray} seed={floralSeed} scheme={scheme} />}
@@ -352,7 +364,7 @@ declare global {
   interface Window {
     __aarSite: React.RefObject<RubikHandle | null>
     /** the section transition: fly to a section, home, next project, busy while a flight or a turn runs */
-    __aarNav: { go: (i: number) => void; home: () => void; next: () => Promise<void>; busy: () => boolean; section: () => number | null; rotY: () => number; dbg: () => unknown }
+    __aarNav: { go: (i: number) => void; home: () => void; next: () => Promise<void>; busy: () => boolean; section: () => number | null; rotY: () => number; dbg: () => unknown; setVersion: (n: string) => void; version: () => string }
   }
 }
 

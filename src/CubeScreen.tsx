@@ -13,7 +13,7 @@ import gsap from 'gsap'
 import type { CubeMove, CubeVersion, WeldMode } from './transitionVersions'
 import { FEEL } from './RubikMask'
 import { SCHEMES, TILE } from './schemes'
-import { pageTexture, paintPage, PROJECTS, type PageColors, type ScreenHandle } from './ScreenSolve'
+import { pageColors, pageTexture, paintPage, PROJECTS, type PageColors, type ScreenHandle } from './ScreenSolve'
 
 /** the cube screen's handle: `next` solves the next project in, `clear` solves the page away to blank tiles (gaps left open,
  *  no weld), `stretch` scales the cube between square tiles (the landed cube's face) and the viewport's thirds */
@@ -102,18 +102,20 @@ const LASER_FRAG = /* glsl */ `
   }
 `
 
-const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: boolean; weld: boolean; projects: typeof PROJECTS; blank: boolean }>(function Cube({ v, scheme, recoil, weld, projects, blank }, ref) {
+const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: boolean; weld: boolean; projects: typeof PROJECTS; blank: boolean; look: 'classic' | 'site'; heroDraw: boolean }>(function Cube({ v, scheme, recoil, weld, projects, blank, look, heroDraw }, ref) {
   const { size, camera } = useThree()
   const W = size.width, H = size.height
   const cw = W / 3, ch = H / 3
-  // the page in the site's scheme: its background, its text greys, the mint (scheme b, the cube's own hue) as the accent
-  const colors = useMemo<PageColors>(() => { const sc = SCHEMES.find((x) => x.name === scheme) ?? SCHEMES[0]; return { bg: sc.bg, bg2: sc.bg2, line: sc.line, text: sc.text, bright: sc.bright, mute: sc.mute, a: sc.b } }, [scheme])
+  // the page's look (a site version), and the weld always in the mint (scheme b, the cube's own hue)
+  const sc = SCHEMES.find((x) => x.name === scheme) ?? SCHEMES[0]
+  const colors = useMemo<PageColors>(() => pageColors(sc, look), [sc, look])
+  const weldColor = sc.b
   useEffect(() => {
     const cam = camera as THREE.PerspectiveCamera
     cam.fov = FOV; cam.position.set(0, 0, H / 2 / Math.tan((FOV * Math.PI) / 360)); cam.near = 1; cam.far = cam.position.z * 6; cam.updateProjectionMatrix()
   }, [camera, H])
   // the pages start with a bare hero (t 0): the hero draws itself after the weld; the blank tile is one flat colour
-  const textures = useMemo(() => projects.map((p) => pageTexture(p, W, H, colors, 0)), [W, H, colors, projects])
+  const textures = useMemo(() => projects.map((p) => pageTexture(p, W, H, colors, heroDraw ? 0 : 1)), [W, H, colors, projects, heroDraw])
   // the blank tile: the landed cube's cubie, one flat colour with rounded corners (transparent outside them)
   const blankTex = useMemo(() => { const c = document.createElement('canvas'); const n = 256; c.width = c.height = n; const g = c.getContext('2d')!; g.fillStyle = TILE; g.beginPath(); g.roundRect(0, 0, n, n, n * LANDED_ROUND); g.fill(); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t }, [])
   const landedGap = () => Math.min(W, H) / 3 * LANDED_SEAM
@@ -167,7 +169,7 @@ const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: bo
   }
   useEffect(() => {
     const g = root.current
-    const col = new THREE.Color(colors.a)
+    const col = new THREE.Color(weldColor)
     seams.current = [0, 1, 2, 3].map(() => {
       const mat = new THREE.ShaderMaterial({ uniforms: { uColor: { value: col }, uHeat: { value: 0 }, uBead: { value: 0 }, uP0: { value: new THREE.Vector2() }, uP1: { value: new THREE.Vector2() }, uP2: { value: new THREE.Vector2() }, uR: { value: 0 }, uGraph: { value: 0 }, uL: { value: 1 }, uS: { value: new THREE.Vector3(1e8, 1e8, 1e8) }, uD1: { value: 1e8 }, uD2: { value: 1e8 }, uHot: { value: 0 }, uWide: { value: 1 }, uGap: { value: 0 }, uTime: { value: 0 } }, vertexShader: BEAD_VERT, fragmentShader: LASER_FRAG, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat)
@@ -179,7 +181,7 @@ const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: bo
     if (blank && !state.current.landed) { state.current.landed = true; const [sx, sy] = square(); g.scale.set(sx, sy, 1); setGap(landedGap()); seams.current.forEach((s) => { s.material.uniforms.uHeat.value = 0 }) }
     return () => { seams.current.forEach((s) => { s.material.dispose(); s.geometry.dispose(); g.remove(s) }); groups.current.forEach((c) => g.remove(c)) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [W, H, textures, colors.a])
+  }, [W, H, textures, weldColor])
   useImperativeHandle(ref, () => {
     /** solve `target` (a project, or -1 = blank tiles) onto the front: break, the turns, then the weld (or, for a clear,
      *  the gaps simply stay open with the scar lit) */
@@ -189,7 +191,7 @@ const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: bo
       st.busy = true
       const moves = expand(v)
       const nextIx = target
-      if (nextIx >= 0) paint(nextIx, 0)
+      if (nextIx >= 0 && heroDraw) paint(nextIx, 0)
       // print the next project on the stickers that will end up on the front, each one while it is hidden: simulate the
       // sequence on a copy, note when each sticker first leaves the front, and its in-plane offset at the end
       const sim = cloneCube(st.cube)
@@ -273,7 +275,7 @@ const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: bo
         return
       }
       // the hero draws itself while the seams weld
-      if (nextIx >= 0) { const pr = { t: 0 }; tl.to(pr, { t: 1, duration: Math.max(0.8, v.weld * 0.8), ease: 'none', onUpdate: () => paint(nextIx, pr.t) }, w0 + 0.15) }
+      if (nextIx >= 0 && heroDraw) { const pr = { t: 0 }; tl.to(pr, { t: 1, duration: Math.max(0.8, v.weld * 0.8), ease: 'none', onUpdate: () => paint(nextIx, pr.t) }, w0 + 0.15) }
       if (!weld) {
         // no weld: the gaps close and the seams fade, the page is simply whole again
         seams.current.forEach((s) => { s.material.uniforms.uBead.value = 0 })
@@ -338,10 +340,10 @@ const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: bo
 
 /** projects: the pages this screen cycles through (default: every placeholder project); blank: start as the landed site
  *  cube (square blank tiles, seams open, no page yet: `stretch(true)` then `next()` bring the first page in) */
-export const CubeScreen = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil?: boolean; weld?: boolean; projects?: typeof PROJECTS; blank?: boolean }>(function CubeScreen({ v, scheme, recoil = true, weld = true, projects = PROJECTS, blank = false }, ref) {
+export const CubeScreen = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil?: boolean; weld?: boolean; projects?: typeof PROJECTS; blank?: boolean; look?: 'classic' | 'site'; heroDraw?: boolean }>(function CubeScreen({ v, scheme, recoil = true, weld = true, projects = PROJECTS, blank = false, look = 'classic', heroDraw = false }, ref) {
   return (
     <Canvas className="transition-canvas" dpr={[1, 2]} camera={{ fov: FOV, position: [0, 0, 1000] }} gl={{ antialias: true, alpha: true, toneMapping: THREE.NoToneMapping }}>
-      <Cube ref={ref} v={v} scheme={scheme} recoil={recoil} weld={weld} projects={projects} blank={blank} />
+      <Cube ref={ref} v={v} scheme={scheme} recoil={recoil} weld={weld} projects={projects} blank={blank} look={look} heroDraw={heroDraw} />
     </Canvas>
   )
 })
