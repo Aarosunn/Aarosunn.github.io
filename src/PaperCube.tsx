@@ -272,7 +272,13 @@ function finalFragment(shader: PaperShader) {
     fragColor.rgb = mix(u_colorBack.rgb, fragColor.rgb, mix(1.0, u_alpha, inside));
     // settled (the site's section page): the liquid gives way to a still gradient drawn from the cube's own field, light where
     // the field is high and toward the lower left, dark teal toward the upper right, the grain kept
-    if (u_flat > 0.0 && u_flatMode > 0.5) fragColor.rgb = mix(fragColor.rgb, u_flatSolid, u_flat * inside); // solid: one dark mint
+    if (u_flat > 0.0 && u_flatMode > 1.5) {
+      // frozen: the highlights pressed down (luminance capped at u_cap), the dark shades left alone: a still of the shader
+      float lum = dot(fragColor.rgb, vec3(0.299, 0.587, 0.114));
+      float s = u_cap / max(lum, u_cap);
+      vec3 pressed = mix(fragColor.rgb * s, u_flatSolid * (u_cap / 0.17), 0.6 * (1.0 - s)); // the brighter it was, the more it takes the mint
+      fragColor.rgb = mix(fragColor.rgb, pressed, u_flat * inside);
+    } else if (u_flat > 0.0 && u_flatMode > 0.5) fragColor.rgb = mix(fragColor.rgb, u_flatSolid, u_flat * inside); // solid: one dark mint
     if (u_flat > 0.0 && u_flatMode < 0.5) {
       float fieldV = texture(u_image, vec2(mUV.x, 1.0 - mUV.y)).r;
       // light at the lower left, dark teal at the upper right, a touch of the field for depth
@@ -351,7 +357,7 @@ function finalFragment(shader: PaperShader) {
   const body = src.slice(0, i + marker.length) + tail + src.slice(i + marker.length)
   // heatmap's fragment never declares u_resolution; the ascii outline needs it
   const res = body.includes('uniform vec2 u_resolution') ? '' : ' uniform vec2 u_resolution;'
-  return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform float u_asciiSquash; uniform float u_asciiDither; uniform float u_asciiFade; uniform float u_asciiGlow; uniform float u_asciiMul; uniform float u_flat; uniform vec3 u_flatColor; uniform vec3 u_flatDark; uniform float u_flatMode; uniform vec3 u_flatSolid; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; uniform vec2 u_stretch; precision highp int;')
+  return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform float u_asciiSquash; uniform float u_asciiDither; uniform float u_asciiFade; uniform float u_asciiGlow; uniform float u_asciiMul; uniform float u_flat; uniform vec3 u_flatColor; uniform vec3 u_flatDark; uniform float u_flatMode; uniform vec3 u_flatSolid; uniform float u_cap; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; uniform vec2 u_stretch; precision highp int;')
 }
 
 const rt = (size: number, depth = false, samples = 0) =>
@@ -396,7 +402,8 @@ const finalUniforms = (): Record<string, THREE.IUniform> => ({
   u_flat: { value: 0 }, // the flight drains the look to flat tiles as it lands (Site)
   u_flatColor: { value: new THREE.Vector3(0.78, 0.86, 0.85) }, // the settled gradient's light end
   u_flatDark: { value: new THREE.Vector3(0.01, 0.17, 0.17) }, // and its dark teal end
-  u_flatMode: { value: 0 }, // 0 gradient, 1 solid
+  u_flatMode: { value: 0 }, // 0 gradient, 1 solid, 2 frozen (highlights capped)
+  u_cap: { value: 0.3 }, // frozen: the luminance the highlights are pressed down to
   u_flatSolid: { value: new THREE.Vector3(0.05, 0.22, 0.2) }, // the cube's darker mint (the site's s3 page)
   u_asciiMask: { value: null },
   u_grain: { value: 0 },
@@ -479,7 +486,9 @@ export type FlyHandle = { root: THREE.Group; camera: THREE.PerspectiveCamera; ha
   stretch: (x: number, y: number) => void
   /** settle (0..1): the cubies close up (spacing → touching), the hairline seams fade, the field merges into one surface and the
    *  liquid gives way to the still gradient */
-  settle: (k: number, mode?: 'gradient' | 'solid') => void
+  settle: (k: number, mode?: 'gradient' | 'solid' | 'frozen') => void
+  /** freeze the liquid's clock where it is (on) or let it run again (off) */
+  freeze: (on: boolean) => void
   /** extra seconds on the liquid's clock, so a highlight can sweep through during the settle */
   sweep: (extra: number) => void
   /** capture on: the final image goes to a screen-sized target instead of the screen (the section page's tiles sample it) */
@@ -571,6 +580,8 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
   const settled = useRef(0)
   const merge = useRef(false)
   const sweep = useRef(0)
+  const frozen = useRef<number | null>(null)
+  const lastT = useRef(0)
   const shot = useMemo(() => rt2(Math.round(size.width * dpr), Math.round(size.height * dpr)), [size.width, size.height, dpr])
   useEffect(() => () => shot.dispose(), [shot])
   const scale0 = typeof params.scale === 'number' ? params.scale : 0.75
@@ -578,7 +589,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     stretch: (x, y) => { Q.final.uniforms.u_stretch.value.set(x, y); if (Q.final2) Q.final2.uniforms.u_stretch.value.set(x, y) },
     settle: (k, mode = 'gradient') => {
       settled.current = k
-      Q.final.uniforms.u_flatMode.value = mode === 'solid' ? 1 : 0
+      Q.final.uniforms.u_flatMode.value = mode === 'frozen' ? 2 : mode === 'solid' ? 1 : 0
       Q.final.uniforms.u_flat.value = k
       // gradient: the cubies overlap a little (0.92 of a cubie) so the rounded corners leave no holes, the seams fade, the field merges;
       // solid: the cube's geometry is left alone (the page layer welds the seams)
@@ -589,6 +600,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       merge.current = mode === 'gradient' && k > 0.5
     },
     sweep: (extra) => { sweep.current = extra },
+    freeze: (on) => { frozen.current = on ? lastT.current : null },
     capture: (on) => { captureOn.current = on }, shot: shot.texture }), [camera, V.rubikGap, scale0, Q, shot]) // the paper pass writes to the screen raw: the hex as-is, not THREE's linear conversion
   // preset params -> uniforms
   useEffect(() => {
@@ -763,7 +775,8 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     u.u_image.value = R.combined.texture
     u.u_mask.value = M.texture
     u.u_asciiMask.value = (A.still ? R.still : M).texture
-    u.u_time.value = state.clock.elapsedTime * speed + frame + sweep.current
+    lastT.current = frozen.current ?? state.clock.elapsedTime * speed + frame + sweep.current
+    u.u_time.value = lastT.current
     u.u_aspect.value = size.width / size.height
     u.u_resolution.value.set(size.width * gl.getPixelRatio(), size.height * gl.getPixelRatio())
     const out = captureOn.current ? shot : null

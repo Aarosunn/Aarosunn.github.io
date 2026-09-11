@@ -162,7 +162,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       onComplete: () => landed(),
       // 'fade': the page fades in over the flight's last stretch (and out again on the way home)
       onUpdate: () => { if (sv.join === 'fade' && overlay.current) overlay.current.style.opacity = String(Math.min(1, Math.max(0, (t.time() - lead - FLIGHT.fadeAt * dur) / ((1 - FLIGHT.fadeAt) * dur)))) },
-      onReverseComplete: () => { tl.current = null; phase.current = null; h.zoom(1); h.ascii(1); h.stretch(1, 1); h.settle(0); h.sweep(0); h.capture(false); setHidden(false); setStill(false); setSection(null); setFlying(false) },
+      onReverseComplete: () => { tl.current = null; phase.current = null; h.zoom(1); h.ascii(1); h.stretch(1, 1); h.settle(0); h.sweep(0); h.freeze(false); h.capture(false); setHidden(false); setStill(false); setSection(null); setFlying(false) },
     })
     // 1. the surroundings fade (CSS, `hidden`) and the ascii outline with them; 2. the flight from `lead`; reversed, the
     //    callback at the take-off point fires as the cube lands home and the page fades back in with the outline
@@ -182,12 +182,20 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       const extras: Promise<unknown>[] = []
       if (sv.weldIn) extras.push(grid.current?.weldIn(reduced ? 0.01 : WELD) ?? Promise.resolve())
       if (sv.settle === 'solid') extras.push(settleSolid(1, reduced ? 0.01 : SETTLE))
+      if (sv.settle === 'frozen') { h.freeze(true); extras.push(settleFrozen(1, reduced ? 0.01 : 0.8)) }
       await Promise.all([spreading, ...extras])
     }
     phase.current = 'in'
     setFlying(false)
   }
-  /** s3's settle: the liquid mixes to the solid dark mint while its clock runs `SWEEP` s ahead (the highlight passes once) */
+  /** 'frozen': the liquid is stopped where it is (freeze) and its highlights pressed down to the dark shades */
+  const settleFrozen = (to: 0 | 1, duration: number) => new Promise<void>((res) => {
+    const h = fly.current
+    if (!h) return res()
+    const k = { v: 1 - to }
+    gsap.to(k, { v: to, duration, ease: 'power1.inOut', onUpdate: () => h.settle(k.v, 'frozen'), onComplete: res })
+  })
+  /** 'solid': the liquid mixes to the solid dark mint while its clock runs `SWEEP` s ahead (the highlight passes once) */
   const settleSolid = (to: 0 | 1, duration: number) => new Promise<void>((res) => {
     const h = fly.current
     if (!h) return res()
@@ -225,6 +233,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       const back: Promise<unknown>[] = []
       if (sv.weldIn) back.push(grid.current?.openGaps(reduced ? 0.01 : 0.4) ?? Promise.resolve())
       if (sv.settle === 'solid') back.push(settleSolid(0, reduced ? 0.01 : 0.6))
+      if (sv.settle === 'frozen') back.push(settleFrozen(0, reduced ? 0.01 : 0.5).then(() => fly.current?.freeze(false)))
       await Promise.all(back)
       await spread(0, reduced ? 0.01 : STRETCH, () => { grid.current?.setLive(false); fly.current?.capture(false); t.reverse() })
       return

@@ -6,9 +6,10 @@
  *  hairline grid and ring, the hero drawing itself after the weld); grain: the site's grain overlay on the page.
  */
 /** settle: what the liquid does once the page is there ('none' = stays live; 'gradient' = the cubies close up and the liquid gives way
- *  to a still gradient; 'solid' = the liquid's highlight sweeps through once and the face rests on one dark mint); weldIn: the
+ *  to a still gradient; 'solid' = the liquid's highlight sweeps through once and the face rests on one dark mint; 'frozen' = the
+ *  liquid stops where it is and its highlights are pressed down to the dark mint shades, a still of the shader); weldIn: the
  *  cube's seams stay as real gaps at the landing and the laser weld closes them */
-export type SiteVersion = { name: string; flight: string; join: 'fade' | 'stretch'; page: 'classic' | 'site' | 'liquid' | 'solid'; grain: boolean; settle?: 'none' | 'gradient' | 'solid'; weldIn?: boolean; note: string }
+export type SiteVersion = { name: string; flight: string; join: 'fade' | 'stretch'; page: 'classic' | 'site' | 'liquid' | 'solid'; grain: boolean; settle?: 'none' | 'gradient' | 'solid' | 'frozen'; weldIn?: boolean; note: string }
 
 export const SITE_TRANSITIONS: SiteVersion[] = [
   { name: 's1', flight: 'v4', join: 'fade', page: 'classic', grain: false, note: 'the face overfills the viewport, the page fades in over it (2026-09-10 night)' },
@@ -17,5 +18,7 @@ export const SITE_TRANSITIONS: SiteVersion[] = [
   { name: 's2', flight: 'v5', join: 'stretch', page: 'liquid', grain: false, settle: 'none', note: 'lands square, stretches into the viewport as the page fades in over the cube\'s live liquid, which stays' },
   // s3 (04:50): s2's arrival, then the seams weld shut, the highlight sweeps through once and the face settles on a dark mint
   { name: 's3', flight: 'v5', join: 'stretch', page: 'solid', grain: false, settle: 'solid', weldIn: true, note: 's2, then the laser weld closes the cube\'s seams and the liquid settles on the cube\'s dark mint after one last sweep' },
+  // s4 (05:55): "just a frozen shot of the shader without the highlights"
+  { name: 's4', flight: 'v5', join: 'stretch', page: 'solid', grain: false, settle: 'frozen', weldIn: true, note: 's3 with the liquid frozen where it is instead of settling solid, its highlights pressed down to the dark mint' },
 ]
 export const SITE_TRANSITION_OF = (name: string) => SITE_TRANSITIONS.find((v) => v.name === name)
