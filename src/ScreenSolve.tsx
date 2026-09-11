@@ -25,10 +25,15 @@ export const PROJECTS = [
   { title: 'ascii portrait', meta: 'creatives · 2026', blurb: 'a portrait in text that watches back.' },
 ]
 /** the page in the site's own palette: bg, the panel tone (bg2), hairlines (line), the text greys, and the mint only as a thin accent */
-export type PageColors = { bg: string; bg2: string; line: string; text: string; bright: string; mute: string; a: string; disc: 'fill' | 'ring' }
-/** the two page looks: 'classic' (the first pages: own greys, the accent as a filled disc) and 'site' (the site's palette, hairline grid, a ring) */
-export const pageColors = (sc: { bg: string; bg2: string; line: string; text: string; bright: string; mute: string; a: string; b: string }, look: 'classic' | 'site'): PageColors =>
-  look === 'classic' ? { bg: '#0b0e13', bg2: '#0e1219', line: sc.a + '55', text: '#c9cdd8', bright: '#f2f3f7', mute: '#6b7185', a: sc.a, disc: 'fill' } : { bg: sc.bg, bg2: sc.bg2, line: sc.line, text: sc.text, bright: sc.bright, mute: sc.mute, a: sc.b, disc: 'ring' }
+export type PageLook = 'classic' | 'site' | 'liquid'
+/** bg 'transparent' = text only, over whatever the tile shows (the 'liquid' look: the cube's own material); hero: the placeholder block */
+export type PageColors = { bg: string; bg2: string; text: string; bright: string; mute: string; a: string; disc: 'fill' | 'ring'; hero: boolean }
+/** the page looks: 'classic' (the first pages: own greys, the accent as a filled disc on a panel), 'site' (the site's palette, a ring),
+ *  'liquid' (no background at all: dark text over the cube's liquid, no hero) */
+export const pageColors = (sc: { bg: string; bg2: string; line: string; text: string; bright: string; mute: string; a: string; b: string }, look: PageLook): PageColors =>
+  look === 'classic' ? { bg: '#0b0e13', bg2: '#0e1219', text: '#c9cdd8', bright: '#f2f3f7', mute: '#6b7185', a: sc.a, disc: 'fill', hero: true }
+  : look === 'site' ? { bg: sc.bg, bg2: sc.bg2, text: sc.text, bright: sc.bright, mute: sc.mute, a: sc.b, disc: 'ring', hero: true }
+  : { bg: 'transparent', bg2: 'transparent', text: '#12201d', bright: '#07110f', mute: '#2f4a45', a: sc.b, disc: 'ring', hero: false }
 /** one project drawn as a page at the viewport's size */
 export function pageTexture(p: (typeof PROJECTS)[number], w: number, h: number, colors: PageColors, t = 1) {
   const c = document.createElement('canvas')
@@ -46,23 +51,21 @@ export function paintPage(c: HTMLCanvasElement, p: (typeof PROJECTS)[number], w:
   const s = c.width / w
   const g = c.getContext('2d')!
   g.setTransform(s, 0, 0, s, 0, 0)
-  g.fillStyle = colors.bg; g.fillRect(0, 0, w, h)
-  // a hero block on the right with a faint grid, like a placeholder still
+  g.clearRect(0, 0, w, h)
+  if (colors.bg !== 'transparent') { g.fillStyle = colors.bg; g.fillRect(0, 0, w, h) }
+  // a hero block on the right, a placeholder still (no grid: Aaron, "get rid of the hatched grid")
   const portrait = h > w
   const hero = portrait ? { x: w * 0.08, y: h * 0.42, w: w * 0.84, h: h * 0.4 } : { x: w * 0.52, y: h * 0.16, w: w * 0.4, h: h * 0.62 }
-  g.fillStyle = colors.bg2; g.fillRect(hero.x, hero.y, hero.w, hero.h)
-  g.strokeStyle = colors.line; g.lineWidth = 1
-  // the grid draws in: each line grows along its length, one after another
-  const drawn = (k: number, n: number) => Math.min(1, Math.max(0, t * (n + 2) - k))
-  for (let i = 1; i < 8; i++) { const f = drawn(i - 1, 7); if (f <= 0) continue; g.beginPath(); g.moveTo(hero.x + (hero.w * i) / 8, hero.y); g.lineTo(hero.x + (hero.w * i) / 8, hero.y + hero.h * f); g.stroke() }
-  for (let i = 1; i < 6; i++) { const f = drawn(i - 1, 5); if (f <= 0) continue; g.beginPath(); g.moveTo(hero.x, hero.y + (hero.h * i) / 6); g.lineTo(hero.x + hero.w * f, hero.y + (hero.h * i) / 6); g.stroke() }
-  // the mint as the site uses it: a hairline ring and a small tick, not a filled shape
+  if (colors.hero) { g.fillStyle = colors.bg2; g.fillRect(hero.x, hero.y, hero.w, hero.h) }
+  // the disc (classic) or the hairline ring and tick (site); nothing on the liquid look
   const grow = 1 - Math.pow(1 - Math.min(1, Math.max(0, (t - 0.3) / 0.7)), 3)
-  if (grow > 0) { const cx = hero.x + hero.w * 0.5, cy = hero.y + hero.h * 0.5, R = Math.min(hero.w, hero.h) * 0.18
+  if (grow > 0 && colors.hero) { const cx = hero.x + hero.w * 0.5, cy = hero.y + hero.h * 0.5, R = Math.min(hero.w, hero.h) * 0.18
     if (colors.disc === 'fill') { g.fillStyle = colors.a; g.beginPath(); g.arc(cx, cy, R * grow, 0, Math.PI * 2); g.fill() }
     else { g.strokeStyle = colors.a + 'aa'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, R * grow, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * grow); g.stroke(); g.fillStyle = colors.a; g.fillRect(cx - 4, cy, 8 * grow, 1) } }
   const left = w * 0.08
   const top = portrait ? h * 0.14 : h * 0.3
+  // over the liquid the text gets a soft light halo so it reads on the dark streaks too
+  if (colors.bg === 'transparent') { g.shadowColor = 'rgba(220, 244, 238, 0.95)'; g.shadowBlur = 16 }
   g.fillStyle = colors.mute; g.font = `400 ${portrait ? 12 : 13}px "Geist Mono", ui-monospace, monospace`
   g.fillText(p.meta, left, top)
   g.fillStyle = colors.bright; g.font = `300 ${portrait ? 40 : 64}px Unbounded, sans-serif`

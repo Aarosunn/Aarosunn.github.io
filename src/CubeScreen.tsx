@@ -7,17 +7,34 @@
  * faces are the right size. Gaps are the seams; a laser weld erases them.
  */
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import gsap from 'gsap'
 import type { CubeMove, CubeVersion, WeldMode } from './transitionVersions'
 import { FEEL } from './RubikMask'
 import { SCHEMES, TILE } from './schemes'
-import { pageColors, pageTexture, paintPage, PROJECTS, type PageColors, type ScreenHandle } from './ScreenSolve'
+import { pageColors, pageTexture, paintPage, PROJECTS, type PageColors, type PageLook, type ScreenHandle } from './ScreenSolve'
 
 /** the cube screen's handle: `next` solves the next project in, `clear` solves the page away to blank tiles (gaps left open,
  *  no weld), `stretch` scales the cube between square tiles (the landed cube's face) and the viewport's thirds */
-export type CubeHandle = ScreenHandle & { clear: () => Promise<void>; stretch: (full: boolean, duration?: number) => Promise<void>; dbg: () => { gap: number; sx: number; sy: number } }
+export type CubeHandle = ScreenHandle & { clear: () => Promise<void>; stretch: (full: boolean, duration?: number) => Promise<void>; dbg: () => { gap: number; sx: number; sy: number };
+  /** the liquid look (Site s2): the root's scale (the landed face is square, the page the viewport's thirds), the face's
+   *  rect in the captured image (uv: x y w h, y up) the tiles sample their liquid from, and the text's opacity */
+  setScale: (sx: number, sy: number) => void; setFace: (x: number, y: number, w: number, h: number) => void; setFade: (k: number) => void;
+  /** drawn or not (imperative, so it can flip in the same tick as the paper pass's capture) */
+  setLive: (on: boolean) => void }
+
+/** a sticker in the liquid look: the cube's captured image under the page's text */
+const LIQUID_VERT = /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`
+const LIQUID_FRAG = /* glsl */ `
+  uniform sampler2D uLiquid; uniform sampler2D uPage; uniform float uFade; uniform vec4 uFace; uniform float uHasPage;
+  varying vec2 vUv;
+  void main() {
+    vec3 liq = texture2D(uLiquid, uFace.xy + vUv * uFace.zw).rgb;
+    vec4 pg = uHasPage > 0.5 ? texture2D(uPage, vUv) : vec4(0.0);
+    gl_FragColor = vec4(mix(liq, pg.rgb, pg.a * uFade), 1.0);
+  }
+`
 
 const FOV = 30
 /** the landed site cube's seams, as a fraction of a tile: its cubies' gap plus the mask's hairline and rounding (blank state) */
@@ -98,22 +115,38 @@ const LASER_FRAG = /* glsl */ `
       return;
     }
     float scar = uHeat * 0.22 * edge * un; float hot = uBead * front * edge * un * 1.6;
-    gl_FragColor = vec4(uColor * (scar + hot) + vec3(hot * hot * 0.5), 1.0);
+    gl_FragColor = vec4(uColor * (scar + hot) + vec3(hot * hot * 0.15), 1.0);
   }
 `
 
-const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: boolean; weld: boolean; projects: typeof PROJECTS; blank: boolean; look: 'classic' | 'site'; heroDraw: boolean }>(function Cube({ v, scheme, recoil, weld, projects, blank, look, heroDraw }, ref) {
-  const { size, camera } = useThree()
+/** the screen cube itself: its own scene and camera (z = 0 is the viewport in CSS px), rendered by hand after everything else in
+ *  the canvas it sits in (the transition tab's own, or the site's, where `liquid` is the shader cube's captured image and the
+ *  tiles show it under the page's text); `live` off = not drawn at all */
+export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: boolean; weld: boolean; projects: typeof PROJECTS; blank: boolean; look: PageLook; heroDraw: boolean; liquid?: THREE.Texture | null; live?: boolean }>(function ScreenCube({ v, scheme, recoil, weld, projects, blank, look, heroDraw, liquid = null, live = true }, ref) {
+  const { size, gl } = useThree()
   const W = size.width, H = size.height
   const cw = W / 3, ch = H / 3
   // the page's look (a site version), and the weld always in the mint (scheme b, the cube's own hue)
   const sc = SCHEMES.find((x) => x.name === scheme) ?? SCHEMES[0]
   const colors = useMemo<PageColors>(() => pageColors(sc, look), [sc, look])
   const weldColor = sc.b
+  const scene = useRef<THREE.Scene>(null!)
+  const camera = useMemo(() => new THREE.PerspectiveCamera(FOV, 1, 1, 10), [])
   useEffect(() => {
-    const cam = camera as THREE.PerspectiveCamera
-    cam.fov = FOV; cam.position.set(0, 0, H / 2 / Math.tan((FOV * Math.PI) / 360)); cam.near = 1; cam.far = cam.position.z * 6; cam.updateProjectionMatrix()
-  }, [camera, H])
+    camera.aspect = W / H; camera.fov = FOV; camera.position.set(0, 0, H / 2 / Math.tan((FOV * Math.PI) / 360)); camera.near = 1; camera.far = camera.position.z * 6; camera.updateProjectionMatrix()
+  }, [camera, W, H])
+  const liquidU = useRef({ face: new THREE.Vector4(0, 0, 1, 1), fade: 1 })
+  const liveRef = useRef(live)
+  const liquidMats = useRef<THREE.ShaderMaterial[]>([])
+  // drawn by hand after the paper pass (priority 2): a clear to the page colour, then the cube
+  useFrame(() => {
+    if (!liveRef.current || !scene.current) return
+    gl.setRenderTarget(null)
+    const prev = gl.getClearColor(new THREE.Color()); const prevA = gl.getClearAlpha(); const auto = gl.autoClear
+    gl.setClearColor(new THREE.Color(colors.bg === 'transparent' ? sc.bg : colors.bg), 1); gl.autoClear = true
+    gl.render(scene.current, camera)
+    gl.setClearColor(prev, prevA); gl.autoClear = auto
+  }, 2)
   // the pages start with a bare hero (t 0): the hero draws itself after the weld; the blank tile is one flat colour
   const textures = useMemo(() => projects.map((p) => pageTexture(p, W, H, colors, heroDraw ? 0 : 1)), [W, H, colors, projects, heroDraw])
   // the blank tile: the landed cube's cubie, one flat colour with rounded corners (transparent outside them)
@@ -132,6 +165,7 @@ const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: bo
   const build = (depth: number) => {
     const g = root.current
     groups.current.forEach((c) => { c.traverse((o) => { if (o instanceof THREE.Mesh) { o.geometry.dispose(); if (o.material !== body) (o.material as THREE.Material).dispose() } }); c.parent?.remove(c) })
+    liquidMats.current = []
     state.current.depth = depth
     const ext = (a: THREE.Vector3) => (Math.abs(a.x) ? cw : Math.abs(a.y) ? ch : depth)
     groups.current = state.current.cube.map((c) => {
@@ -144,7 +178,12 @@ const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: bo
         const geo = new THREE.PlaneGeometry(w, h)
         const uv = geo.attributes.uv as THREE.BufferAttribute
         for (let k = 0; k < uv.count; k++) uv.setXY(k, (s.col + uv.getX(k)) / 3, (2 - s.row + uv.getY(k)) / 3)
-        const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: s.tex < 0 ? blankTex : textures[s.tex % textures.length], transparent: s.tex < 0 }))
+        const page = s.tex < 0 ? null : textures[s.tex % textures.length]
+        const mat = liquid
+          ? new THREE.ShaderMaterial({ uniforms: { uLiquid: { value: liquid }, uPage: { value: page }, uHasPage: { value: page ? 1 : 0 }, uFade: { value: liquidU.current.fade }, uFace: { value: liquidU.current.face } }, vertexShader: LIQUID_VERT, fragmentShader: LIQUID_FRAG })
+          : new THREE.MeshBasicMaterial({ map: page ?? blankTex, transparent: s.tex < 0 })
+        if (mat instanceof THREE.ShaderMaterial) liquidMats.current.push(mat)
+        const m = new THREE.Mesh(geo, mat)
         m.position.copy(s.n).multiplyScalar(ext(s.n) / 2 + 0.5)
         m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(s.right, s.up, s.n))
         grp.add(m)
@@ -181,7 +220,7 @@ const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: bo
     if (blank && !state.current.landed) { state.current.landed = true; const [sx, sy] = square(); g.scale.set(sx, sy, 1); setGap(landedGap()); seams.current.forEach((s) => { s.material.uniforms.uHeat.value = 0 }) }
     return () => { seams.current.forEach((s) => { s.material.dispose(); s.geometry.dispose(); g.remove(s) }); groups.current.forEach((c) => g.remove(c)) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [W, H, textures, weldColor])
+  }, [W, H, textures, weldColor, liquid])
   useImperativeHandle(ref, () => {
     /** solve `target` (a project, or -1 = blank tiles) onto the front: break, the turns, then the weld (or, for a clear,
      *  the gaps simply stay open with the scar lit) */
@@ -321,7 +360,11 @@ const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: bo
       busy: () => state.current.busy,
       next: () => solve((state.current.project + 1) % textures.length, true),
       clear: () => solve(-1, false),
-      dbg: () => ({ gap: gapNow.current, sx: root.current.scale.x, sy: root.current.scale.y }),
+      dbg: () => ({ gap: gapNow.current, sx: root.current.scale.x, sy: root.current.scale.y, W, H, cam: [camera.aspect, camera.position.z] }),
+      setScale: (sx, sy) => root.current.scale.set(sx, sy, 1),
+      setFace: (x, y, w, h) => { liquidU.current.face.set(x, y, w, h) },
+      setFade: (k) => { liquidU.current.fade = k; liquidMats.current.forEach((m) => { m.uniforms.uFade.value = k }) },
+      setLive: (on) => { liveRef.current = on },
       stretch: (full, duration = 0.5) => new Promise<void>((resolve) => {
         const st = state.current
         if (st.busy) return resolve()
@@ -335,15 +378,19 @@ const Cube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: bo
       }),
     }
   }, [v, textures, W, H, recoil, weld])
-  return <group ref={root} />
+  return (
+    <scene ref={scene}>
+      <group ref={root} />
+    </scene>
+  )
 })
 
 /** projects: the pages this screen cycles through (default: every placeholder project); blank: start as the landed site
  *  cube (square blank tiles, seams open, no page yet: `stretch(true)` then `next()` bring the first page in) */
-export const CubeScreen = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil?: boolean; weld?: boolean; projects?: typeof PROJECTS; blank?: boolean; look?: 'classic' | 'site'; heroDraw?: boolean }>(function CubeScreen({ v, scheme, recoil = true, weld = true, projects = PROJECTS, blank = false, look = 'classic', heroDraw = false }, ref) {
+export const CubeScreen = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil?: boolean; weld?: boolean; projects?: typeof PROJECTS; blank?: boolean; look?: PageLook; heroDraw?: boolean }>(function CubeScreen({ v, scheme, recoil = true, weld = true, projects = PROJECTS, blank = false, look = 'classic', heroDraw = false }, ref) {
   return (
     <Canvas className="transition-canvas" dpr={[1, 2]} camera={{ fov: FOV, position: [0, 0, 1000] }} gl={{ antialias: true, alpha: true, toneMapping: THREE.NoToneMapping }}>
-      <Cube ref={ref} v={v} scheme={scheme} recoil={recoil} weld={weld} projects={projects} blank={blank} look={look} heroDraw={heroDraw} />
+      <ScreenCube ref={ref} v={v} scheme={scheme} recoil={recoil} weld={weld} projects={projects} blank={blank} look={look} heroDraw={heroDraw} />
     </Canvas>
   )
 })

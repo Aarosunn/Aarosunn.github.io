@@ -8,13 +8,13 @@ import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import gsap from 'gsap'
 import { PaperCube, type FlyHandle } from './PaperCube'
-import { CubeScreen, type CubeHandle } from './CubeScreen'
+import { CubeScreen, ScreenCube, type CubeHandle } from './CubeScreen'
 import { CUBE_OF, TRANSITION_OF } from './transitionVersions'
 import { SITE_TRANSITION_OF, SITE_TRANSITIONS, type SiteVersion } from './siteVersions'
 import { PROJECTS } from './ScreenSolve'
 import { VERSION_OF } from './paperVersions'
 import { presetNamed } from './paperPresets'
-import { SCHEMES, TILE } from './schemes'
+import { SCHEMES } from './schemes'
 import { ALGS, type RubikHandle } from './RubikMask'
 import { Floral } from './Floral'
 import { XrayFloral } from './XrayFloral'
@@ -60,11 +60,9 @@ const FOV = 30 // the mask camera's vertical fov (Canvas below)
 const PRE = 1
 const LEAD = 0.5
 const UI_EASE = 'expo.out'
-/** the landing: over the flight's last `DRAIN` s the cube's look drains to flat tiles (the screen cube's blank tile); then the
- *  screen cube crossfades in over `SWAP` s (same tiles, same seams), stretches to the viewport over `STRETCH` s and solves the page in */
-const DRAIN = 0.35
-const SWAP = 0.25
-const STRETCH = 0.5
+/** s2's landing: the square face stretches into the viewport while the page's text fades in over it, one motion of `STRETCH` s;
+ *  the page's tiles are the shader cube's own live image (captured in the same GL context), so nothing changes material */
+const STRETCH = 0.7
 /** the hand-placed floral group's canvas is `GROUP_OVER` times taller than its layout footprint (`--fh` in styles.css, 222 px on a
  *  900 px screen, shrinking with a shorter viewport so the base row never runs off the bottom) and the camera that much
  *  farther, so the flowers keep their size with headroom above and below: their petals were being cut by the canvas edge */
@@ -140,7 +138,6 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     // 'stretch' lands the square face on the viewport's short side; 'fade' overfills the viewport (the window grows to its long side)
     const aspect = window.innerWidth / window.innerHeight
     const kFill = (sv.join === 'stretch' ? Math.min(aspect, 1) : Math.max(aspect, 1)) / h.scale0
-    const flat = { k: 0 }
     const dur = reduced ? 0.01 : FLIGHT.duration
     const pre = reduced ? 0.01 : PRE
     const lead = reduced ? 0.01 : LEAD
@@ -154,7 +151,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       onComplete: () => landed(),
       // 'fade': the page fades in over the flight's last stretch (and out again on the way home)
       onUpdate: () => { if (sv.join === 'fade' && overlay.current) overlay.current.style.opacity = String(Math.min(1, Math.max(0, (t.time() - lead - FLIGHT.fadeAt * dur) / ((1 - FLIGHT.fadeAt) * dur)))) },
-      onReverseComplete: () => { tl.current = null; phase.current = null; h.zoom(1); h.ascii(1); h.flat(0, TILE); setHidden(false); setStill(false); setSection(null); setFlying(false) },
+      onReverseComplete: () => { tl.current = null; phase.current = null; h.zoom(1); h.ascii(1); h.stretch(1, 1); h.capture(false); setHidden(false); setStill(false); setSection(null); setFlying(false) },
     })
     // 1. the surroundings fade (CSS, `hidden`) and the ascii outline with them; 2. the flight from `lead`; reversed, the
     //    callback at the take-off point fires as the cube lands home and the page fades back in with the outline
@@ -162,29 +159,43 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     t.to(root.rotation, { x: e.x + Math.PI * 2 * FLIGHT.spin[0], y: ey + Math.PI * 2 * FLIGHT.spin[1], z: e.z, duration: dur, ease: FLIGHT.spinEase }, lead)
     t.to(root.position, { x: to.x, y: to.y, z: to.z, duration: dur, ease: FLIGHT.approachEase }, lead)
     t.to(zoom, { k: kFill, duration: dur, ease: FLIGHT.approachEase, onUpdate: () => h.zoom(zoom.k) }, lead)
-    // 'stretch': the look drains to flat tiles as it lands
-    if (sv.join === 'stretch') t.to(flat, { k: 1, duration: reduced ? 0.01 : DRAIN, ease: 'power1.inOut', onUpdate: () => h.flat(flat.k, TILE) }, lead + dur - (reduced ? 0.01 : DRAIN))
     tl.current = t
     await landing
     if (sv.join === 'stretch') {
-      // the screen cube takes over: same square tiles, same seams; it stretches to the viewport and solves the page in
-      await new Promise<void>((res) => gsap.to(overlay.current, { opacity: 1, duration: SWAP, ease: 'none', onComplete: res }))
-      await grid.current?.stretch(true, STRETCH)
-      await grid.current?.next()
+      // the page layer takes over the drawing (same image: its tiles show the cube's captured face), then the face stretches
+      // into the viewport while the text fades in
+      h.capture(true)
+      grid.current?.setLive(true)
+      await spread(1, reduced ? 0.01 : STRETCH)
     }
     phase.current = 'in'
     setFlying(false)
   }
+  /** s2: the landed square face ↔ the viewport, the paper window and the page layer's tiles moving together, the text fading with it */
+  const spread = (to: 0 | 1, duration: number) => new Promise<void>((res) => {
+    const h = fly.current, g = grid.current
+    if (!h || !g) return res()
+    const aspect = window.innerWidth / window.innerHeight
+    const k = { v: 1 - to }
+    const apply = () => {
+      if (aspect >= 1) { const sx = 1 + (aspect - 1) * k.v; h.stretch(sx, 1); g.setScale(sx / aspect, 1); g.setFace((1 - sx / aspect) / 2, 0, sx / aspect, 1) }
+      else { const sy = 1 + (1 / aspect - 1) * k.v; h.stretch(1, sy); g.setScale(1, sy * aspect); g.setFace(0, (1 - sy * aspect) / 2, 1, sy * aspect) }
+      g.setFade(k.v)
+      if (overlay.current) overlay.current.style.opacity = String(k.v)
+    }
+    apply()
+    gsap.to(k, { v: to, duration, ease: 'power2.inOut', onUpdate: apply, onComplete: res })
+  })
   const home = async () => {
     const t = tl.current
     if (!t || phase.current !== 'in') return
     phase.current = 'out'
     setFlying(true)
     if (sv.join === 'stretch') {
-      // the page solves away to blank tiles, the cube shrinks square, the site cube shows through, then flies home
-      await grid.current?.clear()
-      await grid.current?.stretch(false, STRETCH)
-      await new Promise<void>((res) => gsap.to(overlay.current, { opacity: 0, duration: SWAP, ease: 'none', onComplete: res }))
+      // the text fades as the face squares back, then the shader cube draws itself again and flies home
+      await spread(0, reduced ? 0.01 : STRETCH)
+      grid.current?.setLive(false)
+      fly.current?.capture(false)
     }
     t.reverse()
   }
@@ -275,11 +286,13 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     <>
       <Canvas key={version} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
         <PaperCube version={PV} params={params} spin={!reduced && !still} spinSpeed={0.12} auto={!reduced && !away} autoInterval={3600} combo={0.35} rubik={rubik} fly={fly} />
+        {/* s2's page: the screen cube drawn in this same canvas, its tiles sampling the shader cube's captured image */}
+        {sv.join === 'stretch' && section !== null && fly.current && <ScreenCube key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} weld projects={projects} blank={false} look="liquid" heroDraw={false} liquid={fly.current.shot} live={false} />}
       </Canvas>
       {/* the section page: the screen as a cube, faded in over the landing; the wordmark (or escape) flies home */}
       {section !== null && (
-        <div className="section-page" ref={overlay}>
-          <CubeScreen key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} blank={sv.join === 'stretch'} look={sv.page} heroDraw={sv.page === 'site'} projects={projects} />
+        <div className={`section-page ${sv.join === 'stretch' ? 'bare' : ''}`} ref={overlay}>
+          {sv.join === 'fade' && <CubeScreen key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} look={sv.page} heroDraw={sv.page === 'site'} projects={projects} />}
           {sv.grain && <div className="grain" />}
           <button className="wordmark home" onClick={home} aria-label="home">aarcube</button>
           <div className="page-hint"><span>{SECTIONS[section].title.toLowerCase()} · {sv.name}</span><button onClick={() => grid.current?.next()}>next (n)</button><button onClick={home}>home (esc)</button></div>

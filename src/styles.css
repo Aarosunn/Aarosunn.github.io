@@ -588,6 +588,8 @@ body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130
   .site-tabs { display: none; }
   .portrait { display: none; }
   .site ~ canvas, canvas { transform: translateY(-10vh); }
+  /* no lift while a section is open or the cube is flying: the page layer draws in this same canvas and must sit on the viewport */
+  body:has(.site.away) canvas { transform: none; }
   .sec.on h2 { font-size: 26px; }
   /* scrim so the copy stays legible over the cube */
   .site::after {
@@ -632,6 +634,8 @@ body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130
 .ui.site { transition: opacity 1s var(--ease); }
 .ui.site.away { opacity: 0; pointer-events: none; }
 .section-page { position: fixed; inset: 0; z-index: 3; opacity: 0; background: var(--bg); }
+.section-page.bare { background: transparent; pointer-events: none; }
+.section-page.bare .home, .section-page.bare .page-hint { pointer-events: auto; }
 .section-page .grain { position: absolute; z-index: 1; }
 .section-page .transition-canvas { position: absolute !important; inset: 0; }
 .section-page canvas { animation: none; transition: none; transform: none !important; }

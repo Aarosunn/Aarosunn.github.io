@@ -220,14 +220,15 @@ const FACE_FRAG = /* glsl */ `
 // paper's vertex semantics for fit = contain, square image, no rotation / offset
 const FINAL_VERT = /* glsl */ `
   in vec3 position; in vec2 uv;
-  uniform float u_aspect; uniform float u_scale;
+  uniform float u_aspect; uniform float u_scale; uniform vec2 u_stretch;
   out vec2 v_imageUV; out vec2 v_objectUV; out vec2 v_responsiveUV; out vec2 v_responsiveBoxGivenSize;
   void main() {
     vec2 p = uv - 0.5;
-    vec2 q = p * vec2(u_aspect, 1.0) / u_scale;
+    // u_stretch: the window (and the mask in it) pulled to a non-square shape, the site's landed face stretching into the viewport
+    vec2 q = p * vec2(u_aspect, 1.0) / (u_scale * u_stretch);
     v_objectUV = q;
     v_imageUV = vec2(q.x + 0.5, 0.5 - q.y);
-    v_responsiveUV = p / u_scale;
+    v_responsiveUV = p / (u_scale * u_stretch);
     v_responsiveBoxGivenSize = vec2(u_aspect, 1.0) * 1000.0;
     gl_Position = vec4(position, 1.0);
   }
@@ -293,7 +294,7 @@ function finalFragment(shader: PaperShader) {
     if (u_outline > 2.5) {
       vec2 cid = floor(gl_FragCoord.xy / u_asciiCell);
       vec2 cuv = (cid + 0.5) * u_asciiCell / u_resolution;
-      vec2 cq = (cuv - 0.5) * vec2(u_aspect, 1.0) / u_scale;
+      vec2 cq = (cuv - 0.5) * vec2(u_aspect, 1.0) / (u_scale * u_stretch);
       vec2 cm = vec2(cq.x + 0.5, 0.5 - cq.y);
       ${shader === 'heat' ? 'cm = (cm - 0.5) * 0.5714285714285714 + 0.5;' : ''}
       float dens = 0.0;
@@ -340,7 +341,7 @@ function finalFragment(shader: PaperShader) {
   const body = src.slice(0, i + marker.length) + tail + src.slice(i + marker.length)
   // heatmap's fragment never declares u_resolution; the ascii outline needs it
   const res = body.includes('uniform vec2 u_resolution') ? '' : ' uniform vec2 u_resolution;'
-  return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform float u_asciiSquash; uniform float u_asciiDither; uniform float u_asciiFade; uniform float u_asciiGlow; uniform float u_asciiMul; uniform float u_flat; uniform vec3 u_flatColor; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; precision highp int;')
+  return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform float u_asciiSquash; uniform float u_asciiDither; uniform float u_asciiFade; uniform float u_asciiGlow; uniform float u_asciiMul; uniform float u_flat; uniform vec3 u_flatColor; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; uniform vec2 u_stretch; precision highp int;')
 }
 
 const rt = (size: number, depth = false, samples = 0) =>
@@ -388,6 +389,7 @@ const finalUniforms = (): Record<string, THREE.IUniform> => ({
   u_grain: { value: 0 },
   u_aspect: { value: 1 },
   u_scale: { value: 1 },
+  u_stretch: { value: new THREE.Vector2(1, 1) },
   u_colorBack: { value: [0, 0, 0, 1] },
   u_colorTint: { value: [1, 1, 1, 1] },
   u_colorInner: { value: [1, 1, 1, 1] },
@@ -458,7 +460,13 @@ export type PaperCubeProps = {
   /** the flight (Site): the mask scene's root and camera, the cube's half extent, and a zoom on paper's window */
   fly?: React.RefObject<FlyHandle | null>
 }
-export type FlyHandle = { root: THREE.Group; camera: THREE.PerspectiveCamera; half: number; scale0: number; zoom: (k: number) => void; ascii: (k: number) => void; flat: (k: number, color: string) => void }
+export type FlyHandle = { root: THREE.Group; camera: THREE.PerspectiveCamera; half: number; scale0: number; zoom: (k: number) => void; ascii: (k: number) => void; flat: (k: number, color: string) => void;
+  /** the window pulled to a non-square shape (x, y multipliers) */
+  stretch: (x: number, y: number) => void
+  /** capture on: the final image goes to a screen-sized target instead of the screen (the section page's tiles sample it) */
+  capture: (on: boolean) => void
+  /** that target's texture (valid content only while capturing) */
+  shot: THREE.Texture }
 
 export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = false, autoInterval = 900, combo = 0, debug = 'off', gain = 1, alpha = 1, outline: outlineProp, outlineColor = '#ffffff', ascii, rubik, fly }: PaperCubeProps) {
   const outline = outlineProp ?? V.outline ?? 'off'
@@ -539,8 +547,14 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
 
   // the flight zooms paper's window (u_scale) so the cube can fill the whole viewport, not just the mask square
   const zoom = useRef(1)
+  // capture: the site's section page draws the cube's live image on its tiles (same GL context, so a render target is shared)
+  const captureOn = useRef(false)
+  const shot = useMemo(() => rt2(Math.round(size.width * dpr), Math.round(size.height * dpr)), [size.width, size.height, dpr])
+  useEffect(() => () => shot.dispose(), [shot])
   const scale0 = typeof params.scale === 'number' ? params.scale : 0.75
-  useImperativeHandle(fly, () => ({ root: root.current, camera: camera as THREE.PerspectiveCamera, half: 1.5 * V.rubikGap, scale0, zoom: (k) => { zoom.current = k; Q.final.uniforms.u_scale.value = scale0 * k; if (Q.final2) Q.final2.uniforms.u_scale.value = (scale0 / IMG) * k }, ascii: (k) => { Q.final.uniforms.u_asciiMul.value = k }, flat: (k, color) => { Q.final.uniforms.u_flat.value = k; const n = parseInt(color.slice(1), 16); Q.final.uniforms.u_flatColor.value.set(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255) } }), [camera, V.rubikGap, scale0, Q]) // the paper pass writes to the screen raw: the hex as-is, not THREE's linear conversion
+  useImperativeHandle(fly, () => ({ root: root.current, camera: camera as THREE.PerspectiveCamera, half: 1.5 * V.rubikGap, scale0, zoom: (k) => { zoom.current = k; Q.final.uniforms.u_scale.value = scale0 * k; if (Q.final2) Q.final2.uniforms.u_scale.value = (scale0 / IMG) * k }, ascii: (k) => { Q.final.uniforms.u_asciiMul.value = k }, flat: (k, color) => { Q.final.uniforms.u_flat.value = k; const n = parseInt(color.slice(1), 16); Q.final.uniforms.u_flatColor.value.set(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255) },
+    stretch: (x, y) => { Q.final.uniforms.u_stretch.value.set(x, y); if (Q.final2) Q.final2.uniforms.u_stretch.value.set(x, y) },
+    capture: (on) => { captureOn.current = on }, shot: shot.texture }), [camera, V.rubikGap, scale0, Q, shot]) // the paper pass writes to the screen raw: the hex as-is, not THREE's linear conversion
   // preset params -> uniforms
   useEffect(() => {
     const u = Q.final.uniforms
@@ -714,8 +728,9 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     u.u_time.value = state.clock.elapsedTime * speed + frame
     u.u_aspect.value = size.width / size.height
     u.u_resolution.value.set(size.width * gl.getPixelRatio(), size.height * gl.getPixelRatio())
+    const out = captureOn.current ? shot : null
     if (!(V.fuse && F && Q.final2)) {
-      pass(Q.final, null)
+      pass(Q.final, out)
       return
     }
     // fusion: heat -> out1; second mask with per-face plates and seams as holes -> fused shader -> out2; composite
@@ -732,7 +747,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     pass(Q.final2, F.out2)
     Q.composite.uniforms.a.value = F.out1.texture
     Q.composite.uniforms.b.value = F.out2.texture
-    pass(Q.composite, null)
+    pass(Q.composite, out)
   }, 1)
 
   return (
