@@ -55,8 +55,11 @@ const SECTIONS: Section[] = [
 const FLIGHT = TRANSITION_OF('v1')!
 const PAGE = CUBE_OF('w4 branching eased')!
 const FOV = 30 // the mask camera's vertical fov (Canvas below)
-/** before take-off the page around the cube fades out (and the ascii outline with it); on the way home they fade back in as the cube lands */
+/** before take-off the page around the cube fades out (and the ascii outline with it, `UI_EASE` = the CSS --ease); the flight
+ *  starts `LEAD` s into that fade so the cube is already moving as the last of the text goes; on the way home they fade back in as the cube lands */
 const PRE = 1
+const LEAD = 0.5
+const UI_EASE = 'expo.out'
 /** a section's projects: those tagged with its id in PROJECTS; a section with none shows them all */
 const projectsOf = (id: string) => { const own = PROJECTS.filter((p) => p.meta.startsWith(id)); return own.length ? own : PROJECTS }
 
@@ -120,19 +123,22 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
     const kFill = Math.max(window.innerWidth / window.innerHeight, 1) / h.scale0
     const dur = reduced ? 0.01 : FLIGHT.duration
     const pre = reduced ? 0.01 : PRE
+    const lead = reduced ? 0.01 : LEAD
+    // the ascii outline fades with the page: its own tweens (not in the timeline, which would reverse the curve on the way home)
     const asc = { k: 1 }
+    const fadeAscii = (k: number) => gsap.to(asc, { k, duration: pre, ease: UI_EASE, overwrite: true, onUpdate: () => h.ascii(asc.k) })
+    fadeAscii(0)
     const t = gsap.timeline({
-      onUpdate: () => { if (overlay.current) overlay.current.style.opacity = String(Math.min(1, Math.max(0, (t.time() - pre - FLIGHT.fadeAt * dur) / ((1 - FLIGHT.fadeAt) * dur)))) },
+      onUpdate: () => { if (overlay.current) overlay.current.style.opacity = String(Math.min(1, Math.max(0, (t.time() - lead - FLIGHT.fadeAt * dur) / ((1 - FLIGHT.fadeAt) * dur)))) },
       onComplete: () => setFlying(false),
       onReverseComplete: () => { tl.current = null; h.zoom(1); h.ascii(1); setHidden(false); setStill(false); setSection(null); setFlying(false) },
     })
-    // 1. the surroundings fade (CSS, `hidden`) and the ascii outline with them; 2. the flight; reversed, the callback
-    //    at the take-off point fires as the cube lands home and the page fades back in with the outline
-    t.to(asc, { k: 0, duration: pre, ease: 'power1.inOut', onUpdate: () => h.ascii(asc.k) }, 0)
-    t.call(() => { const back = t.reversed(); setStill(!back); if (back) setHidden(false) }, [], pre)
-    t.to(root.rotation, { x: e.x + Math.PI * 2 * FLIGHT.spin[0], y: ey + Math.PI * 2 * FLIGHT.spin[1], z: e.z, duration: dur, ease: FLIGHT.spinEase }, pre)
-    t.to(root.position, { x: to.x, y: to.y, z: to.z, duration: dur, ease: FLIGHT.approachEase }, pre)
-    t.to(zoom, { k: kFill, duration: dur, ease: FLIGHT.approachEase, onUpdate: () => h.zoom(zoom.k) }, pre)
+    // 1. the surroundings fade (CSS, `hidden`) and the ascii outline with them; 2. the flight from `lead`; reversed, the
+    //    callback at the take-off point fires as the cube lands home and the page fades back in with the outline
+    t.call(() => { const back = t.reversed(); setStill(!back); if (back) { setHidden(false); fadeAscii(1) } }, [], lead)
+    t.to(root.rotation, { x: e.x + Math.PI * 2 * FLIGHT.spin[0], y: ey + Math.PI * 2 * FLIGHT.spin[1], z: e.z, duration: dur, ease: FLIGHT.spinEase }, lead)
+    t.to(root.position, { x: to.x, y: to.y, z: to.z, duration: dur, ease: FLIGHT.approachEase }, lead)
+    t.to(zoom, { k: kFill, duration: dur, ease: FLIGHT.approachEase, onUpdate: () => h.zoom(zoom.k) }, lead)
     tl.current = t
   }
   const home = () => { const t = tl.current; if (!t || t.reversed()) return; setFlying(true); t.reverse() }
