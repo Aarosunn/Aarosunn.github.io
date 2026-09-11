@@ -270,8 +270,17 @@ function finalFragment(shader: PaperShader) {
     // look controls, cube body only: brightness scales it, opacity fades it toward the page
     fragColor.rgb = mix(fragColor.rgb, fragColor.rgb * u_gain, inside);
     fragColor.rgb = mix(u_colorBack.rgb, fragColor.rgb, mix(1.0, u_alpha, inside));
-    // the flight's landing: the look drains to flat tiles of one colour (the screen cube's blank tile), seams untouched
-    fragColor.rgb = mix(fragColor.rgb, u_flatColor, u_flat * inside);
+    // settled (the site's section page): the liquid gives way to a still gradient drawn from the cube's own field, light where
+    // the field is high and toward the lower left, dark teal toward the upper right, the grain kept
+    if (u_flat > 0.0) {
+      float fieldV = texture(u_image, vec2(mUV.x, 1.0 - mUV.y)).r;
+      // light at the lower left, dark teal at the upper right, a touch of the field for depth
+      float diag = smoothstep(0.0, 1.0, 0.5 * ((1.0 - mUV.x) + mUV.y));
+      float tone = clamp(0.03 + 0.85 * pow(diag, 1.5) + 0.12 * (fieldV - 0.5), 0.0, 1.0);
+      float gr = u_grain * 0.22 * (fract(sin(dot(v_imageUV * 1000.0, vec2(12.9898, 78.233))) * 43758.5453123) - 0.5);
+      vec3 settled = mix(u_flatDark, u_flatColor, clamp(tone + gr, 0.0, 1.0));
+      fragColor.rgb = mix(fragColor.rgb, settled, u_flat * inside);
+    }
     // outline behind the silhouette: 1 = a line of constant width, 2 = a soft glow; drawn where the pixel is
     // outside the cube but within reach of it (mask B = lambert > 0 inside, seams included, 0 outside)
     if (u_outline > 0.5 && u_outline < 2.5) {
@@ -341,7 +350,7 @@ function finalFragment(shader: PaperShader) {
   const body = src.slice(0, i + marker.length) + tail + src.slice(i + marker.length)
   // heatmap's fragment never declares u_resolution; the ascii outline needs it
   const res = body.includes('uniform vec2 u_resolution') ? '' : ' uniform vec2 u_resolution;'
-  return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform float u_asciiSquash; uniform float u_asciiDither; uniform float u_asciiFade; uniform float u_asciiGlow; uniform float u_asciiMul; uniform float u_flat; uniform vec3 u_flatColor; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; uniform vec2 u_stretch; precision highp int;')
+  return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform float u_asciiSquash; uniform float u_asciiDither; uniform float u_asciiFade; uniform float u_asciiGlow; uniform float u_asciiMul; uniform float u_flat; uniform vec3 u_flatColor; uniform vec3 u_flatDark; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; uniform vec2 u_stretch; precision highp int;')
 }
 
 const rt = (size: number, depth = false, samples = 0) =>
@@ -384,7 +393,8 @@ const finalUniforms = (): Record<string, THREE.IUniform> => ({
   u_asciiGlow: { value: 0 },
   u_asciiMul: { value: 1 }, // the flight fades the ascii outline out (Site)
   u_flat: { value: 0 }, // the flight drains the look to flat tiles as it lands (Site)
-  u_flatColor: { value: new THREE.Vector3(0.75, 0.9, 0.85) },
+  u_flatColor: { value: new THREE.Vector3(0.78, 0.86, 0.85) }, // the settled gradient's light end
+  u_flatDark: { value: new THREE.Vector3(0.01, 0.17, 0.17) }, // and its dark teal end
   u_asciiMask: { value: null },
   u_grain: { value: 0 },
   u_aspect: { value: 1 },
@@ -463,6 +473,9 @@ export type PaperCubeProps = {
 export type FlyHandle = { root: THREE.Group; camera: THREE.PerspectiveCamera; half: number; scale0: number; zoom: (k: number) => void; ascii: (k: number) => void; flat: (k: number, color: string) => void;
   /** the window pulled to a non-square shape (x, y multipliers) */
   stretch: (x: number, y: number) => void
+  /** settle (0..1): the cubies close up (spacing → touching), the hairline seams fade, the field merges into one surface and the
+   *  liquid gives way to the still gradient */
+  settle: (k: number) => void
   /** capture on: the final image goes to a screen-sized target instead of the screen (the section page's tiles sample it) */
   capture: (on: boolean) => void
   /** that target's texture (valid content only while capturing) */
@@ -549,11 +562,23 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
   const zoom = useRef(1)
   // capture: the site's section page draws the cube's live image on its tiles (same GL context, so a render target is shared)
   const captureOn = useRef(false)
+  const settled = useRef(0)
+  const merge = useRef(false)
   const shot = useMemo(() => rt2(Math.round(size.width * dpr), Math.round(size.height * dpr)), [size.width, size.height, dpr])
   useEffect(() => () => shot.dispose(), [shot])
   const scale0 = typeof params.scale === 'number' ? params.scale : 0.75
   useImperativeHandle(fly, () => ({ root: root.current, camera: camera as THREE.PerspectiveCamera, half: 1.5 * V.rubikGap, scale0, zoom: (k) => { zoom.current = k; Q.final.uniforms.u_scale.value = scale0 * k; if (Q.final2) Q.final2.uniforms.u_scale.value = (scale0 / IMG) * k }, ascii: (k) => { Q.final.uniforms.u_asciiMul.value = k }, flat: (k, color) => { Q.final.uniforms.u_flat.value = k; const n = parseInt(color.slice(1), 16); Q.final.uniforms.u_flatColor.value.set(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255) },
     stretch: (x, y) => { Q.final.uniforms.u_stretch.value.set(x, y); if (Q.final2) Q.final2.uniforms.u_stretch.value.set(x, y) },
+    settle: (k) => {
+      settled.current = k
+      // settled, the cubies overlap a little (0.92 of a cubie) so the rounded corners leave no holes at the junctions
+      const m = 1 + (0.92 / V.rubikGap - 1) * k
+      rubik?.current?.spacing(m)
+      Q.face.uniforms.uHalf.value = 1.5 * V.rubikGap * m
+      Q.face.uniforms.uSeam.value = V.seam * (1 - k)
+      merge.current = k > 0.5
+      Q.final.uniforms.u_flat.value = k
+    },
     capture: (on) => { captureOn.current = on }, shot: shot.texture }), [camera, V.rubikGap, scale0, Q, shot]) // the paper pass writes to the screen raw: the hex as-is, not THREE's linear conversion
   // preset params -> uniforms
   useEffect(() => {
@@ -591,8 +616,10 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       u2.u_alpha.value = alpha
     }
     Q.face.uniforms.k.value = V.fieldK
-    Q.face.uniforms.uHalf.value = 1.5 * V.rubikGap
-    Q.face.uniforms.uSeam.value = V.seam
+    const m = 1 + (0.92 / V.rubikGap - 1) * settled.current
+    Q.face.uniforms.uHalf.value = 1.5 * V.rubikGap * m
+    Q.face.uniforms.uSeam.value = V.seam * (1 - settled.current)
+    u.u_flat.value = settled.current
     Q.face.uniforms.uSeamUv.value = V.seamSpace === 'geometry' ? 0 : V.seamSpace === 'cube' ? 2 : 1
     Q.face.uniforms.uCapCos.value = V.capCos
     Q.face.uniforms.uSeamSym.value = V.seamSym ? 1 : 0
@@ -656,7 +683,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     const px = (r: number, w: number) => Math.max(1, Math.round((r / 1750) * w))
 
     // 1. mask, 2. their preprocess
-    renderMask(R.mask, isHeat ? 0 : fieldMode, V.field === 'poisson')
+    renderMask(R.mask, isHeat ? 0 : fieldMode, V.field === 'poisson' && !merge.current)
     if (outline === 'ascii' && A.still) renderMask(R.still, isHeat ? 0 : fieldMode, false, 2)
     // liquid / smoke: cut hairline seams at occlusion edges, then everything below reads maskE
     const M = isHeat ? R.mask : R.maskE

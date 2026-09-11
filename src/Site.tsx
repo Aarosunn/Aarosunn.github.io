@@ -60,9 +60,12 @@ const FOV = 30 // the mask camera's vertical fov (Canvas below)
 const PRE = 1
 const LEAD = 0.5
 const UI_EASE = 'expo.out'
-/** s2's landing: the square face stretches into the viewport while the page's text fades in over it, one motion of `STRETCH` s;
- *  the page's tiles are the shader cube's own live image (captured in the same GL context), so nothing changes material */
-const STRETCH = 0.7
+/** s2: one motion in and one out. The stretch into the viewport (`STRETCH` s) starts `OVERLAP` s before the flight lands, so the
+ *  face is already spreading as it arrives; the page layer takes over the drawing at the landing and the text fades in over the
+ *  second half while the liquid settles into the still gradient and the cubies close up. Home: the text fades and the face starts
+ *  squaring back, and halfway the shader cube draws itself again and the flight reverses, zooming out while it finishes squaring. */
+const STRETCH = 0.9
+const OVERLAP = 0.45
 /** the hand-placed floral group's canvas is `GROUP_OVER` times taller than its layout footprint (`--fh` in styles.css, 222 px on a
  *  900 px screen, shrinking with a shorter viewport so the base row never runs off the bottom) and the camera that much
  *  farther, so the flowers keep their size with headroom above and below: their petals were being cut by the canvas edge */
@@ -151,7 +154,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       onComplete: () => landed(),
       // 'fade': the page fades in over the flight's last stretch (and out again on the way home)
       onUpdate: () => { if (sv.join === 'fade' && overlay.current) overlay.current.style.opacity = String(Math.min(1, Math.max(0, (t.time() - lead - FLIGHT.fadeAt * dur) / ((1 - FLIGHT.fadeAt) * dur)))) },
-      onReverseComplete: () => { tl.current = null; phase.current = null; h.zoom(1); h.ascii(1); h.stretch(1, 1); h.capture(false); setHidden(false); setStill(false); setSection(null); setFlying(false) },
+      onReverseComplete: () => { tl.current = null; phase.current = null; h.zoom(1); h.ascii(1); h.stretch(1, 1); h.settle(0); h.capture(false); setHidden(false); setStill(false); setSection(null); setFlying(false) },
     })
     // 1. the surroundings fade (CSS, `hidden`) and the ascii outline with them; 2. the flight from `lead`; reversed, the
     //    callback at the take-off point fires as the cube lands home and the page fades back in with the outline
@@ -159,29 +162,35 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     t.to(root.rotation, { x: e.x + Math.PI * 2 * FLIGHT.spin[0], y: ey + Math.PI * 2 * FLIGHT.spin[1], z: e.z, duration: dur, ease: FLIGHT.spinEase }, lead)
     t.to(root.position, { x: to.x, y: to.y, z: to.z, duration: dur, ease: FLIGHT.approachEase }, lead)
     t.to(zoom, { k: kFill, duration: dur, ease: FLIGHT.approachEase, onUpdate: () => h.zoom(zoom.k) }, lead)
+    // 'stretch': the spread begins before the landing (the flight's last OVERLAP s) and the page layer takes over at the landing
+    let spreading: Promise<void> | null = null
+    if (sv.join === 'stretch') t.call(() => { if (!t.reversed()) spreading = spread(1, reduced ? 0.01 : STRETCH) }, [], Math.max(0, lead + dur - (reduced ? 0 : OVERLAP))) // (the reverse crosses this callback too)
     tl.current = t
     await landing
     if (sv.join === 'stretch') {
-      // the page layer takes over the drawing (same image: its tiles show the cube's captured face), then the face stretches
-      // into the viewport while the text fades in
       h.capture(true)
       grid.current?.setLive(true)
-      await spread(1, reduced ? 0.01 : STRETCH)
+      await spreading
     }
     phase.current = 'in'
     setFlying(false)
   }
-  /** s2: the landed square face ↔ the viewport, the paper window and the page layer's tiles moving together, the text fading with it */
-  const spread = (to: 0 | 1, duration: number) => new Promise<void>((res) => {
+  /** s2: the landed square face ↔ the viewport: the paper window and the page layer's tiles move together; over the second half
+   *  (k > .5) the text fades and the liquid settles (cubies closing up, seams fading, the still gradient); `onHalf` fires as k crosses .5 */
+  const spread = (to: 0 | 1, duration: number, onHalf?: () => void) => new Promise<void>((res) => {
     const h = fly.current, g = grid.current
-    if (!h || !g) return res()
+    if (!h) return res()
     const aspect = window.innerWidth / window.innerHeight
     const k = { v: 1 - to }
+    let halved = false
     const apply = () => {
-      if (aspect >= 1) { const sx = 1 + (aspect - 1) * k.v; h.stretch(sx, 1); g.setScale(sx / aspect, 1); g.setFace((1 - sx / aspect) / 2, 0, sx / aspect, 1) }
-      else { const sy = 1 + (1 / aspect - 1) * k.v; h.stretch(1, sy); g.setScale(1, sy * aspect); g.setFace(0, (1 - sy * aspect) / 2, 1, sy * aspect) }
-      g.setFade(k.v)
-      if (overlay.current) overlay.current.style.opacity = String(k.v)
+      if (aspect >= 1) { const sx = 1 + (aspect - 1) * k.v; h.stretch(sx, 1); g?.setScale(sx / aspect, 1); g?.setFace((1 - sx / aspect) / 2, 0, sx / aspect, 1) }
+      else { const sy = 1 + (1 / aspect - 1) * k.v; h.stretch(1, sy); g?.setScale(1, sy * aspect); g?.setFace(0, (1 - sy * aspect) / 2, 1, sy * aspect) }
+      const f = Math.min(1, Math.max(0, (k.v - 0.5) * 2))
+      g?.setFade(f)
+      h.settle(f)
+      if (overlay.current) overlay.current.style.opacity = String(f)
+      if (onHalf && !halved && (to === 1 ? k.v >= 0.5 : k.v <= 0.5)) { halved = true; onHalf() }
     }
     apply()
     gsap.to(k, { v: to, duration, ease: 'power2.inOut', onUpdate: apply, onComplete: res })
@@ -192,10 +201,10 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     phase.current = 'out'
     setFlying(true)
     if (sv.join === 'stretch') {
-      // the text fades as the face squares back, then the shader cube draws itself again and flies home
-      await spread(0, reduced ? 0.01 : STRETCH)
-      grid.current?.setLive(false)
-      fly.current?.capture(false)
+      // the text fades and the liquid wakes as the face starts squaring back; halfway the shader cube draws itself again and
+      // the flight reverses, zooming out while the face finishes squaring
+      await spread(0, reduced ? 0.01 : STRETCH, () => { grid.current?.setLive(false); fly.current?.capture(false); t.reverse() })
+      return
     }
     t.reverse()
   }

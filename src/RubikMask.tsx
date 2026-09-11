@@ -42,6 +42,8 @@ export type RubikHandle = {
   /** debug: per-cubie logical slot, mesh position, parent ok */
   dump: () => { pos: number[]; mesh: number[]; parentOk: boolean }[]
   busy: () => boolean
+  /** the cubies' spacing as a multiplier on `gap` (1 = as built, 1/gap = touching); applied at once when no turn is running */
+  spacing: (m: number) => void
 }
 type Cubie = { mesh: THREE.Mesh; pos: THREE.Vector3 }
 /** turn feel: a layer under a finger flick is the step response of an underdamped second-order system: no velocity
@@ -85,6 +87,7 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
     const busy = useRef(false)
     const alive = useRef(true)
     const pending = useRef<(() => void) | null>(null)
+    const spacing = useRef(1)
     const tween = useRef<gsap.core.Tween | null>(null)
     // a tween still in flight when we unmount must not touch dead refs, and its promise must still settle
     useEffect(() => {
@@ -156,7 +159,7 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
               slice.forEach((c) => {
                 root.current.attach(c.mesh)
                 c.pos.applyAxisAngle(rot, angle).round()
-                c.mesh.position.copy(c.pos).multiplyScalar(gap)
+                c.mesh.position.copy(c.pos).multiplyScalar(gap * spacing.current)
                 snapMesh(c.mesh)
                 c.mesh.updateMatrix()
                 c.mesh.updateMatrixWorld(true)
@@ -211,8 +214,9 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
         placementError: () =>
           Math.max(0, ...cubies.current.map((c) => (c.mesh.parent === root.current ? c.mesh.position.distanceTo(c.pos.clone().multiplyScalar(gap)) : 9))),
         busy: () => busy.current,
+        spacing: (m) => { spacing.current = m; if (!busy.current) cubies.current.forEach((c) => { if (c.mesh.parent === root.current) c.mesh.position.copy(c.pos).multiplyScalar(gap * m) }) },
       }),
-      [turn, run],
+      [turn, run, gap],
     )
 
     useEffect(() => {
