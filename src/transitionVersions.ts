@@ -23,7 +23,7 @@ export type TransitionVersion = {
 export const TRANSITION_VERSIONS: TransitionVersion[] = [
   { name: 'v1', spin: [1, 2], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1.4, fadeAt: 0.72, fade: 0.7, note: 'one turn over, two around, accelerating into the camera until a face overfills the screen; the page fades in over the last quarter' },
   { name: 'v2', spin: [1, 2], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1.4, fadeAt: 0.72, fade: 0.7, screens: ['a1 rows', 'a2 columns', 'a3 slices'], note: 'v2: the screen is a real cube and the next project is solved onto the front face by an algorithm, three to choose from; unseen faces are printed with the next project before they come round' },
-  { name: 'v3', spin: [1, 2], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1.4, fadeAt: 0.72, fade: 0.7, screens: ['w1 branching', 'w2 out to in', 'w3 in to out', 'w4 branching eased'], note: 'v3: the weld runs along the seam lines like a laser, starting each line it crosses: from random points, from the edges inward, or from the centre outward' },
+  { name: 'v3', spin: [1, 2], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1.4, fadeAt: 0.72, fade: 0.7, screens: ['w1 branching', 'w2 out to in', 'w3 in to out', 'w4 branching eased', 'w5 hot'], note: 'v3: the weld runs along the seam lines like a laser, starting each line it crosses: from random points, from the edges inward, or from the centre outward' },
 ]
 
 export const TRANSITION_OF = (name: string) => TRANSITION_VERSIONS.find((v) => v.name === name)
@@ -74,7 +74,9 @@ export type CubeMove = { axis: 'x' | 'y'; layers: number[]; dir: 1 | -1 }
  *  points, starting a crossing line when they reach it; 'edges' = the same from the eight points where the seams meet the
  *  screen edge, burning inward; 'centre' = from the four crossings outward */
 export type WeldMode = 'radial' | 'lines' | 'edges' | 'centre'
-export type CubeVersion = { name: string; moves?: CubeMove[]; alg?: string; stagger: number; open: number; gap: number; weld: number; weldMode?: WeldMode; weldEase?: string; note: string }
+export type CubeVersion = { name: string; moves?: CubeMove[]; alg?: string; stagger: number; open: number; gap: number; weld: number; weldMode?: WeldMode; weldEase?: string;
+  /** hot: the weld spills heat onto the tiles (white-hot front, halo, cooling trail); flash: the seams appear this bright and fade to the scar over `hold` s before the turns */
+  hot?: boolean; flash?: number; hold?: number; note: string }
 const CUBE = { stagger: 0.03, open: 0.35, gap: 8, weld: 1.6 }
 export const CUBE_VERSIONS: CubeVersion[] = [
   { name: 'c1 row by row', ...CUBE, moves: [{ axis: 'y', layers: [1], dir: -1 }, { axis: 'y', layers: [0], dir: -1 }, { axis: 'y', layers: [-1], dir: -1 }], note: 'a real cube: U, then E, then D turn the same way, the right face comes to the front one row of stickers at a time; laser weld, slower' },
@@ -94,5 +96,6 @@ CUBE_VERSIONS.push(
   { name: 'w2 out to in', ...W3, weldMode: 'edges', note: 'a1 with lasers starting where the seams meet the screen edge, burning inward along the lines and meeting in the middle' },
   { name: 'w3 in to out', ...W3, weldMode: 'centre', note: 'a1 with lasers starting at the four crossings, burning outward along the lines to the edges' },
   { name: 'w4 branching eased', ...W3, weldMode: 'lines', weldEase: 'power2.out', note: 'w1 with the lasers fast off the start and slowing toward the end' },
+  { name: 'w5 hot', ...W3, weldMode: 'lines', weldEase: 'power2.out', hot: true, flash: 2.6, hold: 0.25, note: 'w4 with heat: the seams flash bright and cool to the dark scar before the turns; the weld front is white-hot with a halo spilling onto the tiles and a cooling trail behind it' },
 )
 export const CUBE_OF = (name: string) => CUBE_VERSIONS.find((v) => v.name === name)

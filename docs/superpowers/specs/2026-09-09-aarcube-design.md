@@ -347,3 +347,7 @@ Aaron: "I like w1 branching, but faster start and slow down near end" → w4 und
 ## Weld on / off (06:45, 2026-09-10)
 
 Aaron: "add a weld on and off toggle, for v3, where it just merges seamlessly after the turns". The tab's toggle row now has `weld on / off` next to recoil; off skips the laser and, once the turns land, closes the gaps and fades the seam scars over half a second. Timed: a pass with the weld off runs ~2.3 s.
+
+## w5 hot: a weld that spills heat, and a flash on the break (07:00, 2026-09-10)
+
+Aaron: the weld "looks a bit fake still"; for the break-apart "try a bright color then fade to darker before it spins". w5 under v3 (w4 kept): `hot` seams are drawn 48 px across instead of the gap's 8 (`WIDE`), so with additive blending the heat spills onto the tiles: a white-hot front (gaussian at the erase radius) with a halo across the strip, a cooling trail behind it that runs white → scheme colour → dark over ~140 px, a little flicker on the front (`uTime`), and the un-welded scar line still confined to the gap. `flash 2.6` / `hold .25`: the seams appear at 2.6× scar brightness and cool to the scar over the open plus a quarter-second hold, and only then do the turns start. Verified (`shots/sheet-solve-w5-land.png`, crop `shots/solve/w5-weld-crop.png`): bright seams at 0.1–0.3 s, dark by 0.6 s, white fronts with halos from 1.9 s.

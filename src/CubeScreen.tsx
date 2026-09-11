@@ -16,6 +16,7 @@ import { SCHEMES } from './schemes'
 import { pageTexture, PROJECTS, type ScreenHandle } from './ScreenSolve'
 
 const FOV = 30
+const WIDE = 48 // px across a hot seam quad: the heat spills this far onto the tiles
 type Sticker = { id: number; tex: number; col: number; row: number; up: THREE.Vector3; right: THREE.Vector3; n: THREE.Vector3 }
 type Cubie = { pos: THREE.Vector3; stickers: Sticker[] }
 /** the six faces as seen from outside: normal, the page's up and right in cube space, which project */
@@ -60,6 +61,8 @@ const LASER_FRAG = /* glsl */ `
   // along-the-line mode: burn distance = shortest path along the seam lines from the nearest start; direct starts on this
   // seam (uS0..2, along it in px), and the two crossings at a third and two thirds with their own path distances uD1, uD2
   uniform float uGraph; uniform float uL; uniform vec3 uS; uniform float uD1; uniform float uD2;
+  // hot mode: the quad is uWide px across (wider than the gap) so the heat spills onto the tiles
+  uniform float uHot; uniform float uWide; uniform float uGap; uniform float uTime;
   varying vec2 vUv; varying vec2 vPos;
   void main() {
     float edge = 1.0 - abs(vUv.y - 0.5) * 2.0;
@@ -71,6 +74,21 @@ const LASER_FRAG = /* glsl */ `
     } else d = min(distance(vPos, uP0), min(distance(vPos, uP1), distance(vPos, uP2)));
     float front = exp(-pow((d - uR) / 22.0, 2.0)) * 1.6 + exp(-max(d - uR, 0.0) / 60.0) * 0.5;
     float un = smoothstep(uR - 4.0, uR + 4.0, d);
+    if (uHot > 0.5) {
+      float yp = (vUv.y - 0.5) * uWide;
+      float core = 1.0 - smoothstep(uGap * 0.5 - 1.0, uGap * 0.5 + 1.0, abs(yp));
+      float halo = exp(-yp * yp / 220.0);
+      float behind = uR - d;
+      float ft = exp(-pow((d - uR) / 10.0, 2.0));
+      float trail = behind > 0.0 ? exp(-behind / 140.0) : 0.0;
+      float fl = 0.85 + 0.15 * sin(uTime * 90.0 + d * 0.15);
+      vec3 white = vec3(1.0);
+      vec3 col = uColor * uHeat * 0.35 * core * un
+        + white * 2.2 * ft * (core + 0.6 * halo) * fl * uBead
+        + mix(white, uColor, clamp(behind / 70.0, 0.0, 1.0)) * trail * (core * 1.2 + 0.5 * halo) * uBead;
+      gl_FragColor = vec4(col, 1.0);
+      return;
+    }
     float scar = uHeat * 0.22 * edge * un; float hot = uBead * front * edge * un * 1.6;
     gl_FragColor = vec4(uColor * (scar + hot) + vec3(hot * hot * 0.5), 1.0);
   }
@@ -123,9 +141,11 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: 
   const setGap = (gap: number) => {
     gapNow.current = gap
     groups.current.forEach((grp) => grp.scale.set((cw - gap) / cw, (ch - gap) / ch, 1))
+    const across = v.hot ? WIDE : Math.max(gap, 1)
     seams.current.forEach((s, k) => {
       const n = (k % 2) + 1
-      if (k < 2) { s.position.set(0, H / 2 - n * ch, 1); s.rotation.z = 0; s.scale.set(W, Math.max(gap, 1), 1) } else { s.position.set(-W / 2 + n * cw, 0, 1); s.rotation.z = Math.PI / 2; s.scale.set(H, Math.max(gap, 1), 1) }
+      if (k < 2) { s.position.set(0, H / 2 - n * ch, 1); s.rotation.z = 0; s.scale.set(W, across, 1) } else { s.position.set(-W / 2 + n * cw, 0, 1); s.rotation.z = Math.PI / 2; s.scale.set(H, across, 1) }
+      s.material.uniforms.uHot.value = v.hot ? 1 : 0; s.material.uniforms.uWide.value = across; s.material.uniforms.uGap.value = gap
       s.visible = gap > 0
     })
   }
@@ -133,7 +153,7 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: 
     const g = root.current
     const col = new THREE.Color(colors.a)
     seams.current = [0, 1, 2, 3].map(() => {
-      const mat = new THREE.ShaderMaterial({ uniforms: { uColor: { value: col }, uHeat: { value: 0 }, uBead: { value: 0 }, uP0: { value: new THREE.Vector2() }, uP1: { value: new THREE.Vector2() }, uP2: { value: new THREE.Vector2() }, uR: { value: 0 }, uGraph: { value: 0 }, uL: { value: 1 }, uS: { value: new THREE.Vector3(1e8, 1e8, 1e8) }, uD1: { value: 1e8 }, uD2: { value: 1e8 } }, vertexShader: BEAD_VERT, fragmentShader: LASER_FRAG, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })
+      const mat = new THREE.ShaderMaterial({ uniforms: { uColor: { value: col }, uHeat: { value: 0 }, uBead: { value: 0 }, uP0: { value: new THREE.Vector2() }, uP1: { value: new THREE.Vector2() }, uP2: { value: new THREE.Vector2() }, uR: { value: 0 }, uGraph: { value: 0 }, uL: { value: 1 }, uS: { value: new THREE.Vector3(1e8, 1e8, 1e8) }, uD1: { value: 1e8 }, uD2: { value: 1e8 }, uHot: { value: 0 }, uWide: { value: 1 }, uGap: { value: 0 }, uTime: { value: 0 } }, vertexShader: BEAD_VERT, fragmentShader: LASER_FRAG, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat)
       g.add(mesh)
       return mesh
@@ -175,8 +195,12 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: 
       const tl = gsap.timeline({ onComplete: () => { st.project = nextIx; st.busy = false; resolve() } })
       // 1. the break: the gaps open and the seams light
       const gp = { g: 0 }
-      seams.current.forEach((s) => { s.material.uniforms.uHeat.value = 1; s.material.uniforms.uBead.value = 0; s.material.uniforms.uR.value = 0 })
+      const flash = v.flash ?? 1
+      const hold = v.hold ?? 0
+      seams.current.forEach((s) => { s.material.uniforms.uHeat.value = flash; s.material.uniforms.uBead.value = 0; s.material.uniforms.uR.value = 0 })
       tl.to(gp, { g: v.gap, duration: v.open, ease: 'power2.out', onUpdate: () => setGap(gp.g) }, 0)
+      // the seams may appear bright and cool to the scar before anything moves
+      if (flash !== 1) { const h = { v: flash }; tl.to(h, { v: 1, duration: v.open + hold, ease: 'power2.out', onUpdate: () => seams.current.forEach((s) => { s.material.uniforms.uHeat.value = h.v }) }, 0) }
       // 2. the turns, one move after another: the move's layers hang under pivots at the cube's centre and roll a quarter
       //    turn; on landing the state takes the turn, hidden stickers get their print, and the cube is rebuilt on the grid
       //    with the depth the next move's axis needs
@@ -184,9 +208,9 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: 
       //    against the layer while it accelerates) with a speedcuber's numbers, tuned separately from the site cube
       const feel = FEEL.screen
       const live: { pivots: THREE.Group[]; body: THREE.Group | null; axis: CubeMove['axis']; dir: number } = { pivots: [], body: null, axis: 'y', dir: 1 }
-      let landed = v.open
+      let landed = v.open + hold
       moves.forEach((mv, k) => {
-        const at = v.open + k * (feel.duration + v.stagger)
+        const at = v.open + hold + k * (feel.duration + v.stagger)
         tl.call(() => {
           build(depthFor(mv.axis))
           const centre = new THREE.Vector3(0, 0, -1.5 * st.depth)
@@ -259,7 +283,7 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: 
         let reach = 0
         per.forEach((q, k) => { for (let i = 0; i <= 48; i++) { const a = (i / 48) * L(k); const d = Math.min(...q.own.map((s) => Math.abs(a - s)), Math.abs(a - nodeAt(k, 0)) + q.d1, Math.abs(a - nodeAt(k, 1)) + q.d2); reach = Math.max(reach, d) } })
         tl.call(() => seams.current.forEach((s, k) => { const u = s.material.uniforms; u.uGraph.value = 1; u.uL.value = L(k); u.uS.value.set(per[k].own[0], per[k].own[1], per[k].own[2]); u.uD1.value = per[k].d1; u.uD2.value = per[k].d2; u.uBead.value = 1 }), [], w0)
-        tl.to(r, { v: reach, duration: v.weld, ease: v.weldEase ?? 'none', onUpdate: () => seams.current.forEach((s) => { s.material.uniforms.uR.value = r.v }) }, w0)
+        tl.to(r, { v: reach, duration: v.weld, ease: v.weldEase ?? 'none', onUpdate: () => seams.current.forEach((s) => { s.material.uniforms.uR.value = r.v; s.material.uniforms.uTime.value = performance.now() / 1000 }) }, w0)
       }
       tl.to(gp, { g: 0, duration: v.weld, ease: 'power2.inOut', onUpdate: () => setGap(gp.g) }, w0)
       tl.call(() => seams.current.forEach((s) => { s.material.uniforms.uHeat.value = 0; s.material.uniforms.uBead.value = 0 }), [], w0 + v.weld)
