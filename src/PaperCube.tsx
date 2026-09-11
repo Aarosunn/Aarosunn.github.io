@@ -328,8 +328,8 @@ function finalFragment(shader: PaperShader) {
       vec3 gcol = mix(u_asciiColor2, u_asciiColor, dens);
       // glow: a soft blob of the glyph colour under the cell, by density; then the glyph, dimmer the farther out
       float blob = smoothstep(0.9, 0.0, length(fc - 0.5) * 2.0);
-      fragColor.rgb = mix(fragColor.rgb, gcol, u_asciiGlow * dens * blob * step(0.5, level) * (1.0 - silA));
-      fragColor.rgb = mix(fragColor.rgb, gcol, ink * mix(1.0, dens, u_asciiFade) * (1.0 - silA));
+      fragColor.rgb = mix(fragColor.rgb, gcol, u_asciiMul * u_asciiGlow * dens * blob * step(0.5, level) * (1.0 - silA));
+      fragColor.rgb = mix(fragColor.rgb, gcol, u_asciiMul * ink * mix(1.0, dens, u_asciiFade) * (1.0 - silA));
     }
     ${shader === 'heat' ? 'fragColor.a = mix(fragColor.a, max(1.0 - inside, smoothstep(0.0, 0.35, img.r)), u_fuse);' : ''}
   }`
@@ -338,7 +338,7 @@ function finalFragment(shader: PaperShader) {
   const body = src.slice(0, i + marker.length) + tail + src.slice(i + marker.length)
   // heatmap's fragment never declares u_resolution; the ascii outline needs it
   const res = body.includes('uniform vec2 u_resolution') ? '' : ' uniform vec2 u_resolution;'
-  return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform float u_asciiSquash; uniform float u_asciiDither; uniform float u_asciiFade; uniform float u_asciiGlow; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; precision highp int;')
+  return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform float u_asciiSquash; uniform float u_asciiDither; uniform float u_asciiFade; uniform float u_asciiGlow; uniform float u_asciiMul; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; precision highp int;')
 }
 
 const rt = (size: number, depth = false, samples = 0) =>
@@ -379,6 +379,7 @@ const finalUniforms = (): Record<string, THREE.IUniform> => ({
   u_asciiDither: { value: 0 },
   u_asciiFade: { value: 0 },
   u_asciiGlow: { value: 0 },
+  u_asciiMul: { value: 1 }, // the flight fades the ascii outline out (Site)
   u_asciiMask: { value: null },
   u_grain: { value: 0 },
   u_aspect: { value: 1 },
@@ -451,7 +452,7 @@ export type PaperCubeProps = {
   /** the flight (Site): the mask scene's root and camera, the cube's half extent, and a zoom on paper's window */
   fly?: React.RefObject<FlyHandle | null>
 }
-export type FlyHandle = { root: THREE.Group; camera: THREE.PerspectiveCamera; half: number; scale0: number; zoom: (k: number) => void }
+export type FlyHandle = { root: THREE.Group; camera: THREE.PerspectiveCamera; half: number; scale0: number; zoom: (k: number) => void; ascii: (k: number) => void }
 
 export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = false, autoInterval = 900, debug = 'off', gain = 1, alpha = 1, outline: outlineProp, outlineColor = '#ffffff', ascii, rubik, fly }: PaperCubeProps) {
   const outline = outlineProp ?? V.outline ?? 'off'
@@ -533,7 +534,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
   // the flight zooms paper's window (u_scale) so the cube can fill the whole viewport, not just the mask square
   const zoom = useRef(1)
   const scale0 = typeof params.scale === 'number' ? params.scale : 0.75
-  useImperativeHandle(fly, () => ({ root: root.current, camera: camera as THREE.PerspectiveCamera, half: 1.5 * V.rubikGap, scale0, zoom: (k) => { zoom.current = k; Q.final.uniforms.u_scale.value = scale0 * k; if (Q.final2) Q.final2.uniforms.u_scale.value = (scale0 / IMG) * k } }), [camera, V.rubikGap, scale0, Q])
+  useImperativeHandle(fly, () => ({ root: root.current, camera: camera as THREE.PerspectiveCamera, half: 1.5 * V.rubikGap, scale0, zoom: (k) => { zoom.current = k; Q.final.uniforms.u_scale.value = scale0 * k; if (Q.final2) Q.final2.uniforms.u_scale.value = (scale0 / IMG) * k }, ascii: (k) => { Q.final.uniforms.u_asciiMul.value = k } }), [camera, V.rubikGap, scale0, Q])
   // preset params -> uniforms
   useEffect(() => {
     const u = Q.final.uniforms

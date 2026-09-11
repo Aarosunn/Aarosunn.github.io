@@ -25,7 +25,7 @@ for (const [w, h, name] of [[1440, 900, 'land'], [420, 820, 'port']]) {
   }
   let t0 = Date.now()
   await page.evaluate((i) => window.__aarNav.go(i), sec)
-  await shoot('go', t0, [0, 700, 1300, 1800, 2050, 2300, 2700])
+  await shoot('go', t0, [0, 300, 600, 1300, 1900, 2400, 2650, 2900, 3300])
   await page.waitForFunction(() => !window.__aarNav.busy())
   console.log(name, 'landed, section', await page.evaluate(() => window.__aarNav.section()))
   t0 = Date.now()
@@ -34,7 +34,7 @@ for (const [w, h, name] of [[1440, 900, 'land'], [420, 820, 'port']]) {
   await page.waitForFunction(() => !window.__aarNav.busy())
   t0 = Date.now()
   await page.evaluate(() => window.__aarNav.home())
-  await shoot('home', t0, [0, 400, 900, 1500, 2300])
+  await shoot('home', t0, [0, 400, 900, 1500, 2300, 2600, 2900, 3400])
   await page.waitForFunction(() => !window.__aarNav.busy())
   await page.waitForTimeout(300)
   console.log(name, 'home, section', await page.evaluate(() => window.__aarNav.section()))
