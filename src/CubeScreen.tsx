@@ -46,7 +46,7 @@ const FOV = 30
 /** the landed site cube's seams, as a fraction of a tile: its cubies' gap plus the mask's hairline and rounding (blank state) */
 export const LANDED_SEAM = 0.13
 /** how far inside its cell a tile samples the cube's plate (each side, fraction of a tile): past the seam and the plate's soft rim */
-export const LANDED_INSET = 0.095
+export const LANDED_INSET = 0.125
 const LANDED_ROUND = 0.07
 const WIDE = 48 // px across a hot seam quad: the heat spills this far onto the tiles
 type Sticker = { id: number; tex: number; col: number; row: number; up: THREE.Vector3; right: THREE.Vector3; n: THREE.Vector3 }

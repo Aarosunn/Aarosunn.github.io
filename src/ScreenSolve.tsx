@@ -34,7 +34,7 @@ export const pageColors = (sc: { bg: string; bg2: string; line: string; text: st
   look === 'classic' ? { bg: '#0b0e13', bg2: '#0e1219', text: '#c9cdd8', bright: '#f2f3f7', mute: '#6b7185', a: sc.a, disc: 'fill', hero: true }
   : look === 'site' ? { bg: sc.bg, bg2: sc.bg2, text: sc.text, bright: sc.bright, mute: sc.mute, a: sc.b, disc: 'ring', hero: true }
   : look === 'liquid' ? { bg: 'transparent', bg2: 'transparent', text: '#12201d', bright: '#07110f', mute: '#2f4a45', a: sc.b, disc: 'ring', hero: false }
-  : { bg: 'transparent', bg2: 'transparent', text: sc.text, bright: sc.bright, mute: sc.mute, a: sc.b, disc: 'ring', hero: false }
+  : { bg: 'transparent', bg2: 'transparent', text: sc.text, bright: sc.bright, mute: '#8fb3ab', a: sc.b, disc: 'ring', hero: false } // mute lifted for the dark mint
 /** one project drawn as a page at the viewport's size */
 export function pageTexture(p: (typeof PROJECTS)[number], w: number, h: number, colors: PageColors, t = 1) {
   const c = document.createElement('canvas')
