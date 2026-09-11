@@ -56,7 +56,7 @@ const FLIGHT = TRANSITION_OF('v1')!
 const PAGE = CUBE_OF('w4 branching eased')!
 const FOV = 30 // the mask camera's vertical fov (Canvas below)
 /** before take-off the page around the cube fades out (and the ascii outline with it); on the way home they fade back in as the cube lands */
-const PRE = 1.2
+const PRE = 1
 /** a section's projects: those tagged with its id in PROJECTS; a section with none shows them all */
 const projectsOf = (id: string) => { const own = PROJECTS.filter((p) => p.meta.startsWith(id)); return own.length ? own : PROJECTS }
 

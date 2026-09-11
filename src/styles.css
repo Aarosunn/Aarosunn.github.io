@@ -623,7 +623,7 @@ body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130
 
 /* the section transition: the site's UI fades as the cube takes off; the section page sits over the cube canvas and
    fades in over the landing (its opacity is driven by the flight); the wordmark flies home */
-.ui.site { transition: opacity 1.2s var(--ease); }
+.ui.site { transition: opacity 1s var(--ease); }
 .ui.site.away { opacity: 0; pointer-events: none; }
 .section-page { position: fixed; inset: 0; z-index: 3; opacity: 0; }
 .section-page .transition-canvas { position: absolute !important; inset: 0; }

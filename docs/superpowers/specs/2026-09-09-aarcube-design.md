@@ -367,3 +367,7 @@ Aaron: "there needs to be a fade out and in of the surrounding components before
 ## Longer fades (23:00, 2026-09-10)
 
 Aaron: "the fade out and in are too short" → `PRE` 0.6 → 1.2 s, the CSS transition on `.ui.site` to match. Sheet: the page and glyphs go over the first 1.2 s (half gone at 400 ms, gone by 1.2 s), the cube alone from 1.2 s, flying from then; home lands at ~2.3 s and the page is fully back by ~3.5 s.
+
+## Fades at 1 s (23:05, 2026-09-10)
+
+Aaron: "maybe 1s" → `PRE` 1 s, CSS to match. Reshot, same sequence.
