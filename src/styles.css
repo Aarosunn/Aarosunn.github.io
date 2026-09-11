@@ -631,7 +631,8 @@ body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130
    fades in over the landing (its opacity is driven by the flight); the wordmark flies home */
 .ui.site { transition: opacity 1s var(--ease); }
 .ui.site.away { opacity: 0; pointer-events: none; }
-.section-page { position: fixed; inset: 0; z-index: 3; opacity: 0; }
+.section-page { position: fixed; inset: 0; z-index: 3; opacity: 0; background: var(--bg); }
+.section-page .grain { position: absolute; z-index: 1; }
 .section-page .transition-canvas { position: absolute !important; inset: 0; }
 .section-page canvas { animation: none; transition: none; transform: none !important; }
 .section-page .home { position: fixed; top: 28px; left: 40px; z-index: 2; border: 0; padding: 0; background: transparent; animation: none; cursor: pointer; }

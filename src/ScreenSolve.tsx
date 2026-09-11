@@ -24,22 +24,36 @@ export const PROJECTS = [
   { title: 'camera rig', meta: 'hardware · 2026', blurb: 'a hand-tracking camera rig that knows which finger is which.' },
   { title: 'ascii portrait', meta: 'creatives · 2026', blurb: 'a portrait in text that watches back.' },
 ]
+export type PageColors = { bg: string; text: string; bright: string; mute: string; a: string }
 /** one project drawn as a page at the viewport's size */
-export function pageTexture(p: (typeof PROJECTS)[number], w: number, h: number, colors: { bg: string; text: string; bright: string; mute: string; a: string }) {
+export function pageTexture(p: (typeof PROJECTS)[number], w: number, h: number, colors: PageColors, t = 1) {
   const c = document.createElement('canvas')
   const s = 2
   c.width = w * s; c.height = h * s
+  paintPage(c, p, w, h, colors, t)
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.minFilter = THREE.LinearFilter
+  return tex
+}
+/** the page onto a canvas; `t` is the hero's entrance (0 = a bare block, 1 = the grid drawn line by line and the disc grown),
+ *  the text is always there: the text arrives with the tiles, the hero draws itself once the seams have welded */
+export function paintPage(c: HTMLCanvasElement, p: (typeof PROJECTS)[number], w: number, h: number, colors: PageColors, t = 1) {
+  const s = c.width / w
   const g = c.getContext('2d')!
-  g.scale(s, s)
+  g.setTransform(s, 0, 0, s, 0, 0)
   g.fillStyle = colors.bg; g.fillRect(0, 0, w, h)
   // a hero block on the right with a faint grid, like a placeholder still
   const portrait = h > w
   const hero = portrait ? { x: w * 0.08, y: h * 0.42, w: w * 0.84, h: h * 0.4 } : { x: w * 0.52, y: h * 0.16, w: w * 0.4, h: h * 0.62 }
-  g.fillStyle = '#0e1219'; g.fillRect(hero.x, hero.y, hero.w, hero.h)
+  g.fillStyle = '#0a1210'; g.fillRect(hero.x, hero.y, hero.w, hero.h)
   g.strokeStyle = colors.a + '55'; g.lineWidth = 1
-  for (let i = 1; i < 8; i++) { g.beginPath(); g.moveTo(hero.x + (hero.w * i) / 8, hero.y); g.lineTo(hero.x + (hero.w * i) / 8, hero.y + hero.h); g.stroke() }
-  for (let i = 1; i < 6; i++) { g.beginPath(); g.moveTo(hero.x, hero.y + (hero.h * i) / 6); g.lineTo(hero.x + hero.w, hero.y + (hero.h * i) / 6); g.stroke() }
-  g.fillStyle = colors.a; g.beginPath(); g.arc(hero.x + hero.w * 0.5, hero.y + hero.h * 0.5, Math.min(hero.w, hero.h) * 0.18, 0, Math.PI * 2); g.fill()
+  // the grid draws in: each line grows along its length, one after another
+  const drawn = (k: number, n: number) => Math.min(1, Math.max(0, t * (n + 2) - k))
+  for (let i = 1; i < 8; i++) { const f = drawn(i - 1, 7); if (f <= 0) continue; g.beginPath(); g.moveTo(hero.x + (hero.w * i) / 8, hero.y); g.lineTo(hero.x + (hero.w * i) / 8, hero.y + hero.h * f); g.stroke() }
+  for (let i = 1; i < 6; i++) { const f = drawn(i - 1, 5); if (f <= 0) continue; g.beginPath(); g.moveTo(hero.x, hero.y + (hero.h * i) / 6); g.lineTo(hero.x + hero.w * f, hero.y + (hero.h * i) / 6); g.stroke() }
+  const grow = 1 - Math.pow(1 - Math.min(1, Math.max(0, (t - 0.3) / 0.7)), 3)
+  if (grow > 0) { g.fillStyle = colors.a; g.beginPath(); g.arc(hero.x + hero.w * 0.5, hero.y + hero.h * 0.5, Math.min(hero.w, hero.h) * 0.18 * grow, 0, Math.PI * 2); g.fill() }
   const left = w * 0.08
   const top = portrait ? h * 0.14 : h * 0.3
   g.fillStyle = colors.mute; g.font = `400 ${portrait ? 12 : 13}px "Geist Mono", ui-monospace, monospace`
@@ -49,12 +63,8 @@ export function pageTexture(p: (typeof PROJECTS)[number], w: number, h: number, 
   g.fillStyle = colors.text; g.font = `400 ${portrait ? 13 : 15}px "Geist Mono", ui-monospace, monospace`
   // wrap the blurb
   const words = p.blurb.split(' '); const maxW = portrait ? w * 0.84 : w * 0.36; let line = ''; let y = top + (portrait ? 92 : 130)
-  for (const wd of words) { const t = line ? `${line} ${wd}` : wd; if (g.measureText(t).width > maxW) { g.fillText(line, left, y); line = wd; y += 22 } else line = t }
+  for (const wd of words) { const q = line ? `${line} ${wd}` : wd; if (g.measureText(q).width > maxW) { g.fillText(line, left, y); line = wd; y += 22 } else line = q }
   g.fillText(line, left, y)
-  const tex = new THREE.CanvasTexture(c)
-  tex.colorSpace = THREE.SRGBColorSpace
-  tex.minFilter = THREE.LinearFilter
-  return tex
 }
 
 const BEAD_VERT = /* glsl */ `varying vec2 vUv; varying vec2 vPos; void main() { vUv = uv; vPos = (modelMatrix * vec4(position, 1.0)).xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`
@@ -88,7 +98,7 @@ type Seam = { mesh: THREE.Mesh; mat: THREE.ShaderMaterial; dir: 'h' | 'v' }
 const Grid = forwardRef<ScreenHandle, { v: SolveVersion; scheme: string }>(function Grid({ v, scheme }, ref) {
   const { size, camera } = useThree()
   const W = size.width, H = size.height
-  const colors = useMemo(() => { const sc = SCHEMES.find((x) => x.name === scheme) ?? SCHEMES[0]; return { bg: '#0b0e13', text: '#c9cdd8', bright: '#f2f3f7', mute: '#6b7185', a: sc.a } }, [scheme])
+  const colors = useMemo(() => { const sc = SCHEMES.find((x) => x.name === scheme) ?? SCHEMES[0]; return { bg: sc.bg, text: sc.text, bright: sc.bright, mute: sc.mute, a: sc.b } }, [scheme])
   // the z=0 plane maps to the viewport exactly: world units are CSS pixels
   useEffect(() => {
     const cam = camera as THREE.PerspectiveCamera

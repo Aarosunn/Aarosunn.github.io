@@ -15,6 +15,9 @@ export type Scheme = {
   b: string
 }
 
+/** the blank tile the site cube drains to as it lands, and the screen cube starts from (Site / CubeScreen) */
+export const TILE = '#bfe6da'
+
 export const SCHEMES: Scheme[] = [
   {
     // ice top-left, mint glow bottom-right

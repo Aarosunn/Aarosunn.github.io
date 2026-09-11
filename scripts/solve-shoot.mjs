@@ -11,7 +11,7 @@ for (const [w, h, name] of [[1440, 900, 'land'], [420, 820, 'port']]) {
   const page = await browser.newPage({ viewport: { width: w, height: h } })
   page.on('pageerror', (e) => console.error('pageerror', e.message))
   page.on('console', (m) => m.type() === 'error' && !m.text().includes('404') && console.error('console', m.text().slice(0, 300)))
-  await page.goto(`http://localhost:5173/?tab=transition&screen=${encodeURIComponent(v)}`)
+  await page.goto(`http://localhost:5173/?tab=transition&tv=${tag[0] === 'a' ? 'v2' : tag[0] === 'w' ? 'v3' : 'v1'}&screen=${encodeURIComponent(v)}`)
   await page.waitForFunction(() => window.__aarTransition)
   await page.waitForFunction(() => document.querySelector('.transition-tab canvas')?.width > 300)
   await page.waitForTimeout(600)

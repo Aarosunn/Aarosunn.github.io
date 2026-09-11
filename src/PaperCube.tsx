@@ -269,6 +269,8 @@ function finalFragment(shader: PaperShader) {
     // look controls, cube body only: brightness scales it, opacity fades it toward the page
     fragColor.rgb = mix(fragColor.rgb, fragColor.rgb * u_gain, inside);
     fragColor.rgb = mix(u_colorBack.rgb, fragColor.rgb, mix(1.0, u_alpha, inside));
+    // the flight's landing: the look drains to flat tiles of one colour (the screen cube's blank tile), seams untouched
+    fragColor.rgb = mix(fragColor.rgb, u_flatColor, u_flat * inside);
     // outline behind the silhouette: 1 = a line of constant width, 2 = a soft glow; drawn where the pixel is
     // outside the cube but within reach of it (mask B = lambert > 0 inside, seams included, 0 outside)
     if (u_outline > 0.5 && u_outline < 2.5) {
@@ -338,7 +340,7 @@ function finalFragment(shader: PaperShader) {
   const body = src.slice(0, i + marker.length) + tail + src.slice(i + marker.length)
   // heatmap's fragment never declares u_resolution; the ascii outline needs it
   const res = body.includes('uniform vec2 u_resolution') ? '' : ' uniform vec2 u_resolution;'
-  return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform float u_asciiSquash; uniform float u_asciiDither; uniform float u_asciiFade; uniform float u_asciiGlow; uniform float u_asciiMul; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; precision highp int;')
+  return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform float u_asciiSquash; uniform float u_asciiDither; uniform float u_asciiFade; uniform float u_asciiGlow; uniform float u_asciiMul; uniform float u_flat; uniform vec3 u_flatColor; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; precision highp int;')
 }
 
 const rt = (size: number, depth = false, samples = 0) =>
@@ -380,6 +382,8 @@ const finalUniforms = (): Record<string, THREE.IUniform> => ({
   u_asciiFade: { value: 0 },
   u_asciiGlow: { value: 0 },
   u_asciiMul: { value: 1 }, // the flight fades the ascii outline out (Site)
+  u_flat: { value: 0 }, // the flight drains the look to flat tiles as it lands (Site)
+  u_flatColor: { value: new THREE.Vector3(0.75, 0.9, 0.85) },
   u_asciiMask: { value: null },
   u_grain: { value: 0 },
   u_aspect: { value: 1 },
@@ -454,7 +458,7 @@ export type PaperCubeProps = {
   /** the flight (Site): the mask scene's root and camera, the cube's half extent, and a zoom on paper's window */
   fly?: React.RefObject<FlyHandle | null>
 }
-export type FlyHandle = { root: THREE.Group; camera: THREE.PerspectiveCamera; half: number; scale0: number; zoom: (k: number) => void; ascii: (k: number) => void }
+export type FlyHandle = { root: THREE.Group; camera: THREE.PerspectiveCamera; half: number; scale0: number; zoom: (k: number) => void; ascii: (k: number) => void; flat: (k: number, color: string) => void }
 
 export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = false, autoInterval = 900, combo = 0, debug = 'off', gain = 1, alpha = 1, outline: outlineProp, outlineColor = '#ffffff', ascii, rubik, fly }: PaperCubeProps) {
   const outline = outlineProp ?? V.outline ?? 'off'
@@ -536,7 +540,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
   // the flight zooms paper's window (u_scale) so the cube can fill the whole viewport, not just the mask square
   const zoom = useRef(1)
   const scale0 = typeof params.scale === 'number' ? params.scale : 0.75
-  useImperativeHandle(fly, () => ({ root: root.current, camera: camera as THREE.PerspectiveCamera, half: 1.5 * V.rubikGap, scale0, zoom: (k) => { zoom.current = k; Q.final.uniforms.u_scale.value = scale0 * k; if (Q.final2) Q.final2.uniforms.u_scale.value = (scale0 / IMG) * k }, ascii: (k) => { Q.final.uniforms.u_asciiMul.value = k } }), [camera, V.rubikGap, scale0, Q])
+  useImperativeHandle(fly, () => ({ root: root.current, camera: camera as THREE.PerspectiveCamera, half: 1.5 * V.rubikGap, scale0, zoom: (k) => { zoom.current = k; Q.final.uniforms.u_scale.value = scale0 * k; if (Q.final2) Q.final2.uniforms.u_scale.value = (scale0 / IMG) * k }, ascii: (k) => { Q.final.uniforms.u_asciiMul.value = k }, flat: (k, color) => { Q.final.uniforms.u_flat.value = k; const n = parseInt(color.slice(1), 16); Q.final.uniforms.u_flatColor.value.set(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255) } }), [camera, V.rubikGap, scale0, Q]) // the paper pass writes to the screen raw: the hex as-is, not THREE's linear conversion
   // preset params -> uniforms
   useEffect(() => {
     const u = Q.final.uniforms

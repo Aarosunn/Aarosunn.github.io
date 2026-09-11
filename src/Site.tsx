@@ -8,12 +8,12 @@ import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import gsap from 'gsap'
 import { PaperCube, type FlyHandle } from './PaperCube'
-import { CubeScreen } from './CubeScreen'
+import { CubeScreen, type CubeHandle } from './CubeScreen'
 import { CUBE_OF, TRANSITION_OF } from './transitionVersions'
-import { PROJECTS, type ScreenHandle } from './ScreenSolve'
+import { PROJECTS } from './ScreenSolve'
 import { VERSION_OF } from './paperVersions'
 import { presetNamed } from './paperPresets'
-import { SCHEMES } from './schemes'
+import { SCHEMES, TILE } from './schemes'
 import { ALGS, type RubikHandle } from './RubikMask'
 import { Floral } from './Floral'
 import { XrayFloral } from './XrayFloral'
@@ -52,7 +52,7 @@ const SECTIONS: Section[] = [
 /** the section transition: the site cube spins and flies into the camera (the transition tab's v1 flight), the
  *  section page fades in over the landing; the page is the screen-as-cube with Aaron's picks (w4 branching eased weld,
  *  no recoil); home reverses the same flight */
-const FLIGHT = TRANSITION_OF('v4')!
+const FLIGHT = TRANSITION_OF('v5')!
 const PAGE = CUBE_OF('w4 branching eased')!
 const FOV = 30 // the mask camera's vertical fov (Canvas below)
 /** before take-off the page around the cube fades out (and the ascii outline with it, `UI_EASE` = the CSS --ease); the flight
@@ -60,6 +60,11 @@ const FOV = 30 // the mask camera's vertical fov (Canvas below)
 const PRE = 1
 const LEAD = 0.5
 const UI_EASE = 'expo.out'
+/** the landing: over the flight's last `DRAIN` s the cube's look drains to flat tiles (the screen cube's blank tile); then the
+ *  screen cube crossfades in over `SWAP` s (same tiles, same seams), stretches to the viewport over `STRETCH` s and solves the page in */
+const DRAIN = 0.35
+const SWAP = 0.25
+const STRETCH = 0.5
 /** the hand-placed floral group's canvas is `GROUP_OVER` times taller than its layout footprint (`--fh` in styles.css, 222 px on a
  *  900 px screen, shrinking with a shorter viewport so the base row never runs off the bottom) and the camera that much
  *  farther, so the flowers keep their size with headroom above and below: their petals were being cut by the canvas edge */
@@ -98,7 +103,9 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
   const fly = useRef<FlyHandle | null>(null)
   const tl = useRef<gsap.core.Timeline | null>(null)
   const overlay = useRef<HTMLDivElement | null>(null)
-  const grid = useRef<ScreenHandle | null>(null)
+  const grid = useRef<CubeHandle | null>(null)
+  // the whole sequence's phase: 'out' while going or coming (nothing else may start), 'in' on the page, null at home
+  const phase = useRef<'out' | 'in' | null>(null)
   const [section, setSection] = useState<number | null>(null)
   const [flying, setFlying] = useState(false)
   const away = flying || section !== null
@@ -106,9 +113,10 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
   // the idle spin runs right up to the moment the flight takes the rotation and resumes the moment it hands it back,
   // so the cube never sits still during the fades
   const [still, setStill] = useState(false)
-  const go = (i: number) => {
+  const go = async (i: number) => {
     const h = fly.current
-    if (!h || tl.current) return
+    if (!h || tl.current || phase.current) return
+    phase.current = 'out'
     setOpen(null)
     setActive(i)
     setSection(i)
@@ -120,11 +128,12 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     const e = new THREE.Euler().setFromQuaternion(cam.quaternion, 'XYZ')
     const ey = e.y + Math.PI * 2 * Math.ceil((root.rotation.y - e.y) / (Math.PI * 2))
     // fly up the view axis to where the face fills paper's square window (overshoot flies closer), while the window
-    // itself grows to cover the viewport
+    // itself grows to the viewport's short side: the landed face is a square filling the height (landscape) or the width
     const dist = h.half / Math.tan((FOV * Math.PI) / 360) / FLIGHT.overshoot
     const to = cam.position.clone().addScaledVector(cam.getWorldDirection(new THREE.Vector3()), dist)
     const zoom = { k: 1 }
-    const kFill = Math.max(window.innerWidth / window.innerHeight, 1) / h.scale0
+    const kFill = Math.min(window.innerWidth / window.innerHeight, 1) / h.scale0
+    const flat = { k: 0 }
     const dur = reduced ? 0.01 : FLIGHT.duration
     const pre = reduced ? 0.01 : PRE
     const lead = reduced ? 0.01 : LEAD
@@ -132,10 +141,11 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     const asc = { k: 1 }
     const fadeAscii = (k: number) => gsap.to(asc, { k, duration: pre, ease: UI_EASE, overwrite: true, onUpdate: () => h.ascii(asc.k) })
     fadeAscii(0)
+    let landed!: () => void
+    const landing = new Promise<void>((res) => { landed = res })
     const t = gsap.timeline({
-      onUpdate: () => { if (overlay.current) overlay.current.style.opacity = String(Math.min(1, Math.max(0, (t.time() - lead - FLIGHT.fadeAt * dur) / ((1 - FLIGHT.fadeAt) * dur)))) },
-      onComplete: () => setFlying(false),
-      onReverseComplete: () => { tl.current = null; h.zoom(1); h.ascii(1); setHidden(false); setStill(false); setSection(null); setFlying(false) },
+      onComplete: () => landed(),
+      onReverseComplete: () => { tl.current = null; phase.current = null; h.zoom(1); h.ascii(1); h.flat(0, TILE); setHidden(false); setStill(false); setSection(null); setFlying(false) },
     })
     // 1. the surroundings fade (CSS, `hidden`) and the ascii outline with them; 2. the flight from `lead`; reversed, the
     //    callback at the take-off point fires as the cube lands home and the page fades back in with the outline
@@ -143,12 +153,31 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     t.to(root.rotation, { x: e.x + Math.PI * 2 * FLIGHT.spin[0], y: ey + Math.PI * 2 * FLIGHT.spin[1], z: e.z, duration: dur, ease: FLIGHT.spinEase }, lead)
     t.to(root.position, { x: to.x, y: to.y, z: to.z, duration: dur, ease: FLIGHT.approachEase }, lead)
     t.to(zoom, { k: kFill, duration: dur, ease: FLIGHT.approachEase, onUpdate: () => h.zoom(zoom.k) }, lead)
+    // the look drains to flat tiles as it lands
+    t.to(flat, { k: 1, duration: reduced ? 0.01 : DRAIN, ease: 'power1.inOut', onUpdate: () => h.flat(flat.k, TILE) }, lead + dur - (reduced ? 0.01 : DRAIN))
     tl.current = t
+    await landing
+    // the screen cube takes over: same square tiles, same seams; it stretches to the viewport and solves the page in
+    await new Promise<void>((res) => gsap.to(overlay.current, { opacity: 1, duration: SWAP, ease: 'none', onComplete: res }))
+    await grid.current?.stretch(true, STRETCH)
+    await grid.current?.next()
+    phase.current = 'in'
+    setFlying(false)
   }
-  const home = () => { const t = tl.current; if (!t || t.reversed()) return; setFlying(true); t.reverse() }
+  const home = async () => {
+    const t = tl.current
+    if (!t || phase.current !== 'in') return
+    phase.current = 'out'
+    setFlying(true)
+    // the page solves away to blank tiles, the cube shrinks square, the site cube shows through, then flies home
+    await grid.current?.clear()
+    await grid.current?.stretch(false, STRETCH)
+    await new Promise<void>((res) => gsap.to(overlay.current, { opacity: 0, duration: SWAP, ease: 'none', onComplete: res }))
+    t.reverse()
+  }
   const goRef = useRef({ go, home })
   goRef.current = { go, home }
-  useEffect(() => { window.__aarNav = { go: (i) => goRef.current.go(i), home: () => goRef.current.home(), next: () => grid.current?.next() ?? Promise.resolve(), busy: () => (tl.current?.isActive() ?? false) || (grid.current?.busy() ?? false), section: () => section, rotY: () => fly.current?.root.rotation.y ?? 0 } }, [section])
+  useEffect(() => { window.__aarNav = { go: (i) => goRef.current.go(i), home: () => goRef.current.home(), next: () => grid.current?.next() ?? Promise.resolve(), busy: () => phase.current === 'out' || (grid.current?.busy() ?? false), section: () => section, rotY: () => fly.current?.root.rotation.y ?? 0, dbg: () => grid.current?.dbg() } }, [section])
   // the lab's v1 at its own camera (blur radii are frame-relative, so the cube stays crisp);
   // paper's `scale` shrinks the whole image on screen so the sections breathe
   const narrow = typeof window !== 'undefined' && window.innerWidth < 900
@@ -236,7 +265,8 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       {/* the section page: the screen as a cube, faded in over the landing; the wordmark (or escape) flies home */}
       {section !== null && (
         <div className="section-page" ref={overlay}>
-          <CubeScreen key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} projects={projectsOf(SECTIONS[section].id)} />
+          <CubeScreen key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} blank projects={projectsOf(SECTIONS[section].id)} />
+          <div className="grain" />
           <button className="wordmark home" onClick={home} aria-label="home">aarcube</button>
           <div className="page-hint"><span>{SECTIONS[section].title.toLowerCase()}</span><button onClick={() => grid.current?.next()}>next (n)</button><button onClick={home}>home (esc)</button></div>
         </div>
@@ -320,7 +350,7 @@ declare global {
   interface Window {
     __aarSite: React.RefObject<RubikHandle | null>
     /** the section transition: fly to a section, home, next project, busy while a flight or a turn runs */
-    __aarNav: { go: (i: number) => void; home: () => void; next: () => Promise<void>; busy: () => boolean; section: () => number | null; rotY: () => number }
+    __aarNav: { go: (i: number) => void; home: () => void; next: () => Promise<void>; busy: () => boolean; section: () => number | null; rotY: () => number; dbg: () => unknown }
   }
 }
 

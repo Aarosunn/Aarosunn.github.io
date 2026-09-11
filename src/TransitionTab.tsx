@@ -7,7 +7,7 @@ import gsap from 'gsap'
 import { CUBE_OF, CUBE_VERSIONS, SOLVE_OF, SOLVE_VERSIONS, TRANSITION_VERSIONS, type TransitionVersion } from './transitionVersions'
 import { ScreenSolve, type ScreenHandle } from './ScreenSolve'
 import { FEEL } from './RubikMask'
-import { CubeScreen } from './CubeScreen'
+import { CubeScreen, type CubeHandle } from './CubeScreen'
 
 const FOV = 35
 const CAM_Z = 9
@@ -54,7 +54,7 @@ export function TransitionTab({ v, setVersion, screen, setScreen, scheme }: { v:
   // the screen row under this version; switching version lands on its first screen
   const screens = v.screens ?? ['flight', ...SOLVE_VERSIONS.map((x) => x.name), ...CUBE_VERSIONS.filter((x) => !x.alg).map((x) => x.name)]
   useEffect(() => { if (!screens.includes(screen)) setScreen(screens[0]) }, [v.name]) // eslint-disable-line react-hooks/exhaustive-deps
-  const grid = useRef<ScreenHandle | null>(null)
+  const grid = useRef<CubeHandle | null>(null)
   const [recoil, setRecoil] = useState(false) // Aaron: no recoil on transitions
   const [weld, setWeld] = useState(true)
   const group = useRef<THREE.Group | null>(null)

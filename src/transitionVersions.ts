@@ -26,6 +26,9 @@ export const TRANSITION_VERSIONS: TransitionVersion[] = [
   { name: 'v3', spin: [1, 2], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1.4, fadeAt: 0.72, fade: 0.7, screens: ['w1 branching', 'w2 out to in', 'w3 in to out', 'w4 branching eased', 'w5 hot'], note: 'v3: the weld runs along the seam lines like a laser, starting each line it crosses: from random points, from the edges inward, or from the centre outward' },
   // the site's flight (Site.tsx): v1 with fewer spins. y may take half turns (a half turn about the camera's own up axis still lands a face); x whole turns only
   { name: 'v4', spin: [1, 1.5], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1.4, fadeAt: 0.72, fade: 0.7, screens: ['flight'], note: 'v4: the site\'s flight, one turn over and a turn and a half around (Aaron: slightly fewer spins)' },
+  // v5 (the site since 2026-09-11): lands with the square face exactly filling the viewport's short side, the look drained
+  // to flat tiles; the screen cube takes over square, stretches to the viewport and solves the page in
+  { name: 'v5', spin: [1, 1.5], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1, fadeAt: 1, fade: 0, screens: ['flight'], note: 'v5: v4 landing square on the short side (no overshoot, no fade): the screen cube then stretches and solves' },
 ]
 
 export const TRANSITION_OF = (name: string) => TRANSITION_VERSIONS.find((v) => v.name === name)
