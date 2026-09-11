@@ -52,7 +52,7 @@ const SECTIONS: Section[] = [
 /** the section transition: the site cube spins and flies into the camera (the transition tab's v1 flight), the
  *  section page fades in over the landing; the page is the screen-as-cube with Aaron's picks (w4 branching eased weld,
  *  no recoil); home reverses the same flight */
-const FLIGHT = TRANSITION_OF('v1')!
+const FLIGHT = TRANSITION_OF('v4')!
 const PAGE = CUBE_OF('w4 branching eased')!
 const FOV = 30 // the mask camera's vertical fov (Canvas below)
 /** before take-off the page around the cube fades out (and the ascii outline with it, `UI_EASE` = the CSS --ease); the flight
@@ -67,21 +67,21 @@ const projectsOf = (id: string) => { const own = PROJECTS.filter((p) => p.meta.s
 const HEAT_OF_SCHEME: Record<string, string> = { icemint: 'icemint', ice: 'icemint', mint: 'icemint', ember: 'ember', graphite: 'graphite', aura: 'default', paper: 'sepia' }
 
 /** cube versions worth comparing in place; key `v` cycles. Versions whose own preset is light get a dark one here. */
-const SITE_VERSIONS = ['v17', 'v16', 'v15', 'v14', 'v1', 'v9', 'v4', 'v7', 'v2', 'v6']
+const SITE_VERSIONS = ['v18', 'v17', 'v16', 'v15', 'v14', 'v1', 'v9', 'v4', 'v7', 'v2', 'v6']
 const SITE_PRESET: Record<string, string> = { v6: 'ice' }
 /** j k l run the famous algorithms at speedcubing pace */
 export const ALG_KEYS: Record<string, string> = { j: 'T perm', k: 'U perm', l: 'Sune' }
 /** the site cube's themes (v14 / v15), key g cycles; the on-screen toggle is gone since Aaron settled on mint grain */
 const SITE_THEMES: [string, string][] = [['ice grain', 'ice'], ['mint grain', 'mint'], ['icemint grain soft', 'icemint']]
 
-export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#07090c', floral = 'v18', floralSeed = 3, flower }: { version?: string; scheme?: string; bg?: string; floral?: string; floralSeed?: number; flower?: string }) {
+export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#07090c', floral = 'v18', floralSeed = 3, flower }: { version?: string; scheme?: string; bg?: string; floral?: string; floralSeed?: number; flower?: string }) {
   const xray0 = FLORAL_OF(floral)
   // the hand-placed group (v14+) sits in the base row a little closer than the tab shows it, in a taller box
   const xray = useMemo(() => (xray0?.scene?.place ? { ...xray0, scene: { ...xray0.scene, camDist: (xray0.scene.camDist ?? 9.4) / 1.9 } } : xray0), [xray0])
   const [active, setActive] = useState(0)
-  const [version, setVersion] = useState(VERSION_OF(initial) ? initial : 'v17')
+  const [version, setVersion] = useState(VERSION_OF(initial) ? initial : 'v18')
   // a deep-linked version outside the curated cycle still cycles from itself
-  const cycle = useMemo(() => Array.from(new Set([VERSION_OF(initial) ? initial : 'v17', ...SITE_VERSIONS])), [initial])
+  const cycle = useMemo(() => Array.from(new Set([VERSION_OF(initial) ? initial : 'v18', ...SITE_VERSIONS])), [initial])
   const [open, setOpen] = useState<{ section: number; item: number } | null>(null)
   // layout A/B: sections in the corners, or deck only (the deck carries the blurb, panels do the rest)
   const [layout, setLayout] = useState<'corners' | 'deck'>('corners')
@@ -227,7 +227,7 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
   return (
     <>
       <Canvas key={version} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
-        <PaperCube version={PV} params={params} spin={!reduced && !still} spinSpeed={0.12} auto={!reduced && !away} autoInterval={6500} rubik={rubik} fly={fly} />
+        <PaperCube version={PV} params={params} spin={!reduced && !still} spinSpeed={0.12} auto={!reduced && !away} autoInterval={3600} combo={0.35} rubik={rubik} fly={fly} />
       </Canvas>
       {/* the section page: the screen as a cube, faded in over the landing; the wordmark (or escape) flies home */}
       {section !== null && (
@@ -284,7 +284,7 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
           </aside>
         )}
         <div className="site-base">
-          {xray?.placement === 'bottom' ? null : xray ? (xray.kind === 'mesh' ? <XrayFlower3D v={xray} flower={flower} seed={floralSeed} height={xray.scene?.place ? 210 : undefined} className={`floral xray ${xray.scene?.place ? 'group' : ''}`} scheme={scheme} /> : <XrayFloral v={xray} seed={floralSeed} className="floral xray" scheme={scheme} />) : <Floral className="floral" seed={11 + 7 * Math.max(0, SCHEMES.findIndex((x) => x.name === scheme))} />}
+          {xray?.placement === 'bottom' ? null : xray ? (xray.kind === 'mesh' ? <XrayFlower3D v={xray} flower={flower} seed={floralSeed} height={xray.scene?.place ? 222 : undefined} className={`floral xray ${xray.scene?.place ? 'group' : ''}`} scheme={scheme} /> : <XrayFloral v={xray} seed={floralSeed} className="floral xray" scheme={scheme} />) : <Floral className="floral" seed={11 + 7 * Math.max(0, SCHEMES.findIndex((x) => x.name === scheme))} />}
           {layout === 'deck' && (
             <div className="deck-blurb">
               <h2>{SECTIONS[active].title}</h2>

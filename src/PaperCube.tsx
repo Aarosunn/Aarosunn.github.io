@@ -439,6 +439,8 @@ export type PaperCubeProps = {
   /** chain random turns, with this pause between them (ms) */
   auto?: boolean
   autoInterval?: number
+  /** chance an idle turn is a burst of two or three (RubikMask) */
+  combo?: number
   debug?: PaperDebug
   /** look controls: brightness multiplier and cube-body opacity */
   gain?: number
@@ -454,7 +456,7 @@ export type PaperCubeProps = {
 }
 export type FlyHandle = { root: THREE.Group; camera: THREE.PerspectiveCamera; half: number; scale0: number; zoom: (k: number) => void; ascii: (k: number) => void }
 
-export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = false, autoInterval = 900, debug = 'off', gain = 1, alpha = 1, outline: outlineProp, outlineColor = '#ffffff', ascii, rubik, fly }: PaperCubeProps) {
+export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = false, autoInterval = 900, combo = 0, debug = 'off', gain = 1, alpha = 1, outline: outlineProp, outlineColor = '#ffffff', ascii, rubik, fly }: PaperCubeProps) {
   const outline = outlineProp ?? V.outline ?? 'off'
   const A: AsciiParams = { cell: 9, reach: 0.05, bias: 3, scatter: 0.5, color: '#ece8df', ...V.ascii, ...ascii }
   const SIZE = V.size
@@ -735,7 +737,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       {/* the mask scene: never rendered by R3F, only by the manual passes above */}
       <scene ref={maskScene}>
         <group ref={root} rotation={[0.5, -0.7, 0]}>
-          <RubikMask ref={rubik} gap={V.rubikGap} rounded={V.rubikRound} material={Q.face} auto={auto} autoInterval={autoInterval} />
+          <RubikMask ref={rubik} gap={V.rubikGap} rounded={V.rubikRound} material={Q.face} auto={auto} autoInterval={autoInterval} combo={combo} />
           {/* the un-turned cube's shape, layer 1 only: the still ascii outline measures from this */}
           <mesh layers-mask={2} material={Q.face}>
             <boxGeometry args={[3 * V.rubikGap, 3 * V.rubikGap, 3 * V.rubikGap]} />

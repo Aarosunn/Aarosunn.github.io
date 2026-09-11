@@ -76,8 +76,9 @@ const orientationError = (m: THREE.Mesh) => {
   return worst
 }
 
-export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.Material; auto: boolean; autoInterval?: number; rounded?: number; onTurn?: () => void }>(
-  function RubikMask({ gap, material, auto, autoInterval = 900, rounded = 0, onTurn }, ref) {
+/** combo: the chance an idle turn is instead a burst of two or three quick turns (a speedcuber's fingers) */
+export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.Material; auto: boolean; autoInterval?: number; combo?: number; rounded?: number; onTurn?: () => void }>(
+  function RubikMask({ gap, material, auto, autoInterval = 900, combo = 0, rounded = 0, onTurn }, ref) {
     const root = useRef<THREE.Group>(null!)
     const pivot = useRef<THREE.Group>(null!)
     const cubies = useRef<Cubie[]>([])
@@ -219,15 +220,25 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
       let live = true
       const loop = async () => {
         while (live) {
-          await turn()
-          await new Promise((r) => setTimeout(r, autoInterval))
+          if (Math.random() < combo) {
+            // a burst: two or three turns on different axes, brisk but not algorithm-fast
+            const moves: Move[] = []
+            let ax: Axis = AXES[Math.floor(Math.random() * 3)]
+            for (let i = 0; i < 2 + (Math.random() < 0.5 ? 1 : 0); i++) {
+              moves.push({ axis: ax, layer: ([-1, 0, 1] as const)[Math.floor(Math.random() * 3)], dir: Math.random() < 0.5 ? 1 : -1, quarters: 1 })
+              ax = AXES[(AXES.indexOf(ax) + 1 + Math.floor(Math.random() * 2)) % 3]
+            }
+            await run(moves, 0.3)
+          } else await turn()
+          // the pause varies around the interval so the idle never ticks like a clock
+          await new Promise((r) => setTimeout(r, autoInterval * (0.6 + 0.8 * Math.random())))
         }
       }
       loop()
       return () => {
         live = false
       }
-    }, [auto, autoInterval, turn])
+    }, [auto, autoInterval, combo, turn, run])
 
     return (
       <group ref={root}>

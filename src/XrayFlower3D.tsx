@@ -252,7 +252,8 @@ export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, heig
   const swatches = useMemo(() => readSwatches(v), [v.swatches, scheme])
   const scene = !!v.scene
   const cam = { position: (scene ? [0, strip ? 1.0 : 1.1, camDist] : [0, 0, upright ? 4.9 : 6.8]) as [number, number, number], fov: 30 }
-  const lookAt: [number, number, number] = [0, strip ? 0.05 : -0.25, 0]
+  // a hand-placed group sits a little higher in its box (its lowest petals were cut by the site's base row)
+  const lookAt: [number, number, number] = [0, strip ? 0.05 : v.scene?.place ? -0.36 : -0.25, 0]
   const blur = v.blur ?? 0
   return (
     <div className={`xf3d ${className ?? ''}`} style={{ position: 'relative', width, height }}>

@@ -377,7 +377,8 @@ button:focus-visible {
   opacity: 0.26;
   pointer-events: none;
 }
-.floral.xray.group { height: 210px; margin-top: -74px; }
+.floral.xray.group { height: 222px; margin-top: -74px; }
+.site-base:has(.floral.xray.group) { padding-top: 12px; }
 .floral.xray {
   height: 140px;
   opacity: 0.9;

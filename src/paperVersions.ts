@@ -241,6 +241,8 @@ export const PAPER_VERSIONS: PaperVersion[] = [
     note: "v16's outline thinner top and bottom, code glyphs . ; / < = { #, an ordered dither that fades with distance, a soft glow under each glyph",
   },
 ]
+// v18: v17 with the ascii glyphs in a darker mint next to the cube blending to a lighter mint at the tips (Aaron, 2026-09-10)
+PAPER_VERSIONS.push({ ...PAPER_VERSIONS[PAPER_VERSIONS.length - 1], name: 'v18', ascii: { ...PAPER_VERSIONS[PAPER_VERSIONS.length - 1].ascii!, color: '#3fa88e', color2: '#c6f2e6' }, note: "v17 with the glyphs a darker mint by the cube, blending to a lighter mint as they trail off" })
 
 /** paper tab: the shaders on a plain-looking cube (whole-face plates hide the cubies until a layer turns) */
 export const CUBE_DEMOS: PaperVersion[] = [

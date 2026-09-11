@@ -24,6 +24,8 @@ export const TRANSITION_VERSIONS: TransitionVersion[] = [
   { name: 'v1', spin: [1, 2], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1.4, fadeAt: 0.72, fade: 0.7, note: 'one turn over, two around, accelerating into the camera until a face overfills the screen; the page fades in over the last quarter' },
   { name: 'v2', spin: [1, 2], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1.4, fadeAt: 0.72, fade: 0.7, screens: ['a1 rows', 'a2 columns', 'a3 slices'], note: 'v2: the screen is a real cube and the next project is solved onto the front face by an algorithm, three to choose from; unseen faces are printed with the next project before they come round' },
   { name: 'v3', spin: [1, 2], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1.4, fadeAt: 0.72, fade: 0.7, screens: ['w1 branching', 'w2 out to in', 'w3 in to out', 'w4 branching eased', 'w5 hot'], note: 'v3: the weld runs along the seam lines like a laser, starting each line it crosses: from random points, from the edges inward, or from the centre outward' },
+  // the site's flight (Site.tsx): v1 with fewer spins. y may take half turns (a half turn about the camera's own up axis still lands a face); x whole turns only
+  { name: 'v4', spin: [1, 1.5], duration: 2.2, approachEase: 'power3.in', spinEase: 'power2.inOut', overshoot: 1.4, fadeAt: 0.72, fade: 0.7, screens: ['flight'], note: 'v4: the site\'s flight, one turn over and a turn and a half around (Aaron: slightly fewer spins)' },
 ]
 
 export const TRANSITION_OF = (name: string) => TRANSITION_VERSIONS.find((v) => v.name === name)
