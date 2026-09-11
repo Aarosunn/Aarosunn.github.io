@@ -371,3 +371,7 @@ Aaron: "the fade out and in are too short" → `PRE` 0.6 → 1.2 s, the CSS tran
 ## Fades at 1 s (23:05, 2026-09-10)
 
 Aaron: "maybe 1s" → `PRE` 1 s, CSS to match. Reshot, same sequence.
+
+## The spin never stops (23:15, 2026-09-10)
+
+Aaron: "an awkward break where the cube stops rotating for a second or starts rotating a second after breaks the immersion". The idle spin had been switched off at take-off (the fade beat) and back on only once the return fully unwound. Now a `still` state flips at the flight's own start point in the timeline: forward, the spin stops the moment the flight tween takes the rotation (the tween records its start lazily, so it continues from wherever the spin left the cube); reversed, the same callback resumes the spin the moment the tween hands the rotation back. Probed through `__aarNav.rotY()` at 100 ms: idle 0.012 rad per sample straight into the flight's ramp at 1.2 s, and the return decelerating straight into 0.012 idle at 2.3 s, no zero stretch either side.

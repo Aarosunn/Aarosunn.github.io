@@ -96,6 +96,9 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
   const [flying, setFlying] = useState(false)
   const away = flying || section !== null
   const [hidden, setHidden] = useState(false) // the page around the cube, faded out before take-off and back in on landing home
+  // the idle spin runs right up to the moment the flight takes the rotation and resumes the moment it hands it back,
+  // so the cube never sits still during the fades
+  const [still, setStill] = useState(false)
   const go = (i: number) => {
     const h = fly.current
     if (!h || tl.current) return
@@ -121,12 +124,12 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
     const t = gsap.timeline({
       onUpdate: () => { if (overlay.current) overlay.current.style.opacity = String(Math.min(1, Math.max(0, (t.time() - pre - FLIGHT.fadeAt * dur) / ((1 - FLIGHT.fadeAt) * dur)))) },
       onComplete: () => setFlying(false),
-      onReverseComplete: () => { tl.current = null; h.zoom(1); h.ascii(1); setHidden(false); setSection(null); setFlying(false) },
+      onReverseComplete: () => { tl.current = null; h.zoom(1); h.ascii(1); setHidden(false); setStill(false); setSection(null); setFlying(false) },
     })
     // 1. the surroundings fade (CSS, `hidden`) and the ascii outline with them; 2. the flight; reversed, the callback
     //    at the take-off point fires as the cube lands home and the page fades back in with the outline
     t.to(asc, { k: 0, duration: pre, ease: 'power1.inOut', onUpdate: () => h.ascii(asc.k) }, 0)
-    t.call(() => { if (t.reversed()) setHidden(false) }, [], pre)
+    t.call(() => { const back = t.reversed(); setStill(!back); if (back) setHidden(false) }, [], pre)
     t.to(root.rotation, { x: e.x + Math.PI * 2 * FLIGHT.spin[0], y: ey + Math.PI * 2 * FLIGHT.spin[1], z: e.z, duration: dur, ease: FLIGHT.spinEase }, pre)
     t.to(root.position, { x: to.x, y: to.y, z: to.z, duration: dur, ease: FLIGHT.approachEase }, pre)
     t.to(zoom, { k: kFill, duration: dur, ease: FLIGHT.approachEase, onUpdate: () => h.zoom(zoom.k) }, pre)
@@ -135,7 +138,7 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
   const home = () => { const t = tl.current; if (!t || t.reversed()) return; setFlying(true); t.reverse() }
   const goRef = useRef({ go, home })
   goRef.current = { go, home }
-  useEffect(() => { window.__aarNav = { go: (i) => goRef.current.go(i), home: () => goRef.current.home(), next: () => grid.current?.next() ?? Promise.resolve(), busy: () => (tl.current?.isActive() ?? false) || (grid.current?.busy() ?? false), section: () => section } }, [section])
+  useEffect(() => { window.__aarNav = { go: (i) => goRef.current.go(i), home: () => goRef.current.home(), next: () => grid.current?.next() ?? Promise.resolve(), busy: () => (tl.current?.isActive() ?? false) || (grid.current?.busy() ?? false), section: () => section, rotY: () => fly.current?.root.rotation.y ?? 0 } }, [section])
   // the lab's v1 at its own camera (blur radii are frame-relative, so the cube stays crisp);
   // paper's `scale` shrinks the whole image on screen so the sections breathe
   const narrow = typeof window !== 'undefined' && window.innerWidth < 900
@@ -218,7 +221,7 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
   return (
     <>
       <Canvas key={version} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
-        <PaperCube version={PV} params={params} spin={!reduced && !away} spinSpeed={0.12} auto={!reduced && !away} autoInterval={6500} rubik={rubik} fly={fly} />
+        <PaperCube version={PV} params={params} spin={!reduced && !still} spinSpeed={0.12} auto={!reduced && !away} autoInterval={6500} rubik={rubik} fly={fly} />
       </Canvas>
       {/* the section page: the screen as a cube, faded in over the landing; the wordmark (or escape) flies home */}
       {section !== null && (
@@ -307,7 +310,7 @@ declare global {
   interface Window {
     __aarSite: React.RefObject<RubikHandle | null>
     /** the section transition: fly to a section, home, next project, busy while a flight or a turn runs */
-    __aarNav: { go: (i: number) => void; home: () => void; next: () => Promise<void>; busy: () => boolean; section: () => number | null }
+    __aarNav: { go: (i: number) => void; home: () => void; next: () => Promise<void>; busy: () => boolean; section: () => number | null; rotY: () => number }
   }
 }
 
