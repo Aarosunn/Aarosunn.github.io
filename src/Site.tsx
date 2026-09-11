@@ -8,7 +8,7 @@ import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import gsap from 'gsap'
 import { PaperCube, type FlyHandle } from './PaperCube'
-import { CubeScreen, ScreenCube, type CubeHandle } from './CubeScreen'
+import { CubeScreen, LANDED_INSET, ScreenCube, type CubeHandle } from './CubeScreen'
 import { CUBE_OF, TRANSITION_OF } from './transitionVersions'
 import { SITE_TRANSITION_OF, SITE_TRANSITIONS, type SiteVersion } from './siteVersions'
 import { PROJECTS } from './ScreenSolve'
@@ -66,6 +66,11 @@ const UI_EASE = 'expo.out'
  *  squaring back, and halfway the shader cube draws itself again and the flight reverses, zooming out while it finishes squaring. */
 const STRETCH = 0.9
 const OVERLAP = 0.45
+/** s3: at the landing the seams stay as gaps and the laser weld closes them over `WELD` s, while the liquid's clock is pushed
+ *  `SWEEP` s ahead over `SETTLE` s (one last highlight through) as it settles onto the solid dark mint */
+const WELD = 1.3
+const SETTLE = 1.6
+const SWEEP = 2.5
 /** the hand-placed floral group's canvas is `GROUP_OVER` times taller than its layout footprint (`--fh` in styles.css, 222 px on a
  *  900 px screen, shrinking with a shorter viewport so the base row never runs off the bottom) and the camera that much
  *  farther, so the flowers keep their size with headroom above and below: their petals were being cut by the canvas edge */
@@ -135,7 +140,10 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     const ey = e.y + Math.PI * 2 * Math.ceil((root.rotation.y - e.y) / (Math.PI * 2))
     // fly up the view axis to where the face fills paper's square window (overshoot flies closer), while the window
     // itself grows to the viewport's short side: the landed face is a square filling the height (landscape) or the width
-    const dist = h.half / Math.tan((FOV * Math.PI) / 360) / FLIGHT.overshoot
+    // the face plane (h.half nearer than the cube's centre) fills the window at h.half / tan(fov/2) from the camera; the centre sits
+    // h.half farther. Overshoot flies closer. (Set to the centre alone, perspective made the face 1.33× the window and the seams
+    // landed a third of the way inside the page's tiles.)
+    const dist = h.half + h.half / Math.tan((FOV * Math.PI) / 360) / FLIGHT.overshoot
     const to = cam.position.clone().addScaledVector(cam.getWorldDirection(new THREE.Vector3()), dist)
     const zoom = { k: 1 }
     // 'stretch' lands the square face on the viewport's short side; 'fade' overfills the viewport (the window grows to its long side)
@@ -154,7 +162,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       onComplete: () => landed(),
       // 'fade': the page fades in over the flight's last stretch (and out again on the way home)
       onUpdate: () => { if (sv.join === 'fade' && overlay.current) overlay.current.style.opacity = String(Math.min(1, Math.max(0, (t.time() - lead - FLIGHT.fadeAt * dur) / ((1 - FLIGHT.fadeAt) * dur)))) },
-      onReverseComplete: () => { tl.current = null; phase.current = null; h.zoom(1); h.ascii(1); h.stretch(1, 1); h.settle(0); h.capture(false); setHidden(false); setStill(false); setSection(null); setFlying(false) },
+      onReverseComplete: () => { tl.current = null; phase.current = null; h.zoom(1); h.ascii(1); h.stretch(1, 1); h.settle(0); h.sweep(0); h.capture(false); setHidden(false); setStill(false); setSection(null); setFlying(false) },
     })
     // 1. the surroundings fade (CSS, `hidden`) and the ascii outline with them; 2. the flight from `lead`; reversed, the
     //    callback at the take-off point fires as the cube lands home and the page fades back in with the outline
@@ -170,11 +178,22 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     if (sv.join === 'stretch') {
       h.capture(true)
       grid.current?.setLive(true)
-      await spreading
+      // s3: the seams weld shut and the liquid settles solid, both from the landing, alongside the rest of the spread
+      const extras: Promise<unknown>[] = []
+      if (sv.weldIn) extras.push(grid.current?.weldIn(reduced ? 0.01 : WELD) ?? Promise.resolve())
+      if (sv.settle === 'solid') extras.push(settleSolid(1, reduced ? 0.01 : SETTLE))
+      await Promise.all([spreading, ...extras])
     }
     phase.current = 'in'
     setFlying(false)
   }
+  /** s3's settle: the liquid mixes to the solid dark mint while its clock runs `SWEEP` s ahead (the highlight passes once) */
+  const settleSolid = (to: 0 | 1, duration: number) => new Promise<void>((res) => {
+    const h = fly.current
+    if (!h) return res()
+    const k = { v: 1 - to }
+    gsap.to(k, { v: to, duration, ease: 'power1.inOut', onUpdate: () => { h.settle(k.v, 'solid'); h.sweep(k.v * SWEEP) }, onComplete: res })
+  })
   /** s2: the landed square face ↔ the viewport: the paper window and the page layer's tiles move together; over the second half
    *  (k > .5) the text fades and the liquid settles (cubies closing up, seams fading, the still gradient); `onHalf` fires as k crosses .5 */
   const spread = (to: 0 | 1, duration: number, onHalf?: () => void) => new Promise<void>((res) => {
@@ -188,7 +207,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       else { const sy = 1 + (1 / aspect - 1) * k.v; h.stretch(1, sy); g?.setScale(1, sy * aspect); g?.setFace(0, (1 - sy * aspect) / 2, 1, sy * aspect) }
       const f = Math.min(1, Math.max(0, (k.v - 0.5) * 2))
       g?.setFade(f)
-      h.settle(f)
+      if (sv.settle === 'gradient') h.settle(f, 'gradient')
       if (overlay.current) overlay.current.style.opacity = String(f)
       if (onHalf && !halved && (to === 1 ? k.v >= 0.5 : k.v <= 0.5)) { halved = true; onHalf() }
     }
@@ -201,8 +220,12 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     phase.current = 'out'
     setFlying(true)
     if (sv.join === 'stretch') {
-      // the text fades and the liquid wakes as the face starts squaring back; halfway the shader cube draws itself again and
-      // the flight reverses, zooming out while the face finishes squaring
+      // s3 first: the seams open again and the liquid wakes; then the text fades and the face starts squaring back; halfway the
+      // shader cube draws itself again and the flight reverses, zooming out while the face finishes squaring
+      const back: Promise<unknown>[] = []
+      if (sv.weldIn) back.push(grid.current?.openGaps(reduced ? 0.01 : 0.4) ?? Promise.resolve())
+      if (sv.settle === 'solid') back.push(settleSolid(0, reduced ? 0.01 : 0.6))
+      await Promise.all(back)
       await spread(0, reduced ? 0.01 : STRETCH, () => { grid.current?.setLive(false); fly.current?.capture(false); t.reverse() })
       return
     }
@@ -296,7 +319,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       <Canvas key={version} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
         <PaperCube version={PV} params={params} spin={!reduced && !still} spinSpeed={0.12} auto={!reduced && !away} autoInterval={3600} combo={0.35} rubik={rubik} fly={fly} />
         {/* s2's page: the screen cube drawn in this same canvas, its tiles sampling the shader cube's captured image */}
-        {sv.join === 'stretch' && section !== null && fly.current && <ScreenCube key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} weld projects={projects} blank={false} look="liquid" heroDraw={false} liquid={fly.current.shot} live={false} />}
+        {sv.join === 'stretch' && section !== null && fly.current && <ScreenCube key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} weld projects={projects} blank={false} look={sv.page} heroDraw={false} liquid={fly.current.shot} live={false} inset={sv.weldIn ? LANDED_INSET : 0} />}
       </Canvas>
       {/* the section page: the screen as a cube, faded in over the landing; the wordmark (or escape) flies home */}
       {section !== null && (

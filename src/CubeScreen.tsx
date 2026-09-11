@@ -22,15 +22,21 @@ export type CubeHandle = ScreenHandle & { clear: () => Promise<void>; stretch: (
    *  rect in the captured image (uv: x y w h, y up) the tiles sample their liquid from, and the text's opacity */
   setScale: (sx: number, sy: number) => void; setFace: (x: number, y: number, w: number, h: number) => void; setFade: (k: number) => void;
   /** drawn or not (imperative, so it can flip in the same tick as the paper pass's capture) */
-  setLive: (on: boolean) => void }
+  setLive: (on: boolean) => void
+  /** the landed cube's seams as real gaps: `weldIn` lights them and runs the branching laser weld while they close; `openGaps` opens them again (scar lit, no laser) */
+  weldIn: (duration: number) => Promise<void>; openGaps: (duration: number) => Promise<void> }
 
 /** a sticker in the liquid look: the cube's captured image under the page's text */
 const LIQUID_VERT = /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`
 const LIQUID_FRAG = /* glsl */ `
-  uniform sampler2D uLiquid; uniform sampler2D uPage; uniform float uFade; uniform vec4 uFace; uniform float uHasPage;
+  uniform sampler2D uLiquid; uniform sampler2D uPage; uniform float uFade; uniform vec4 uFace; uniform float uHasPage; uniform float uInset;
   varying vec2 vUv;
   void main() {
-    vec3 liq = texture2D(uLiquid, uFace.xy + vUv * uFace.zw).rgb;
+    // uInset: sample only the cubie's plate (inside the landed cube's seams), so the seams can be real gaps between the tiles
+    vec2 cell = floor(vUv * 3.0 - 0.001);
+    vec2 local = vUv * 3.0 - cell;
+    vec2 cu = (cell + uInset + local * (1.0 - 2.0 * uInset)) / 3.0;
+    vec3 liq = texture2D(uLiquid, uFace.xy + cu * uFace.zw).rgb;
     vec4 pg = uHasPage > 0.5 ? texture2D(uPage, vUv) : vec4(0.0);
     gl_FragColor = vec4(mix(liq, pg.rgb, pg.a * uFade), 1.0);
   }
@@ -38,7 +44,9 @@ const LIQUID_FRAG = /* glsl */ `
 
 const FOV = 30
 /** the landed site cube's seams, as a fraction of a tile: its cubies' gap plus the mask's hairline and rounding (blank state) */
-const LANDED_SEAM = 0.115
+export const LANDED_SEAM = 0.13
+/** how far inside its cell a tile samples the cube's plate (each side, fraction of a tile): past the seam and the plate's soft rim */
+export const LANDED_INSET = 0.095
 const LANDED_ROUND = 0.07
 const WIDE = 48 // px across a hot seam quad: the heat spills this far onto the tiles
 type Sticker = { id: number; tex: number; col: number; row: number; up: THREE.Vector3; right: THREE.Vector3; n: THREE.Vector3 }
@@ -122,7 +130,7 @@ const LASER_FRAG = /* glsl */ `
 /** the screen cube itself: its own scene and camera (z = 0 is the viewport in CSS px), rendered by hand after everything else in
  *  the canvas it sits in (the transition tab's own, or the site's, where `liquid` is the shader cube's captured image and the
  *  tiles show it under the page's text); `live` off = not drawn at all */
-export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: boolean; weld: boolean; projects: typeof PROJECTS; blank: boolean; look: PageLook; heroDraw: boolean; liquid?: THREE.Texture | null; live?: boolean }>(function ScreenCube({ v, scheme, recoil, weld, projects, blank, look, heroDraw, liquid = null, live = true }, ref) {
+export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: boolean; weld: boolean; projects: typeof PROJECTS; blank: boolean; look: PageLook; heroDraw: boolean; liquid?: THREE.Texture | null; live?: boolean; inset?: number }>(function ScreenCube({ v, scheme, recoil, weld, projects, blank, look, heroDraw, liquid = null, live = true, inset = 0 }, ref) {
   const { size, gl } = useThree()
   const W = size.width, H = size.height
   const cw = W / 3, ch = H / 3
@@ -180,7 +188,7 @@ export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: strin
         for (let k = 0; k < uv.count; k++) uv.setXY(k, (s.col + uv.getX(k)) / 3, (2 - s.row + uv.getY(k)) / 3)
         const page = s.tex < 0 ? null : textures[s.tex % textures.length]
         const mat = liquid
-          ? new THREE.ShaderMaterial({ uniforms: { uLiquid: { value: liquid }, uPage: { value: page }, uHasPage: { value: page ? 1 : 0 }, uFade: { value: liquidU.current.fade }, uFace: { value: liquidU.current.face } }, vertexShader: LIQUID_VERT, fragmentShader: LIQUID_FRAG })
+          ? new THREE.ShaderMaterial({ uniforms: { uLiquid: { value: liquid }, uPage: { value: page }, uHasPage: { value: page ? 1 : 0 }, uFade: { value: liquidU.current.fade }, uFace: { value: liquidU.current.face }, uInset: { value: inset } }, vertexShader: LIQUID_VERT, fragmentShader: LIQUID_FRAG })
           : new THREE.MeshBasicMaterial({ map: page ?? blankTex, transparent: s.tex < 0 })
         if (mat instanceof THREE.ShaderMaterial) liquidMats.current.push(mat)
         const m = new THREE.Mesh(geo, mat)
@@ -195,17 +203,21 @@ export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: strin
   }
   const gapNow = useRef(0)
   /** the seams: cubies shrink toward their centres, the seam quads light the gaps on the front plane */
-  const setGap = (gap: number) => {
+  /** gap: the vertical seams' width (px in root units); gx: the horizontal one (defaults to the same) */
+  const setGap = (gap: number, gx = gap) => {
     gapNow.current = gap
-    groups.current.forEach((grp) => grp.scale.set((cw - gap) / cw, (ch - gap) / ch, 1))
-    const across = v.hot ? WIDE : Math.max(gap, 1)
+    groups.current.forEach((grp) => grp.scale.set((cw - gx) / cw, (ch - gap) / ch, 1))
     seams.current.forEach((s, k) => {
       const n = (k % 2) + 1
+      const g = k < 2 ? gap : gx
+      const across = v.hot ? WIDE : Math.max(g, 1)
       if (k < 2) { s.position.set(0, H / 2 - n * ch, 1); s.rotation.z = 0; s.scale.set(W, across, 1) } else { s.position.set(-W / 2 + n * cw, 0, 1); s.rotation.z = Math.PI / 2; s.scale.set(H, across, 1) }
-      s.material.uniforms.uHot.value = v.hot ? 1 : 0; s.material.uniforms.uWide.value = across; s.material.uniforms.uGap.value = gap
-      s.visible = gap > 0
+      s.material.uniforms.uHot.value = v.hot ? 1 : 0; s.material.uniforms.uWide.value = across; s.material.uniforms.uGap.value = g
+      s.visible = g > 0
     })
   }
+  /** the landed cube's seams in root units per axis (the face is square on screen while the root is scaled square) */
+  const landedGaps = () => { const px = (Math.min(W, H) / 3) * LANDED_SEAM; const [sx, sy] = square(); return { gx: px / sx, gy: px / sy } }
   useEffect(() => {
     const g = root.current
     const col = new THREE.Color(weldColor)
@@ -328,7 +340,14 @@ export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: strin
         const reach = Math.max(...pts.map((p) => Math.hypot(W / 2 + Math.abs(p.x), H / 2 + Math.abs(p.y)))) * 0.75
         tl.call(() => seams.current.forEach((s) => { s.material.uniforms.uGraph.value = 0; s.material.uniforms.uP0.value.copy(pts[0]); s.material.uniforms.uP1.value.copy(pts[1]); s.material.uniforms.uP2.value.copy(pts[2]); s.material.uniforms.uBead.value = 1 }), [], w0)
         tl.to(r, { v: reach, duration: v.weld, ease: 'power1.out', onUpdate: () => seams.current.forEach((s) => { s.material.uniforms.uR.value = r.v }) }, w0)
-      } else {
+      } else lineWeld(tl, w0, mode, v.weld, v.weldEase ?? 'none')
+      tl.to(gp, { g: 0, duration: v.weld, ease: 'power2.inOut', onUpdate: () => setGap(gp.g) }, w0)
+      tl.call(() => seams.current.forEach((s) => { s.material.uniforms.uHeat.value = 0; s.material.uniforms.uBead.value = 0 }), [], w0 + v.weld)
+    })
+    /** the lasers along the seam lines (modes lines / edges / centre) over `dur` s from `w0` */
+    function lineWeld(tl: gsap.core.Timeline, w0: number, mode: WeldMode, dur: number, ease: string) {
+      const r = { v: 0 }
+      {
         // seams 0,1 horizontal (along = x from the left, length W), 2,3 vertical (along = y from the bottom, length H);
         // crossing node (a, b) = horizontal a × vertical b: on horizontal a at W/3 (b 0) and 2W/3 (b 1); on vertical b at 2H/3 (a 0) and H/3 (a 1)
         const L = (k: number) => (k < 2 ? W : H)
@@ -351,11 +370,9 @@ export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: strin
         let reach = 0
         per.forEach((q, k) => { for (let i = 0; i <= 48; i++) { const a = (i / 48) * L(k); const d = Math.min(...q.own.map((s) => Math.abs(a - s)), Math.abs(a - nodeAt(k, 0)) + q.d1, Math.abs(a - nodeAt(k, 1)) + q.d2); reach = Math.max(reach, d) } })
         tl.call(() => seams.current.forEach((s, k) => { const u = s.material.uniforms; u.uGraph.value = 1; u.uL.value = L(k); u.uS.value.set(per[k].own[0], per[k].own[1], per[k].own[2]); u.uD1.value = per[k].d1; u.uD2.value = per[k].d2; u.uBead.value = 1 }), [], w0)
-        tl.to(r, { v: reach, duration: v.weld, ease: v.weldEase ?? 'none', onUpdate: () => seams.current.forEach((s) => { s.material.uniforms.uR.value = r.v; s.material.uniforms.uTime.value = performance.now() / 1000 }) }, w0)
+        tl.to(r, { v: reach, duration: dur, ease, onUpdate: () => seams.current.forEach((s) => { s.material.uniforms.uR.value = r.v; s.material.uniforms.uTime.value = performance.now() / 1000 }) }, w0)
       }
-      tl.to(gp, { g: 0, duration: v.weld, ease: 'power2.inOut', onUpdate: () => setGap(gp.g) }, w0)
-      tl.call(() => seams.current.forEach((s) => { s.material.uniforms.uHeat.value = 0; s.material.uniforms.uBead.value = 0 }), [], w0 + v.weld)
-    })
+    }
     return {
       busy: () => state.current.busy,
       next: () => solve((state.current.project + 1) % textures.length, true),
@@ -365,6 +382,28 @@ export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: strin
       setFace: (x, y, w, h) => { liquidU.current.face.set(x, y, w, h) },
       setFade: (k) => { liquidU.current.fade = k; liquidMats.current.forEach((m) => { m.uniforms.uFade.value = k }) },
       setLive: (on) => { liveRef.current = on },
+      weldIn: (duration) => new Promise<void>((resolve) => {
+        const st = state.current
+        if (st.busy) return resolve()
+        st.busy = true
+        const { gx, gy } = landedGaps()
+        const f = { v: 1 }
+        setGap(gy, gx)
+        seams.current.forEach((s) => { s.material.uniforms.uHeat.value = 1; s.material.uniforms.uBead.value = 0; s.material.uniforms.uR.value = 0 })
+        const tl = gsap.timeline({ onComplete: () => { st.busy = false; resolve() } })
+        lineWeld(tl, 0, 'lines', duration, 'power2.out')
+        tl.to(f, { v: 0, duration, ease: 'power2.inOut', onUpdate: () => setGap(gy * f.v, gx * f.v) }, 0)
+        tl.call(() => seams.current.forEach((s) => { s.material.uniforms.uHeat.value = 0; s.material.uniforms.uBead.value = 0 }), [], duration)
+      }),
+      openGaps: (duration) => new Promise<void>((resolve) => {
+        const st = state.current
+        if (st.busy) return resolve()
+        st.busy = true
+        const { gx, gy } = landedGaps()
+        const f = { v: 0 }
+        seams.current.forEach((s) => { s.material.uniforms.uBead.value = 0 })
+        gsap.to(f, { v: 1, duration, ease: 'power2.out', onUpdate: () => { setGap(gy * f.v, gx * f.v); seams.current.forEach((s) => { s.material.uniforms.uHeat.value = f.v }) }, onComplete: () => { st.busy = false; resolve() } })
+      }),
       stretch: (full, duration = 0.5) => new Promise<void>((resolve) => {
         const st = state.current
         if (st.busy) return resolve()

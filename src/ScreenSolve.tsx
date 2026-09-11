@@ -25,7 +25,7 @@ export const PROJECTS = [
   { title: 'ascii portrait', meta: 'creatives · 2026', blurb: 'a portrait in text that watches back.' },
 ]
 /** the page in the site's own palette: bg, the panel tone (bg2), hairlines (line), the text greys, and the mint only as a thin accent */
-export type PageLook = 'classic' | 'site' | 'liquid'
+export type PageLook = 'classic' | 'site' | 'liquid' | 'solid'
 /** bg 'transparent' = text only, over whatever the tile shows (the 'liquid' look: the cube's own material); hero: the placeholder block */
 export type PageColors = { bg: string; bg2: string; text: string; bright: string; mute: string; a: string; disc: 'fill' | 'ring'; hero: boolean }
 /** the page looks: 'classic' (the first pages: own greys, the accent as a filled disc on a panel), 'site' (the site's palette, a ring),
@@ -33,7 +33,8 @@ export type PageColors = { bg: string; bg2: string; text: string; bright: string
 export const pageColors = (sc: { bg: string; bg2: string; line: string; text: string; bright: string; mute: string; a: string; b: string }, look: PageLook): PageColors =>
   look === 'classic' ? { bg: '#0b0e13', bg2: '#0e1219', text: '#c9cdd8', bright: '#f2f3f7', mute: '#6b7185', a: sc.a, disc: 'fill', hero: true }
   : look === 'site' ? { bg: sc.bg, bg2: sc.bg2, text: sc.text, bright: sc.bright, mute: sc.mute, a: sc.b, disc: 'ring', hero: true }
-  : { bg: 'transparent', bg2: 'transparent', text: '#12201d', bright: '#07110f', mute: '#2f4a45', a: sc.b, disc: 'ring', hero: false }
+  : look === 'liquid' ? { bg: 'transparent', bg2: 'transparent', text: '#12201d', bright: '#07110f', mute: '#2f4a45', a: sc.b, disc: 'ring', hero: false }
+  : { bg: 'transparent', bg2: 'transparent', text: sc.text, bright: sc.bright, mute: sc.mute, a: sc.b, disc: 'ring', hero: false }
 /** one project drawn as a page at the viewport's size */
 export function pageTexture(p: (typeof PROJECTS)[number], w: number, h: number, colors: PageColors, t = 1) {
   const c = document.createElement('canvas')
@@ -65,7 +66,7 @@ export function paintPage(c: HTMLCanvasElement, p: (typeof PROJECTS)[number], w:
   const left = w * 0.08
   const top = portrait ? h * 0.14 : h * 0.3
   // over the liquid the text gets a soft light halo so it reads on the dark streaks too
-  if (colors.bg === 'transparent') { g.shadowColor = 'rgba(220, 244, 238, 0.95)'; g.shadowBlur = 16 }
+  if (colors.bg === 'transparent' && colors.bright === '#07110f') { g.shadowColor = 'rgba(220, 244, 238, 0.95)'; g.shadowBlur = 16 }
   g.fillStyle = colors.mute; g.font = `400 ${portrait ? 12 : 13}px "Geist Mono", ui-monospace, monospace`
   g.fillText(p.meta, left, top)
   g.fillStyle = colors.bright; g.font = `300 ${portrait ? 40 : 64}px Unbounded, sans-serif`
