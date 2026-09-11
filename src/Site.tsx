@@ -60,6 +60,9 @@ const FOV = 30 // the mask camera's vertical fov (Canvas below)
 const PRE = 1
 const LEAD = 0.5
 const UI_EASE = 'expo.out'
+/** the hand-placed floral group's box: 222 px on a 900 px screen, shrinking with a shorter viewport so the base row (and the
+ *  flowers' lowest petals) never run off the bottom; the group's framing follows the vertical fov, so it scales, not crops */
+const GROUP_H = 'clamp(120px, calc(100vh - 678px), 222px)'
 /** a section's projects: those tagged with its id in PROJECTS; a section with none shows them all */
 const projectsOf = (id: string) => { const own = PROJECTS.filter((p) => p.meta.startsWith(id)); return own.length ? own : PROJECTS }
 
@@ -284,7 +287,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
           </aside>
         )}
         <div className="site-base">
-          {xray?.placement === 'bottom' ? null : xray ? (xray.kind === 'mesh' ? <XrayFlower3D v={xray} flower={flower} seed={floralSeed} height={xray.scene?.place ? 222 : undefined} className={`floral xray ${xray.scene?.place ? 'group' : ''}`} scheme={scheme} /> : <XrayFloral v={xray} seed={floralSeed} className="floral xray" scheme={scheme} />) : <Floral className="floral" seed={11 + 7 * Math.max(0, SCHEMES.findIndex((x) => x.name === scheme))} />}
+          {xray?.placement === 'bottom' ? null : xray ? (xray.kind === 'mesh' ? <XrayFlower3D v={xray} flower={flower} seed={floralSeed} height={xray.scene?.place ? GROUP_H : undefined} className={`floral xray ${xray.scene?.place ? 'group' : ''}`} scheme={scheme} /> : <XrayFloral v={xray} seed={floralSeed} className="floral xray" scheme={scheme} />) : <Floral className="floral" seed={11 + 7 * Math.max(0, SCHEMES.findIndex((x) => x.name === scheme))} />}
           {layout === 'deck' && (
             <div className="deck-blurb">
               <h2>{SECTIONS[active].title}</h2>

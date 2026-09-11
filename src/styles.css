@@ -377,8 +377,11 @@ button:focus-visible {
   opacity: 0.26;
   pointer-events: none;
 }
-.floral.xray.group { height: 222px; margin-top: -74px; }
+/* the hand-placed group: its height is GROUP_H in Site.tsx (shrinks with a short viewport) */
+.floral.xray.group { margin-top: -74px; }
 .site-base:has(.floral.xray.group) { padding-top: 12px; }
+/* a short window (a laptop with browser chrome): the About portrait is what keeps the left column from shrinking */
+@media (max-height: 840px) { .site .portrait { display: none; } }
 .floral.xray {
   height: 140px;
   opacity: 0.9;

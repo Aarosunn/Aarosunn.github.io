@@ -216,7 +216,7 @@ function Look({ at }: { at: [number, number, number] }) {
   return null
 }
 
-export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, height = XF_H, className, scheme: pageScheme, upright = false }: { v: FloralVersion; flower?: string; seed?: number; width?: number; height?: number; className?: string; scheme?: string; upright?: boolean }) {
+export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, height = XF_H, className, scheme: pageScheme, upright = false }: { v: FloralVersion; flower?: string; seed?: number; width?: number; height?: number | string; className?: string; scheme?: string; upright?: boolean }) {
   const scheme = v.scheme ?? pageScheme
   const spec = FLOWER_OF(flower)
   const f = useMemo(() => buildFlower(seed, spec, upright, v.buds !== false, 1, v.pollen !== false), [seed, spec, upright, v.buds, v.pollen])
@@ -224,7 +224,7 @@ export function XrayFlower3D({ v, flower = 'poppy', seed = 3, width = XF_W, heig
   // the bed fills the box: its width in world units at the ground from the camera distance and the box's aspect
   const strip = v.placement === 'bottom'
   const camDist = strip ? 6.4 : v.scene?.camDist ?? 9.4
-  const spread = strip ? 2 * camDist * Math.tan((30 * Math.PI) / 360) * (width / height) * 0.95 : v.scene?.spread ?? 8.6
+  const spread = strip ? 2 * camDist * Math.tan((30 * Math.PI) / 360) * (width / (typeof height === 'number' ? height : XF_H)) * 0.95 : v.scene?.spread ?? 8.6
   const planted = useMemo(() => (v.scene ? plant(v, seed, spread) : []), [v, seed, spread])
   useEffect(() => () => planted.forEach((p) => p.f.dispose()), [planted])
   // colours from the scheme table (on the site this mounts before App has applied the CSS variables);
