@@ -94,7 +94,7 @@ const LASER_FRAG = /* glsl */ `
   }
 `
 
-const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: boolean; weld: boolean }>(function Cube({ v, scheme, recoil, weld }, ref) {
+const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: boolean; weld: boolean; projects: typeof PROJECTS }>(function Cube({ v, scheme, recoil, weld, projects }, ref) {
   const { size, camera } = useThree()
   const W = size.width, H = size.height
   const cw = W / 3, ch = H / 3
@@ -103,7 +103,7 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: 
     const cam = camera as THREE.PerspectiveCamera
     cam.fov = FOV; cam.position.set(0, 0, H / 2 / Math.tan((FOV * Math.PI) / 360)); cam.near = 1; cam.far = cam.position.z * 6; cam.updateProjectionMatrix()
   }, [camera, H])
-  const textures = useMemo(() => PROJECTS.map((p) => pageTexture(p, W, H, colors)), [W, H, colors])
+  const textures = useMemo(() => projects.map((p) => pageTexture(p, W, H, colors)), [W, H, colors, projects])
   useEffect(() => () => textures.forEach((t) => t.dispose()), [textures])
   const root = useRef<THREE.Group>(null!)
   const state = useRef({ cube: solvedCube(), busy: false, depth: cw, project: 0 })
@@ -292,10 +292,11 @@ const Cube = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil: 
   return <group ref={root} />
 })
 
-export const CubeScreen = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil?: boolean; weld?: boolean }>(function CubeScreen({ v, scheme, recoil = true, weld = true }, ref) {
+/** projects: the pages this screen cycles through (default: every placeholder project) */
+export const CubeScreen = forwardRef<ScreenHandle, { v: CubeVersion; scheme: string; recoil?: boolean; weld?: boolean; projects?: typeof PROJECTS }>(function CubeScreen({ v, scheme, recoil = true, weld = true, projects = PROJECTS }, ref) {
   return (
     <Canvas className="transition-canvas" dpr={[1, 2]} camera={{ fov: FOV, position: [0, 0, 1000] }} gl={{ antialias: true }}>
-      <Cube ref={ref} v={v} scheme={scheme} recoil={recoil} weld={weld} />
+      <Cube ref={ref} v={v} scheme={scheme} recoil={recoil} weld={weld} projects={projects} />
     </Canvas>
   )
 })

@@ -5,7 +5,12 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { PaperCube } from './PaperCube'
+import * as THREE from 'three'
+import gsap from 'gsap'
+import { PaperCube, type FlyHandle } from './PaperCube'
+import { CubeScreen } from './CubeScreen'
+import { CUBE_OF, TRANSITION_OF } from './transitionVersions'
+import { PROJECTS, type ScreenHandle } from './ScreenSolve'
 import { VERSION_OF } from './paperVersions'
 import { presetNamed } from './paperPresets'
 import { SCHEMES } from './schemes'
@@ -44,6 +49,15 @@ const SECTIONS: Section[] = [
   },
 ]
 
+/** the section transition: the site cube spins and flies into the camera (the transition tab's v1 flight), the
+ *  section page fades in over the landing; the page is the screen-as-cube with Aaron's picks (w4 branching eased weld,
+ *  no recoil); home reverses the same flight */
+const FLIGHT = TRANSITION_OF('v1')!
+const PAGE = CUBE_OF('w4 branching eased')!
+const FOV = 30 // the mask camera's vertical fov (Canvas below)
+/** a section's projects: those tagged with its id in PROJECTS; a section with none shows them all */
+const projectsOf = (id: string) => { const own = PROJECTS.filter((p) => p.meta.startsWith(id)); return own.length ? own : PROJECTS }
+
 /** the cube emits the scheme's hue: scheme name -> heat preset */
 const HEAT_OF_SCHEME: Record<string, string> = { icemint: 'icemint', ice: 'icemint', mint: 'icemint', ember: 'ember', graphite: 'graphite', aura: 'default', paper: 'sepia' }
 
@@ -70,6 +84,48 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
   const rubik = useRef<RubikHandle | null>(null)
   // review hook: the Playwright sweeps drive the site's own cube (App's __aar only reaches the lab cube)
   useEffect(() => { window.__aarSite = rubik }, [])
+  // the section transition: `section` is the page shown (mounted at take-off, faded in over the landing), `flying`
+  // while the timeline runs either way; the same timeline reversed is the way home
+  const fly = useRef<FlyHandle | null>(null)
+  const tl = useRef<gsap.core.Timeline | null>(null)
+  const overlay = useRef<HTMLDivElement | null>(null)
+  const grid = useRef<ScreenHandle | null>(null)
+  const [section, setSection] = useState<number | null>(null)
+  const [flying, setFlying] = useState(false)
+  const away = flying || section !== null
+  const go = (i: number) => {
+    const h = fly.current
+    if (!h || tl.current) return
+    setOpen(null)
+    setActive(i)
+    setSection(i)
+    setFlying(true)
+    const { root, camera: cam } = h
+    // face-on = the root at the camera's own rotation (its +z then points up the view axis), plus whole spins;
+    // the y spins carry on from wherever the idle spin left the cube
+    const e = new THREE.Euler().setFromQuaternion(cam.quaternion, 'XYZ')
+    const ey = e.y + Math.PI * 2 * Math.ceil((root.rotation.y - e.y) / (Math.PI * 2))
+    // fly up the view axis to where the face fills paper's square window (overshoot flies closer), while the window
+    // itself grows to cover the viewport
+    const dist = h.half / Math.tan((FOV * Math.PI) / 360) / FLIGHT.overshoot
+    const to = cam.position.clone().addScaledVector(cam.getWorldDirection(new THREE.Vector3()), dist)
+    const zoom = { k: 1 }
+    const kFill = Math.max(window.innerWidth / window.innerHeight, 1) / h.scale0
+    const dur = reduced ? 0.01 : FLIGHT.duration
+    const t = gsap.timeline({
+      onUpdate: () => { if (overlay.current) overlay.current.style.opacity = String(Math.min(1, Math.max(0, (t.progress() - FLIGHT.fadeAt) / (1 - FLIGHT.fadeAt)))) },
+      onComplete: () => setFlying(false),
+      onReverseComplete: () => { tl.current = null; h.zoom(1); setSection(null); setFlying(false) },
+    })
+    t.to(root.rotation, { x: e.x + Math.PI * 2 * FLIGHT.spin[0], y: ey + Math.PI * 2 * FLIGHT.spin[1], z: e.z, duration: dur, ease: FLIGHT.spinEase }, 0)
+    t.to(root.position, { x: to.x, y: to.y, z: to.z, duration: dur, ease: FLIGHT.approachEase }, 0)
+    t.to(zoom, { k: kFill, duration: dur, ease: FLIGHT.approachEase, onUpdate: () => h.zoom(zoom.k) }, 0)
+    tl.current = t
+  }
+  const home = () => { const t = tl.current; if (!t || t.reversed()) return; setFlying(true); t.reverse() }
+  const goRef = useRef({ go, home })
+  goRef.current = { go, home }
+  useEffect(() => { window.__aarNav = { go: (i) => goRef.current.go(i), home: () => goRef.current.home(), next: () => grid.current?.next() ?? Promise.resolve(), busy: () => (tl.current?.isActive() ?? false) || (grid.current?.busy() ?? false), section: () => section } }, [section])
   // the lab's v1 at its own camera (blur radii are frame-relative, so the cube stays crisp);
   // paper's `scale` shrinks the whole image on screen so the sections breathe
   const narrow = typeof window !== 'undefined' && window.innerWidth < 900
@@ -94,7 +150,14 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
   // swapped during dispatch never sees it, so the live handler lives in a ref
   const onKey = useRef<(e: KeyboardEvent) => void>(() => {})
   onKey.current = (e) => {
+    // in a section (or on the way): escape flies home, n / right arrow is the next project; the deck keys are off
+    if (away) {
+      if (e.key === 'Escape') home()
+      if (section !== null && !flying && (e.key === 'n' || e.key === 'ArrowRight')) grid.current?.next()
+      return
+    }
     if (e.key === 'Escape') setOpen(null)
+    if (e.key === 'Enter') go(active)
     if (e.key === 'ArrowRight') step(active + 1)
     if (e.key === 'ArrowLeft') step(active - 1)
     if (e.key === 'x') setLayout((l) => (l === 'corners' ? 'deck' : 'corners'))
@@ -114,7 +177,7 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
     const w = (e: WheelEvent) => {
       if (Math.abs(e.deltaY) < 24 || performance.now() - last < 900) return
       last = performance.now()
-      stepRef.current(activeRef.current + (e.deltaY > 0 ? 1 : -1))
+      if (!awayRef.current) stepRef.current(activeRef.current + (e.deltaY > 0 ? 1 : -1))
     }
     // touch: a horizontal swipe steps the deck
     let x0 = 0
@@ -123,7 +186,7 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
     const te = (e: TouchEvent) => {
       if (Number.isNaN(x0)) return
       const dx = e.changedTouches[0].clientX - x0
-      if (Math.abs(dx) > 48) stepRef.current(activeRef.current + (dx < 0 ? 1 : -1))
+      if (Math.abs(dx) > 48 && !awayRef.current) stepRef.current(activeRef.current + (dx < 0 ? 1 : -1))
     }
     window.addEventListener('keydown', f)
     window.addEventListener('wheel', w, { passive: true })
@@ -138,23 +201,33 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
   }, [])
   const activeRef = useRef(active)
   activeRef.current = active
+  const awayRef = useRef(away)
+  awayRef.current = away
   const reduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
   return (
     <>
       <Canvas key={version} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
-        <PaperCube version={PV} params={params} spin={!reduced} spinSpeed={0.12} auto={!reduced} autoInterval={6500} rubik={rubik} />
+        <PaperCube version={PV} params={params} spin={!reduced && !away} spinSpeed={0.12} auto={!reduced && !away} autoInterval={6500} rubik={rubik} fly={fly} />
       </Canvas>
+      {/* the section page: the screen as a cube, faded in over the landing; the wordmark (or escape) flies home */}
+      {section !== null && (
+        <div className="section-page" ref={overlay}>
+          <CubeScreen key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} projects={projectsOf(SECTIONS[section].id)} />
+          <button className="wordmark home" onClick={home} aria-label="home">aarcube</button>
+          <div className="page-hint"><span>{SECTIONS[section].title.toLowerCase()}</span><button onClick={() => grid.current?.next()}>next (n)</button><button onClick={home}>home (esc)</button></div>
+        </div>
+      )}
       {xray?.placement === 'bottom' && <BottomBed v={xray} seed={floralSeed} scheme={scheme} />}
       <div className="aura" />
       <div className="grain" />
-      <div className={`ui site layout-${layout} ${open ? 'has-panel' : ''}`}>
+      <div className={`ui site layout-${layout} ${open ? 'has-panel' : ''} ${away ? 'away' : ''}`}>
         <header className="site-head">
           <div className="wordmark">aarcube</div>
           <p className="site-intro">Aaron. Engineer of small machines and large gradients.</p>
         </header>
         {SECTIONS.map((s, i) => (
-          <section key={s.id} className={`sec sec-${s.id} ${i === active ? 'on' : ''}`} onClick={() => step(i)}>
+          <section key={s.id} className={`sec sec-${s.id} ${i === active ? 'on' : ''}`} onClick={() => (i === active ? go(i) : step(i))}>
             <h2>{s.title}</h2>
             {s.id === 'about' && (
               <div className="portrait" title="ascii portrait, later a webcam">
@@ -208,7 +281,7 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
           )}
           <nav className="deck" aria-label="sections">
             {SECTIONS.map((s, i) => (
-              <button key={s.id} className={i === active ? 'on' : ''} onClick={() => step(i)} aria-label={s.title}>
+              <button key={s.id} className={i === active ? 'on' : ''} onClick={() => (i === active ? go(i) : step(i))} aria-label={s.title}>
                 <i />
                 <span>{s.title.toLowerCase()}</span>
               </button>
@@ -223,6 +296,8 @@ export function Site({ version: initial = 'v17', scheme = 'icemint', bg = '#0709
 declare global {
   interface Window {
     __aarSite: React.RefObject<RubikHandle | null>
+    /** the section transition: fly to a section, home, next project, busy while a flight or a turn runs */
+    __aarNav: { go: (i: number) => void; home: () => void; next: () => Promise<void>; busy: () => boolean; section: () => number | null }
   }
 }
 

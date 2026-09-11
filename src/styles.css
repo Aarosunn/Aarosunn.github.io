@@ -386,7 +386,7 @@ button:focus-visible {
 /* the flower bed along the bottom of the page: above the cube canvas, under the UI */
 .floral-bottom { position: fixed !important; left: 0; bottom: 0; z-index: 1; pointer-events: none; }
 .ui { z-index: 2; }
-.site-tabs .tabs { z-index: 3; }
+.site-tabs .tabs { z-index: 4; }
 .floral-stage-page { padding: 0; overflow: hidden; }
 /* the mesh floral's own canvas sits in its box, not fixed over the page like the cube's */
 .xf3d canvas { position: absolute !important; inset: 0; transform: none !important; }
@@ -620,3 +620,13 @@ body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130
 .next-page h1 { font-size: 44px; font-weight: 300; margin: 0; }
 .next-page p { color: var(--mute); margin: 0; }
 .next-page button { justify-self: center; pointer-events: auto; }
+
+/* the section transition: the site's UI fades as the cube takes off; the section page sits over the cube canvas and
+   fades in over the landing (its opacity is driven by the flight); the wordmark flies home */
+.ui.site.away { opacity: 0; pointer-events: none; transition: opacity 0.6s var(--ease); }
+.section-page { position: fixed; inset: 0; z-index: 3; opacity: 0; }
+.section-page .transition-canvas { position: absolute !important; inset: 0; }
+.section-page canvas { animation: none; transition: none; transform: none !important; }
+.section-page .home { position: fixed; top: 28px; left: 40px; z-index: 2; border: 0; padding: 0; background: transparent; animation: none; cursor: pointer; }
+.page-hint { position: fixed; right: 40px; bottom: 24px; z-index: 2; display: flex; gap: 6px; align-items: center; color: var(--mute); }
+.page-hint span { margin-right: 8px; }

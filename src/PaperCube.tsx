@@ -9,7 +9,7 @@
  * Their preprocess then: heat = three box blurs (contour / inner / big); liquid + smoke = a plate per face or
  * their real Poisson field solved here. The final pass gets the raw mask too, for silhouette clip and shading.
  */
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
@@ -448,9 +448,12 @@ export type PaperCubeProps = {
   /** ascii outline overrides on top of the version's */
   ascii?: Partial<AsciiParams>
   rubik?: React.RefObject<RubikHandle | null>
+  /** the flight (Site): the mask scene's root and camera, the cube's half extent, and a zoom on paper's window */
+  fly?: React.RefObject<FlyHandle | null>
 }
+export type FlyHandle = { root: THREE.Group; camera: THREE.PerspectiveCamera; half: number; scale0: number; zoom: (k: number) => void }
 
-export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = false, autoInterval = 900, debug = 'off', gain = 1, alpha = 1, outline: outlineProp, outlineColor = '#ffffff', ascii, rubik }: PaperCubeProps) {
+export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = false, autoInterval = 900, debug = 'off', gain = 1, alpha = 1, outline: outlineProp, outlineColor = '#ffffff', ascii, rubik, fly }: PaperCubeProps) {
   const outline = outlineProp ?? V.outline ?? 'off'
   const A: AsciiParams = { cell: 9, reach: 0.05, bias: 3, scatter: 0.5, color: '#ece8df', ...V.ascii, ...ascii }
   const SIZE = V.size
@@ -527,10 +530,15 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     [R, Q],
   )
 
+  // the flight zooms paper's window (u_scale) so the cube can fill the whole viewport, not just the mask square
+  const zoom = useRef(1)
+  const scale0 = typeof params.scale === 'number' ? params.scale : 0.75
+  useImperativeHandle(fly, () => ({ root: root.current, camera: camera as THREE.PerspectiveCamera, half: 1.5 * V.rubikGap, scale0, zoom: (k) => { zoom.current = k; Q.final.uniforms.u_scale.value = scale0 * k; if (Q.final2) Q.final2.uniforms.u_scale.value = (scale0 / IMG) * k } }), [camera, V.rubikGap, scale0, Q])
   // preset params -> uniforms
   useEffect(() => {
     const u = Q.final.uniforms
     applyParams(u, params)
+    u.u_scale.value = scale0 * zoom.current
     u.u_halo.value = V.halo ? 1 : 0
     u.u_shade.value = V.shade
     u.u_fuse.value = V.fuse ? 1 : 0
@@ -555,7 +563,7 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       applyParams(u2, presetNamed(V.fuse, V.fusePreset).params)
       // same camera and mask as the heat pass: heat shows the mask's central 57% window through its scale,
       // so the full mask spans scale / 0.571 of the screen for the fused pass
-      u2.u_scale.value = (typeof params.scale === 'number' ? params.scale : 0.75) / IMG
+      u2.u_scale.value = (scale0 / IMG) * zoom.current
       u2.u_halo.value = 0
       u2.u_shade.value = V.shade
       u2.u_gain.value = gain
