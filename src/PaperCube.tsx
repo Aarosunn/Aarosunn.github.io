@@ -8,7 +8,6 @@
  */
 import { useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { getShaderColorFromString, liquidMetalFragmentShader } from '@paper-design/shaders'
 import { RubikMask, type RubikHandle } from './RubikMask'
@@ -447,7 +446,6 @@ export function PaperCube({ size: SIZE, scale: scale0, spin, spinSpeed, auto, au
 
   return (
     <>
-      <OrbitControls enablePan={false} enableZoom={false} />
       {/* the mask scene: never rendered by R3F, only by the manual passes above */}
       <scene ref={maskScene}>
         <group ref={root} rotation={[0.5, -0.7, 0]}>

@@ -34,7 +34,7 @@ of projects. **The site's name and intro** are `SITE`.
 
 Home: arrows, 1–4, wheel or a swipe step the deck (each step turns a layer); Enter or a click on the active section
 flies in; a double click or double tap on the cube runs the next of T perm, U perm and Sune. In a section: n or → is
-the next project, Escape or the wordmark flies home. Drag orbits the cube.
+the next project, Escape or the wordmark flies home. The cube cannot be dragged; its motion is its own.
 
 ## Look
 

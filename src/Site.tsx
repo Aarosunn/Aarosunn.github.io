@@ -212,7 +212,7 @@ export function Site() {
       last = performance.now()
       if (!awayRef.current) stepRef.current(activeRef.current + (e.deltaY > 0 ? 1 : -1))
     }
-    // touch: a horizontal swipe steps the deck (orbiting the cube is not a swipe); a double tap on the cube runs an algorithm
+    // touch: a horizontal swipe steps the deck (a swipe over the cube does not count); a double tap on the cube runs an algorithm
     let x0 = 0
     let lastTap = 0
     const onCanvas = (e: Event) => (e.target as Element | null)?.closest?.('canvas') != null
