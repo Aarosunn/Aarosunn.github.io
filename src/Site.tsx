@@ -214,7 +214,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     waking.current = true
     // the light text would sit on the pale liquid: it goes with the ground and comes back with it
     const f = { v: 1 }, d = reduced ? 0.01 : WAKE
-    const text = (to: number) => gsap.to(f, { v: to, duration: d, ease: 'power2.inOut', onUpdate: () => g.setFade(f.v) })
+    const text = (to: number) => { if (!sv.ghost?.textStays) gsap.to(f, { v: to, duration: d, ease: 'power2.inOut', onUpdate: () => g.setFade(f.v) }) }
     text(0)
     await ghost(false, d)
     await g.next()
@@ -363,7 +363,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       <Canvas key={version} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
         <PaperCube version={PV} params={params} spin={!reduced && !still} spinSpeed={0.12} auto={!reduced && !away} autoInterval={3600} combo={0.35} rubik={rubik} fly={fly} />
         {/* s2's page: the screen cube drawn in this same canvas, its tiles sampling the shader cube's captured image */}
-        {sv.join === 'stretch' && section !== null && fly.current && <ScreenCube key={section} ref={grid} v={sv.ghost?.bare ? PAGE_BARE : PAGE} scheme={scheme} recoil={false} weld={!sv.ghost?.bare} projects={projects} blank={false} look={sv.page} heroDraw={false} liquid={fly.current.shot} live={false} inset={sv.ghost?.plates ?? (sv.weldIn || sv.ghost ? LANDED_INSET : 0)} round={sv.ghost?.round ?? 0} plate={sv.ghost?.plates !== undefined ? (LANDED_SEAM / 2 - sv.ghost.plates) / (1 - 2 * sv.ghost.plates) : 0} />}
+        {sv.join === 'stretch' && section !== null && fly.current && <ScreenCube key={section} ref={grid} v={sv.ghost?.bare ? PAGE_BARE : PAGE} scheme={scheme} recoil={false} weld={!sv.ghost?.bare} projects={projects} blank={false} look={sv.page} heroDraw={false} liquid={fly.current.shot} live={false} inset={sv.ghost?.plates ?? (sv.weldIn || sv.ghost ? LANDED_INSET : 0)} round={sv.ghost?.round ?? 0} plate={sv.ghost?.plates !== undefined ? (LANDED_SEAM / 2 - sv.ghost.plates) / (1 - 2 * sv.ghost.plates) : 0} edge={sv.ghost?.noEdge ? 1 / (1 - LANDED_SEAM / 3) : 1} />}
       </Canvas>
       {/* the section page: the screen as a cube, faded in over the landing; the wordmark (or escape) flies home */}
       {section !== null && (

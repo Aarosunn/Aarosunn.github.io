@@ -45,7 +45,7 @@ const LIQUID_FRAG = /* glsl */ `
     if (uRound > 0.0) {
       vec2 q = abs(local - 0.5) - (0.5 - uPlate - uRound);
       float sd = length(max(q, 0.0)) - uRound;
-      liq *= mix(1.0, 0.25, smoothstep(-0.003, 0.003, sd));
+      liq *= mix(1.0, 0.25, smoothstep(-0.006, 0.006, sd));
     }
     vec4 pg = uHasPage > 0.5 ? texture2D(uPage, vUv) : vec4(0.0);
     // uAlpha < 1 (Site s4): the liquid a faint layer over the page's dark ground, the text always full
@@ -142,7 +142,7 @@ const LASER_FRAG = /* glsl */ `
 /** the screen cube itself: its own scene and camera (z = 0 is the viewport in CSS px), rendered by hand after everything else in
  *  the canvas it sits in (the transition tab's own, or the site's, where `liquid` is the shader cube's captured image and the
  *  tiles show it under the page's text); `live` off = not drawn at all */
-export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: boolean; weld: boolean; projects: typeof PROJECTS; blank: boolean; look: PageLook; heroDraw: boolean; liquid?: THREE.Texture | null; live?: boolean; inset?: number; round?: number; plate?: number }>(function ScreenCube({ v, scheme, recoil, weld, projects, blank, look, heroDraw, liquid = null, live = true, inset = 0, round: round_ = 0, plate = 0 }, ref) {
+export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: boolean; weld: boolean; projects: typeof PROJECTS; blank: boolean; look: PageLook; heroDraw: boolean; liquid?: THREE.Texture | null; live?: boolean; inset?: number; round?: number; plate?: number; edge?: number }>(function ScreenCube({ v, scheme, recoil, weld, projects, blank, look, heroDraw, liquid = null, live = true, inset = 0, round: round_ = 0, plate = 0, edge = 1 }, ref) {
   const { size, gl } = useThree()
   const W = size.width, H = size.height
   const cw = W / 3, ch = H / 3
@@ -391,7 +391,7 @@ export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: strin
       next: () => solve((state.current.project + 1) % textures.length, true),
       clear: () => solve(-1, false),
       dbg: () => ({ gap: gapNow.current, sx: root.current.scale.x, sy: root.current.scale.y, W, H, cam: [camera.aspect, camera.position.z] }),
-      setScale: (sx, sy) => root.current.scale.set(sx, sy, 1),
+      setScale: (sx, sy) => root.current.scale.set(sx * edge, sy * edge, 1),
       setFace: (x, y, w, h) => { liquidU.current.face.set(x, y, w, h) },
       setFade: (k) => { liquidU.current.fade = k; liquidMats.current.forEach((m) => { m.uniforms.uFade.value = k }) },
       setLive: (on) => { liveRef.current = on },

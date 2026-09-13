@@ -17,7 +17,9 @@ export type SiteVersion = { name: string; flight: string; join: 'fade' | 'stretc
     /** s6: s2's tile look (the paper's plates and dark seams inside touching tiles) with each tile sampling `plates` of a cell
      *  inside its edges (the seams trimmed narrower), every plate drawn as a rounded rectangle of corner radius `round` (of a
      *  cell), and `bare`: the turns without the break and the weld (no seam lines, the gaps never open) */
-    plates?: number; round?: number; bare?: boolean }; note: string }
+    plates?: number; round?: number; bare?: boolean;
+    /** the outer half-seams pushed off the viewport (the page scaled up by that much), and the text staying through a turn */
+    noEdge?: boolean; textStays?: boolean }; note: string }
 
 export const SITE_TRANSITIONS: SiteVersion[] = [
   { name: 's1', flight: 'v4', join: 'fade', page: 'classic', grain: false, note: 'the face overfills the viewport, the page fades in over it (2026-09-10 night)' },
@@ -34,7 +36,8 @@ export const SITE_TRANSITIONS: SiteVersion[] = [
   // s6 (2026-09-12): "I dont like the thin break, also it went wide then back thin, I like s2's version of some round some
   // straight edges (still slightly round), but close the gaps slightly": s5 with the tiles touching and showing the paper's own
   // plates and seams (s2), the seams trimmed by sampling .03 of a cell inside; no gap tweens. Then "no more divided lines no
-  // weld, also try making all edges slightly rounded": every plate a rounded rectangle, the turns bare
-  { name: 's6', flight: 'v5', join: 'stretch', page: 'solid', grain: false, settle: 'none', ghost: { alpha: 0, tint: '#9de8d4', gap: 0, wake: true, plates: 0.03, round: 0.08, bare: true }, note: 's5 with s2\'s plates in the tiles, the seams a little narrower, every plate rounded, turns without seam lines or weld' },
+  // weld, also try making all edges slightly rounded": every plate a rounded rectangle, the turns bare. Then "I still see a border,
+  // also dont let text fade out": the plate mask a soft fall-off, the outer half-seams off the viewport, the text kept through the turn
+  { name: 's6', flight: 'v5', join: 'stretch', page: 'solid', grain: false, settle: 'none', ghost: { alpha: 0, tint: '#9de8d4', gap: 0, wake: true, plates: 0.03, round: 0.08, bare: true, noEdge: true, textStays: true }, note: 's5 with s2\'s plates in the tiles, the seams a little narrower, every plate rounded, turns without seam lines or weld' },
 ]
 export const SITE_TRANSITION_OF = (name: string) => SITE_TRANSITIONS.find((v) => v.name === name)
