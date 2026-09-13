@@ -288,9 +288,9 @@ export function Site() {
         ))}
         {open && (
           <aside className={`panel ${panelRight ? 'panel-right' : 'panel-left'}`}>
-            <span className="panel-k">{open.section} · {open.year}</span>
+            <span className="panel-k">{open.year ? `${open.section} · ${open.year}` : open.section}</span>
             <h3>{open.title}</h3>
-            <p>{open.detail ?? open.blurb}</p>
+            {(open.detail ?? open.blurb) && <p>{open.detail ?? open.blurb}</p>}
             {(open.stack || open.link) && (
               <p className="panel-meta">
                 {open.stack}

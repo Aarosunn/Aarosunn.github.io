@@ -19,9 +19,9 @@ export type Project = {
   /** which section lists it */
   section: SectionId
   title: string
-  year: number | string
+  year?: number | string
   /** one or two sentences: the page inside the section shows this under the title */
-  blurb: string
+  blurb?: string
   /** the detail panel on the home page (optional, falls back to the blurb) */
   detail?: string
   /** what it is built with, shown on the detail panel */
@@ -45,9 +45,19 @@ export const SECTIONS: Section[] = [
 ]
 
 export const PROJECTS: Project[] = [
-  { section: 'code', title: 'aarcube', year: 2026, blurb: "paper shaders on a Rubik's cube. the cube is the menu, the menu is the cube.", stack: 'react three fiber · paper shaders · gsap', link: { label: 'source', href: 'https://github.com/' } },
-  { section: 'code', title: 'small runtime', year: 2025, blurb: 'a language runtime small enough to read in an afternoon.' },
-  { section: 'code', title: 'a CLI people use', year: 2025, blurb: 'placeholder: a command line tool that earned its place in a few dotfiles.' },
+  // code, in Aaron's order (titles first; years, blurbs and links to come)
+  { section: 'code', title: 'Conduit' },
+  { section: 'code', title: 'Tokenizer in C' },
+  { section: 'code', title: 'GhostWatch' },
+  { section: 'code', title: 'Clerse' },
+  { section: 'code', title: 'ConceptPilot' },
+  { section: 'code', title: 'Cache Simulator' },
+  { section: 'code', title: 'Linker' },
+  { section: 'code', title: 'Database from Scratch' },
+  { section: 'code', title: 'Zombie Shooter' },
+  { section: 'code', title: 'Text Editor' },
+  { section: 'code', title: 'Scioly+' },
+  { section: 'code', title: 'Euchre' },
   { section: 'hardware', title: 'synth voice', year: 2025, blurb: 'a wavetable voice on an FPGA, four oscillators, one very hot chip.' },
   { section: 'hardware', title: 'camera rig', year: 2026, blurb: 'a hand-tracking camera rig that knows which finger is which.' },
   { section: 'hardware', title: 'split keyboard', year: 2024, blurb: 'placeholder: a PCB for a split keyboard, and the firmware to match.' },

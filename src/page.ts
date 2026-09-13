@@ -32,13 +32,13 @@ export function paintPage(c: HTMLCanvasElement, p: Project, w: number, h: number
   const title = clamp(36, w * 0.0444, 72), meta = clamp(11, w * 0.009, 14), body = clamp(12, w * 0.0104, 16)
   g.fillStyle = COLORS.mute
   g.font = `400 ${meta}px "Geist Mono", ui-monospace, monospace`
-  g.fillText(`${p.section} · ${p.year}`, left, top)
+  g.fillText(p.year ? `${p.section} · ${p.year}` : p.section, left, top)
   g.fillStyle = COLORS.bright
   g.font = `300 ${title}px Unbounded, sans-serif`
   g.fillText(p.title, left - 2, top + title * 1.3)
   g.fillStyle = COLORS.text
   g.font = `400 ${body}px "Geist Mono", ui-monospace, monospace`
-  const words = p.blurb.split(' ')
+  const words = (p.blurb ?? '').split(' ')
   const maxW = portrait ? w * 0.84 : w * 0.36
   let line = ''
   let y = top + title * 1.3 + body * 3
