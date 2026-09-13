@@ -24,12 +24,14 @@ export type CubeHandle = ScreenHandle & { clear: () => Promise<void>; stretch: (
   /** drawn or not (imperative, so it can flip in the same tick as the paper pass's capture) */
   setLive: (on: boolean) => void
   /** the landed cube's seams as real gaps: `weldIn` lights them and runs the branching laser weld while they close; `openGaps` opens them again (scar lit, no laser) */
-  weldIn: (duration: number) => Promise<void>; openGaps: (duration: number) => Promise<void> }
+  weldIn: (duration: number) => Promise<void>; openGaps: (duration: number) => Promise<void>
+  /** the liquid's opacity over the page's ground (Site s4: a faint layer), and the seams tweened between two widths (fractions of a tile) */
+  setAlpha: (a: number, tint?: THREE.ColorRepresentation) => void; seams: (from: number, to: number, duration: number) => Promise<void> }
 
 /** a sticker in the liquid look: the cube's captured image under the page's text */
 const LIQUID_VERT = /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`
 const LIQUID_FRAG = /* glsl */ `
-  uniform sampler2D uLiquid; uniform sampler2D uPage; uniform float uFade; uniform vec4 uFace; uniform float uHasPage; uniform float uInset;
+  uniform sampler2D uLiquid; uniform sampler2D uPage; uniform float uFade; uniform vec4 uFace; uniform float uHasPage; uniform float uInset; uniform float uAlpha; uniform vec3 uTint;
   varying vec2 vUv;
   void main() {
     // uInset: sample only the cubie's plate (inside the landed cube's seams), so the seams can be real gaps between the tiles
@@ -38,7 +40,9 @@ const LIQUID_FRAG = /* glsl */ `
     vec2 cu = (cell + uInset + local * (1.0 - 2.0 * uInset)) / 3.0;
     vec3 liq = texture2D(uLiquid, uFace.xy + cu * uFace.zw).rgb;
     vec4 pg = uHasPage > 0.5 ? texture2D(uPage, vUv) : vec4(0.0);
-    gl_FragColor = vec4(mix(liq, pg.rgb, pg.a * uFade), 1.0);
+    // uAlpha < 1 (Site s4): the liquid a faint layer over the page's dark ground, the text always full
+    float t = pg.a * uFade;
+    gl_FragColor = vec4(mix(liq * uTint, pg.rgb, t), mix(uAlpha, 1.0, t));
   }
 `
 
@@ -143,7 +147,7 @@ export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: strin
   useEffect(() => {
     camera.aspect = W / H; camera.fov = FOV; camera.position.set(0, 0, H / 2 / Math.tan((FOV * Math.PI) / 360)); camera.near = 1; camera.far = camera.position.z * 6; camera.updateProjectionMatrix()
   }, [camera, W, H])
-  const liquidU = useRef({ face: new THREE.Vector4(0, 0, 1, 1), fade: 1 })
+  const liquidU = useRef({ face: new THREE.Vector4(0, 0, 1, 1), fade: 1, alpha: 1, tint: new THREE.Color(1, 1, 1) })
   const liveRef = useRef(live)
   const liquidMats = useRef<THREE.ShaderMaterial[]>([])
   // drawn by hand after the paper pass (priority 2): a clear to the page colour, then the cube
@@ -188,7 +192,7 @@ export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: strin
         for (let k = 0; k < uv.count; k++) uv.setXY(k, (s.col + uv.getX(k)) / 3, (2 - s.row + uv.getY(k)) / 3)
         const page = s.tex < 0 ? null : textures[s.tex % textures.length]
         const mat = liquid
-          ? new THREE.ShaderMaterial({ uniforms: { uLiquid: { value: liquid }, uPage: { value: page }, uHasPage: { value: page ? 1 : 0 }, uFade: { value: liquidU.current.fade }, uFace: { value: liquidU.current.face }, uInset: { value: inset } }, vertexShader: LIQUID_VERT, fragmentShader: LIQUID_FRAG })
+          ? new THREE.ShaderMaterial({ uniforms: { uLiquid: { value: liquid }, uPage: { value: page }, uHasPage: { value: page ? 1 : 0 }, uFade: { value: liquidU.current.fade }, uFace: { value: liquidU.current.face }, uInset: { value: inset }, uAlpha: { value: liquidU.current.alpha }, uTint: { value: liquidU.current.tint } }, vertexShader: LIQUID_VERT, fragmentShader: LIQUID_FRAG, transparent: true })
           : new THREE.MeshBasicMaterial({ map: page ?? blankTex, transparent: s.tex < 0 })
         if (mat instanceof THREE.ShaderMaterial) liquidMats.current.push(mat)
         const m = new THREE.Mesh(geo, mat)
@@ -217,7 +221,7 @@ export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: strin
     })
   }
   /** the landed cube's seams in root units per axis (the face is square on screen while the root is scaled square) */
-  const landedGaps = () => { const px = (Math.min(W, H) / 3) * LANDED_SEAM; const [sx, sy] = square(); return { gx: px / sx, gy: px / sy } }
+  const landedGaps = (frac = LANDED_SEAM) => { const px = (Math.min(W, H) / 3) * frac; const [sx, sy] = square(); return { gx: px / sx, gy: px / sy } }
   useEffect(() => {
     const g = root.current
     const col = new THREE.Color(weldColor)
@@ -382,6 +386,13 @@ export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: strin
       setFace: (x, y, w, h) => { liquidU.current.face.set(x, y, w, h) },
       setFade: (k) => { liquidU.current.fade = k; liquidMats.current.forEach((m) => { m.uniforms.uFade.value = k }) },
       setLive: (on) => { liveRef.current = on },
+      setAlpha: (a, tint) => { liquidU.current.alpha = a; if (tint !== undefined) liquidU.current.tint.set(tint); liquidMats.current.forEach((m) => { m.uniforms.uAlpha.value = a }) },
+      seams: (from, to, duration) => new Promise<void>((resolve) => {
+        const a = landedGaps(from), b = landedGaps(to)
+        const f = { v: 0 }
+        setGap(a.gy, a.gx)
+        gsap.to(f, { v: 1, duration, ease: 'power2.inOut', onUpdate: () => setGap(a.gy + (b.gy - a.gy) * f.v, a.gx + (b.gx - a.gx) * f.v), onComplete: resolve })
+      }),
       weldIn: (duration) => new Promise<void>((resolve) => {
         const st = state.current
         if (st.busy) return resolve()

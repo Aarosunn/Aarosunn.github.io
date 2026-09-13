@@ -8,7 +8,7 @@ import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import gsap from 'gsap'
 import { PaperCube, type FlyHandle } from './PaperCube'
-import { CubeScreen, LANDED_INSET, ScreenCube, type CubeHandle } from './CubeScreen'
+import { CubeScreen, LANDED_INSET, LANDED_SEAM, ScreenCube, type CubeHandle } from './CubeScreen'
 import { CUBE_OF, TRANSITION_OF } from './transitionVersions'
 import { SITE_TRANSITION_OF, SITE_TRANSITIONS, type SiteVersion } from './siteVersions'
 import { PROJECTS } from './ScreenSolve'
@@ -70,6 +70,8 @@ const OVERLAP = 0.45
  *  `SWEEP` s ahead over `SETTLE` s (one last highlight through) as it settles onto the solid dark mint */
 const WELD = 1.3
 const SETTLE = 1.6
+/** s4: seconds for the liquid to fade to its faint layer and the seams to narrow, from the landing */
+const GHOST = 0.9
 const SWEEP = 2.5
 /** the hand-placed floral group's canvas is `GROUP_OVER` times taller than its layout footprint (`--fh` in styles.css, 222 px on a
  *  900 px screen, shrinking with a shorter viewport so the base row never runs off the bottom) and the camera that much
@@ -183,10 +185,19 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       if (sv.weldIn) extras.push(grid.current?.weldIn(reduced ? 0.01 : WELD) ?? Promise.resolve())
       if (sv.settle === 'solid') extras.push(settleSolid(1, reduced ? 0.01 : SETTLE))
       if (sv.settle === 'frozen') { h.freeze(true); extras.push(settleFrozen(1, reduced ? 0.01 : 0.8)) }
+      if (sv.ghost) extras.push(ghost(true, reduced ? 0.01 : GHOST))
       await Promise.all([spreading, ...extras])
     }
     phase.current = 'in'
     setFlying(false)
+  }
+  /** s4: the tiles' liquid fades to `ghost.alpha` over the page's dark ground while the seams narrow from the landed cube's to `ghost.gap` (back: the reverse) */
+  const ghost = (on: boolean, duration: number) => {
+    const g = grid.current, gh = sv.ghost
+    if (!g || !gh) return Promise.resolve()
+    const a = { v: on ? 0 : 1 }, white = new THREE.Color(1, 1, 1), mint = new THREE.Color(gh.tint), c = new THREE.Color()
+    gsap.to(a, { v: on ? 1 : 0, duration, ease: 'power2.inOut', onUpdate: () => g.setAlpha(1 + (gh.alpha - 1) * a.v, c.copy(white).lerp(mint, a.v)) })
+    return g.seams(on ? LANDED_SEAM : gh.gap, on ? gh.gap : LANDED_SEAM, duration)
   }
   /** 'frozen': the liquid is stopped where it is (freeze) and its highlights pressed down to the dark shades */
   const settleFrozen = (to: 0 | 1, duration: number) => new Promise<void>((res) => {
@@ -234,6 +245,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       if (sv.weldIn) back.push(grid.current?.openGaps(reduced ? 0.01 : 0.4) ?? Promise.resolve())
       if (sv.settle === 'solid') back.push(settleSolid(0, reduced ? 0.01 : 0.6))
       if (sv.settle === 'frozen') back.push(settleFrozen(0, reduced ? 0.01 : 0.5).then(() => fly.current?.freeze(false)))
+      if (sv.ghost) back.push(ghost(false, reduced ? 0.01 : 0.5))
       await Promise.all(back)
       await spread(0, reduced ? 0.01 : STRETCH, () => { grid.current?.setLive(false); fly.current?.capture(false); t.reverse() })
       return
@@ -242,7 +254,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
   }
   const goRef = useRef({ go, home })
   goRef.current = { go, home }
-  useEffect(() => { window.__aarNav = { go: (i) => goRef.current.go(i), home: () => goRef.current.home(), next: () => grid.current?.next() ?? Promise.resolve(), busy: () => phase.current === 'out' || (grid.current?.busy() ?? false), section: () => section, rotY: () => fly.current?.root.rotation.y ?? 0, dbg: () => grid.current?.dbg(), setVersion: (n: string) => { const v = SITE_TRANSITION_OF(n); if (v) setSv(v) }, version: () => sv.name } }, [section, sv])
+  useEffect(() => { window.__aarNav = { go: (i) => goRef.current.go(i), home: () => goRef.current.home(), next: () => grid.current?.next() ?? Promise.resolve(), busy: () => phase.current === 'out' || (grid.current?.busy() ?? false), section: () => section, rotY: () => fly.current?.root.rotation.y ?? 0, dbg: () => grid.current?.dbg(), alpha: (a: number, tint?: string) => grid.current?.setAlpha(a, tint), setVersion: (n: string) => { const v = SITE_TRANSITION_OF(n); if (v) setSv(v) }, version: () => sv.name } }, [section, sv])
   // the lab's v1 at its own camera (blur radii are frame-relative, so the cube stays crisp);
   // paper's `scale` shrinks the whole image on screen so the sections breathe
   const narrow = typeof window !== 'undefined' && window.innerWidth < 900
@@ -328,7 +340,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       <Canvas key={version} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
         <PaperCube version={PV} params={params} spin={!reduced && !still} spinSpeed={0.12} auto={!reduced && !away} autoInterval={3600} combo={0.35} rubik={rubik} fly={fly} />
         {/* s2's page: the screen cube drawn in this same canvas, its tiles sampling the shader cube's captured image */}
-        {sv.join === 'stretch' && section !== null && fly.current && <ScreenCube key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} weld projects={projects} blank={false} look={sv.page} heroDraw={false} liquid={fly.current.shot} live={false} inset={sv.weldIn ? LANDED_INSET : 0} />}
+        {sv.join === 'stretch' && section !== null && fly.current && <ScreenCube key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} weld projects={projects} blank={false} look={sv.page} heroDraw={false} liquid={fly.current.shot} live={false} inset={sv.weldIn || sv.ghost ? LANDED_INSET : 0} />}
       </Canvas>
       {/* the section page: the screen as a cube, faded in over the landing; the wordmark (or escape) flies home */}
       {section !== null && (
@@ -418,7 +430,7 @@ declare global {
   interface Window {
     __aarSite: React.RefObject<RubikHandle | null>
     /** the section transition: fly to a section, home, next project, busy while a flight or a turn runs */
-    __aarNav: { go: (i: number) => void; home: () => void; next: () => Promise<void>; busy: () => boolean; section: () => number | null; rotY: () => number; dbg: () => unknown; setVersion: (n: string) => void; version: () => string }
+    __aarNav: { go: (i: number) => void; home: () => void; next: () => Promise<void>; busy: () => boolean; section: () => number | null; rotY: () => number; dbg: () => unknown; alpha: (a: number, tint?: string) => void; setVersion: (n: string) => void; version: () => string }
   }
 }
 
