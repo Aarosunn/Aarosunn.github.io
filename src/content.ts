@@ -70,8 +70,9 @@ export const PROJECTS: Project[] = [
   { section: 'hardware', title: 'synth voice', year: 2025, blurb: 'a wavetable voice on an FPGA, four oscillators, one very hot chip.' },
   { section: 'hardware', title: 'camera rig', year: 2026, blurb: 'a hand-tracking camera rig that knows which finger is which.' },
   { section: 'hardware', title: 'split keyboard', year: 2024, blurb: 'placeholder: a PCB for a split keyboard, and the firmware to match.' },
-  { section: 'creatives', title: 'title sequence', year: 2025, blurb: 'a TouchDesigner title sequence cut to a track nobody has heard yet.' },
-  { section: 'creatives', title: 'ascii portrait', year: 2026, blurb: 'a portrait in text that watches back.' },
+  { section: 'creatives', title: 'Art' },
+  { section: 'creatives', title: 'Web Design' },
+  { section: 'creatives', title: 'Polestar89' },
 ]
 
 /** the projects of one section, in the order written above */
