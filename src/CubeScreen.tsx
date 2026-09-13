@@ -45,7 +45,7 @@ const LIQUID_FRAG = /* glsl */ `
     if (uRound > 0.0) {
       vec2 q = abs(local - 0.5) - (0.5 - uPlate - uRound);
       float sd = length(max(q, 0.0)) - uRound;
-      liq *= mix(1.0, 0.25, smoothstep(-0.006, 0.006, sd));
+      liq *= mix(1.0, 0.05, smoothstep(-0.0015, 0.0015, sd)); // to the seam core's black: a quarter left the rim as a faded frame
     }
     vec4 pg = uHasPage > 0.5 ? texture2D(uPage, vUv) : vec4(0.0);
     // uAlpha < 1 (Site s4): the liquid a faint layer over the page's dark ground, the text always full
