@@ -478,3 +478,15 @@ body:has(.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -
   body:has(.ui.away) canvas { transform: none; }
   .floral { --fh: 78px; }
 }
+
+/* ---------- the icon lab (dev only) ---------- */
+.lab { min-height: 100%; overflow: auto; padding: 28px 40px 60px; display: grid; gap: 28px; align-content: start; }
+.lab-head { display: flex; align-items: baseline; gap: 14px; }
+.lab-k { color: var(--mute); }
+.lab-head button.on { border-color: var(--accent); color: var(--accent); }
+.lab-row { display: grid; grid-template-columns: 300px 1fr; gap: 28px; align-items: center; border-top: 1px solid var(--line); padding-top: 20px; }
+.lab-meta h2 { font: 300 1.5rem/1.1 var(--display); color: var(--bright); margin-bottom: 6px; }
+.lab-meta p { color: var(--mute); max-width: 36ch; }
+.lab-icons { display: flex; gap: 28px; align-items: center; }
+.liquid-icon { position: relative; display: block; border-radius: 22%; overflow: hidden; }
+.liquid-icon canvas { position: absolute !important; inset: 0; transform: none !important; animation: none; transition: none; }

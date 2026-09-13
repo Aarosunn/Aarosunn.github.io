@@ -13,7 +13,7 @@ import { getShaderColorFromString, liquidMetalFragmentShader } from '@paper-desi
 import { RubikMask, type RubikHandle } from './RubikMask'
 import { CUBE, LIQUID } from './cube'
 
-const QUAD_VERT = /* glsl */ `
+export const QUAD_VERT = /* glsl */ `
   in vec3 position; in vec2 uv; out vec2 vUv;
   void main() { vUv = uv; gl_Position = vec4(position, 1.0); }
 `
@@ -49,7 +49,7 @@ const EDGE = /* glsl */ `
   }
 `
 // poisson: field = 1 - u / max(u), like their toProcessed*
-const COMBINE_POISSON = /* glsl */ `
+export const COMBINE_POISSON = /* glsl */ `
   precision highp float;
   in vec2 vUv; out vec4 o;
   uniform sampler2D mask; uniform sampler2D u; uniform sampler2D umax;
@@ -62,7 +62,7 @@ const COMBINE_POISSON = /* glsl */ `
   }
 `
 // Jacobi step for  ∇²u = -1  inside the shape (mask G > thresh), u = 0 outside. Their preprocess, on the GPU.
-const POISSON = /* glsl */ `
+export const POISSON = /* glsl */ `
   precision highp float;
   in vec2 vUv; out vec4 o;
   uniform sampler2D u; uniform sampler2D mask; uniform sampler2D ids; uniform float texel; uniform float thresh;
@@ -79,7 +79,7 @@ const POISSON = /* glsl */ `
   }
 `
 // running max of u: halve the texture, sampling the 2x2 block centres
-const REDUCE_MAX = /* glsl */ `
+export const REDUCE_MAX = /* glsl */ `
   precision highp float;
   in vec2 vUv; out vec4 o;
   uniform sampler2D t; uniform float texel;
@@ -133,7 +133,7 @@ const FACE_FRAG = /* glsl */ `
 `
 // paper's vertex semantics for fit = contain, square image, no rotation / offset; u_stretch pulls the window (and the
 // mask in it) to a non-square shape: the landed face stretching into the viewport
-const FINAL_VERT = /* glsl */ `
+export const FINAL_VERT = /* glsl */ `
   in vec3 position; in vec2 uv;
   uniform float u_aspect; uniform float u_scale; uniform vec2 u_stretch;
   out vec2 v_imageUV; out vec2 v_objectUV; out vec2 v_responsiveUV; out vec2 v_responsiveBoxGivenSize;
@@ -149,7 +149,7 @@ const FINAL_VERT = /* glsl */ `
 `
 
 /** their fragment verbatim, plus our tail */
-function finalFragment() {
+export function finalFragment() {
   const src = liquidMetalFragmentShader.replace('#version 300 es', '').replace(/precision mediump float;/, 'precision highp float;')
   const tail = `
   {
@@ -211,12 +211,12 @@ function finalFragment() {
   return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform sampler2D u_asciiMask; uniform float u_shade; uniform float u_grain; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiSquash; uniform float u_asciiDither; uniform float u_asciiFade; uniform float u_asciiGlow; uniform float u_asciiMul; uniform float u_aspect; uniform float u_scale; uniform vec2 u_stretch; precision highp int;')
 }
 
-const rt = (size: number, depth = false, samples = 0) => new THREE.WebGLRenderTarget(size, size, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: depth, samples })
-const frt = (size: number) => new THREE.WebGLRenderTarget(size, size, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false })
+export const rt = (size: number, depth = false, samples = 0) => new THREE.WebGLRenderTarget(size, size, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: depth, samples })
+export const frt = (size: number) => new THREE.WebGLRenderTarget(size, size, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false })
 const rt2 = (w: number, h: number) => new THREE.WebGLRenderTarget(w, h, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false })
 const rgb = (hex: string) => new THREE.Vector3(...new THREE.Color(hex).toArray())
 
-const finalUniforms = (): Record<string, THREE.IUniform> => ({
+export const finalUniforms = (): Record<string, THREE.IUniform> => ({
   u_image: { value: null },
   u_mask: { value: null },
   u_asciiMask: { value: null },
