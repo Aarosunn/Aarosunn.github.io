@@ -76,8 +76,6 @@ export const PROJECTS: Project[] = [
   { section: 'hardware', title: 'Traffic Light Controller', icon: 'verilog' },
   { section: 'hardware', title: 'Sequential Calculator', icon: 'verilog' },
   { section: 'hardware', title: 'Robot Tour' },
-  { section: 'hardware', title: 'Air Trajectory' },
-  { section: 'hardware', title: 'Surprise' },
   { section: 'creatives', title: 'Art' },
   { section: 'creatives', title: 'Web Design' },
   { section: 'creatives', title: 'Polestar89' },
