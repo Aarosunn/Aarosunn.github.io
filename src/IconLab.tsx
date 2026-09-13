@@ -3,10 +3,9 @@
  * to iterate on before one goes on the site. Additive: never edit a version, append.
  */
 import { useState } from 'react'
-import { GITHUB, LINKEDIN, LiquidIcon, type IconLook } from './LiquidIcon'
-import { LIQUID } from './cube'
+import { GITHUB, LINKEDIN, LiquidIcon, SITE_ICON, type IconLook } from './LiquidIcon'
 
-const base = { scale: 0.9, speed: LIQUID.speed, hoverSpeed: LIQUID.speed * 3, soften: 0 }
+const base = { scale: SITE_ICON.scale, speed: SITE_ICON.speed, hoverSpeed: SITE_ICON.hoverSpeed, soften: 0 }
 export const ICON_LOOKS: IconLook[] = [
   { ...base, name: 'v1 pillow', field: 'pillow', ascii: false, note: 'the cube\'s chrome pillow over the mark: the Poisson field high at the edge, deep in the middle' },
   { ...base, name: 'v2 flat', field: 'flat', ascii: false, note: 'no field: paper\'s stripes alone inside the silhouette' },
@@ -32,7 +31,7 @@ export function IconLab() {
           </div>
           <div className="lab-icons">
             <LiquidIcon path={GITHUB.path} box={GITHUB.box} href="https://github.com/Aarosunn" label="GitHub" look={look} px={px} />
-            <LiquidIcon path={LINKEDIN.path} box={LINKEDIN.box} href="https://linkedin.com/in/aasunn" label="LinkedIn" look={look} px={px} />
+            <LiquidIcon path={LINKEDIN.path} box={LINKEDIN.box} fit={LINKEDIN.fit} href="https://linkedin.com/in/aasunn" label="LinkedIn" look={look} px={px} />
           </div>
         </section>
       ))}

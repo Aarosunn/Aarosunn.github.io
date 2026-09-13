@@ -45,6 +45,9 @@ export const SITE = {
   noticeLink: 'creatives' as SectionId,
   /** what an unfinished project says when clicked on the home page (the finished ones are listed under it as links) */
   unfinished: 'This page is not written up yet. The finished ones so far:',
+  /** the two marks either side of the deck, in the cube's material */
+  github: 'https://github.com/Aarosunn',
+  linkedin: 'https://linkedin.com/in/aasunn',
 }
 
 export const SECTIONS: Section[] = [

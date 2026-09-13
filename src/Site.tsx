@@ -17,6 +17,7 @@ import type { Rect } from './page'
 import { ALGS, type RubikHandle } from './RubikMask'
 import { XrayFlower3D } from './XrayFlower3D'
 import { AsciiPortrait } from './Ascii'
+import { GITHUB, LINKEDIN, LiquidIcon, SITE_ICON } from './LiquidIcon'
 import { CUBE, LIQUID } from './cube'
 import { FLORAL } from './florals'
 import { PROJECTS, SECTIONS, SITE, isDone, projectsOf, type Project } from './content'
@@ -39,6 +40,8 @@ const WAKE = 0.6
 /** the florals' canvas is GROUP_OVER times taller than its layout footprint (`--fh` in styles.css) and the camera that much
  *  farther, so the flowers keep their size with headroom above and below */
 const GROUP_OVER = 1.5
+/** the GitHub and LinkedIn marks either side of the deck (the lab's v1 pillow at 96, Aaron's pick) */
+const ICON_PX = 96
 /** the home page lists at most this many of a section's projects, then an ellipsis (the section itself has them all) */
 const LIST_CAP = 7
 /** a double click or double tap on the cube runs the next of the famous algorithms at speedcubing pace */
@@ -347,14 +350,18 @@ export function Site() {
         )}
         <div className="site-base">
           <XrayFlower3D className="floral" camDist={(FLORAL.camDist / 1.9) * GROUP_OVER} />
-          <nav className="deck" aria-label="sections">
-            {SECTIONS.map((s, i) => (
-              <button key={s.id} className={i === active ? 'on' : ''} onClick={() => (i === active ? go(i) : step(i))} aria-label={s.title}>
-                <i />
-                <span>{s.title.toLowerCase()}</span>
-              </button>
-            ))}
-          </nav>
+          <div className="deck-row">
+            <LiquidIcon path={GITHUB.path} box={GITHUB.box} href={SITE.github} label="GitHub" look={SITE_ICON} px={narrow ? 44 : ICON_PX} paused={away} />
+            <nav className="deck" aria-label="sections">
+              {SECTIONS.map((s, i) => (
+                <button key={s.id} className={i === active ? 'on' : ''} onClick={() => (i === active ? go(i) : step(i))} aria-label={s.title}>
+                  <i />
+                  <span>{s.title.toLowerCase()}</span>
+                </button>
+              ))}
+            </nav>
+            <LiquidIcon path={LINKEDIN.path} box={LINKEDIN.box} fit={LINKEDIN.fit} href={SITE.linkedin} label="LinkedIn" look={SITE_ICON} px={narrow ? 44 : ICON_PX} paused={away} />
+          </div>
         </div>
       </div>
     </>
