@@ -25,11 +25,15 @@ body,
   height: 100%;
   overflow: hidden;
 }
+/* one size for the whole page, scaling with the viewport: 12 px at 1440 wide, 11 on a phone, 13.5 on a wide desk; everything below is in rem */
+html {
+  font-size: clamp(11px, 0.4vw + 6.2px, 13.5px);
+}
 
 body {
   background: var(--bg);
   color: var(--text);
-  font: 400 12px/1.5 var(--mono);
+  font: 400 1rem/1.5 var(--mono);
 }
 
 /* the cube's canvas fills the viewport; one load moment: it fades up first, the sections rise after */
@@ -72,7 +76,7 @@ canvas {
 }
 
 .wordmark {
-  font: 700 18px/1 var(--display);
+  font: 700 1.5rem/1 var(--display);
   letter-spacing: -0.02em;
   color: var(--bright);
 }
@@ -146,7 +150,7 @@ button:focus-visible {
 .sec:hover { opacity: 0.8; }
 .sec.on { opacity: 1; }
 .sec h2 {
-  font: 300 22px/1.1 var(--display);
+  font: 300 1.85rem/1.1 var(--display);
   letter-spacing: -0.01em;
   color: var(--text);
   margin-bottom: 8px;
@@ -155,7 +159,7 @@ button:focus-visible {
 }
 .sec.on h2 {
   color: var(--bright);
-  font-size: 30px;
+  font-size: 2.5rem;
 }
 .sec.on h2::before {
   content: '';
@@ -168,7 +172,7 @@ button:focus-visible {
 }
 .sec p {
   color: var(--mute);
-  font-size: 13px;
+  font-size: 1.08rem;
   margin-bottom: 10px;
   max-width: 34ch;
 }
@@ -296,7 +300,7 @@ body:has(.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -
   margin-bottom: 6px;
 }
 .panel h3 {
-  font: 300 20px/1.15 var(--display);
+  font: 300 1.65rem/1.15 var(--display);
   color: var(--bright);
   letter-spacing: -0.01em;
   margin-bottom: 10px;
@@ -373,7 +377,7 @@ body:has(.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -
   .sec.on { display: block; grid-area: 3 / 1; justify-self: start; align-self: end; text-align: left; margin: 0 0 8px 16px; max-width: none; }
   .sec.on h2::before { left: -16px; right: auto; }
   .sec.on li::before { content: '·'; }
-  .sec.on h2 { font-size: 26px; }
+  .sec.on h2 { font-size: 2.15rem; }
   .site-base { grid-area: 4 / 1; }
   /* the florals smaller and no longer pulled up into the section's row; the section's text always above them */
   .floral { --fh: 100px; width: 58vw; height: calc(var(--fh) * 1.4); margin: -8px 0 -22px; }
@@ -404,8 +408,9 @@ body:has(.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -
   body:has(.has-panel .panel-left) canvas,
   body:has(.has-panel .panel-right) canvas { transform: translateY(-10vh); }
 }
-/* a short phone: the cube lifted further so the section's title clears it (Site.tsx also shrinks it with the height) */
+/* a short phone: the cube keeps its size and is lifted further, the florals give up the room, so the section's title clears it */
 @media (max-width: 900px) and (max-height: 720px) {
-  canvas, body:has(.has-panel .panel-left) canvas, body:has(.has-panel .panel-right) canvas { transform: translateY(-15vh); }
+  canvas, body:has(.has-panel .panel-left) canvas, body:has(.has-panel .panel-right) canvas { transform: translateY(-21vh); }
   body:has(.ui.away) canvas { transform: none; }
+  .floral { --fh: 78px; }
 }

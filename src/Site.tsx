@@ -62,8 +62,6 @@ export function Site() {
   const [still, setStill] = useState(false)
   const reduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const narrow = typeof window !== 'undefined' && window.innerWidth < 900
-  // a short phone: the cube shrinks with the height so it clears the section's title (the lift is a fixed 10vh)
-  const short = typeof window !== 'undefined' ? Math.min(1, (window.innerHeight / 820) ** 1.6) : 1
 
   /** the landed square face ↔ the viewport: the paper window and the page layer's tiles move together; over the second half the
    *  text fades in; `onHalf` fires as k crosses .5 */
@@ -249,7 +247,7 @@ export function Site() {
   return (
     <>
       <Canvas dpr={[1, 1.5]} camera={{ position: [0, 0, CUBE.camZ], fov: FOV }} gl={{ antialias: true, powerPreference: 'high-performance' }}>
-        <PaperCube size={narrow ? 768 : CUBE.size} scale={narrow ? LIQUID.scale * 0.53 * short : LIQUID.scale} spin={!reduced && !still} spinSpeed={0.12} auto={!reduced && !away} autoInterval={3600} combo={0.35} rubik={rubik} fly={fly} />
+        <PaperCube size={narrow ? 768 : CUBE.size} scale={narrow ? LIQUID.scale * 0.53 : LIQUID.scale} spin={!reduced && !still} spinSpeed={0.12} auto={!reduced && !away} autoInterval={3600} combo={0.35} rubik={rubik} fly={fly} />
         {/* the section page: the screen cube drawn in this same canvas, its tiles sampling the shader cube's captured image */}
         {section !== null && fly.current && <ScreenCube key={section} ref={grid} projects={projects} liquid={fly.current.shot} />}
       </Canvas>
