@@ -37,6 +37,9 @@ export const SITE = {
   intro: 'Aaron Sun',
   /** the About corner's portrait: an ascii bust for now, a webcam one day */
   portrait: true,
+  /** a small notice on the home page (empty string = none); the section named in `noticeLink` is a link into it */
+  notice: 'Recently created, still moving in. Check out Creatives for my design portfolio.',
+  noticeLink: 'creatives' as SectionId,
 }
 
 export const SECTIONS: Section[] = [

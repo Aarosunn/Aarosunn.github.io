@@ -47,6 +47,7 @@ const DOUBLE_TAP = 350
 export function Site() {
   const [active, setActive] = useState(0)
   const [open, setOpen] = useState<Project | null>(null)
+  const [notice, setNotice] = useState(!!SITE.notice)
   const rubik = useRef<RubikHandle | null>(null)
   const fly = useRef<FlyHandle | null>(null)
   const tl = useRef<gsap.core.Timeline | null>(null)
@@ -97,6 +98,7 @@ export function Site() {
     if (!h || tl.current || phase.current) return
     phase.current = 'out'
     setOpen(null)
+    setNotice(false)
     setActive(i)
     setSection(i)
     setFlying(true)
@@ -244,6 +246,14 @@ export function Site() {
   }, [])
 
   const openProject = (p: Project) => { setOpen(p); rubik.current?.turn() }
+  /** the notice with its section's name as a link that flies there */
+  const noticeParts = () => {
+    const sec = SECTIONS.findIndex((x) => x.id === SITE.noticeLink)
+    const name = sec >= 0 ? SECTIONS[sec].title : ''
+    const at = name ? SITE.notice.indexOf(name) : -1
+    if (at < 0) return SITE.notice
+    return <>{SITE.notice.slice(0, at)}<a href="#" onClick={(e) => { e.preventDefault(); go(sec) }}>{name}</a>{SITE.notice.slice(at + name.length)}</>
+  }
   const panelRight = open && (open.section === 'about' || open.section === 'creatives')
 
   return (
@@ -303,6 +313,12 @@ export function Site() {
               </p>
             )}
             <button className="panel-close" onClick={() => setOpen(null)}>close</button>
+          </aside>
+        )}
+        {notice && (
+          <aside className="notice" role="status">
+            <p>{noticeParts()}</p>
+            <button className="notice-close" onClick={() => setNotice(false)} aria-label="dismiss">×</button>
           </aside>
         )}
         <div className="site-base">

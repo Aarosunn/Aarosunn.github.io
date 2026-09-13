@@ -336,6 +336,36 @@ body:has(.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -
 }
 .has-panel .sec:not(.on) { opacity: 0.12; }
 
+/* the notice: a small glass card, bottom right of the home page, rising in after the load moment; gone on the first flight */
+.notice {
+  position: fixed;
+  right: 40px;
+  bottom: 24px;
+  max-width: 34ch;
+  padding: 12px 34px 12px 16px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--bg2) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bright) 14%, transparent);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  animation: rise 0.9s var(--ease) 1.6s both;
+  z-index: 2;
+}
+.notice p { margin: 0; }
+.notice a { color: var(--bright); text-decoration: none; border-bottom: 1px solid var(--accent); }
+.notice a:hover { color: var(--accent); }
+.notice-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: 0;
+  padding: 2px 5px;
+  color: var(--mute);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.notice-close:hover { color: var(--bright); }
+
 /* the section page: over the cube canvas, transparent (the page is drawn in the canvas), faded in with the spread;
    the wordmark flies home */
 .section-page {
@@ -370,7 +400,7 @@ body:has(.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -
 .page-hint span { margin-right: 8px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .aura, .site-intro, .sec, .site-base, .panel, canvas { animation: none; }
+  .aura, .site-intro, .sec, .site-base, .panel, .notice, canvas { animation: none; }
 }
 
 /* narrow screens: one column, the active section above the base row, the cube lifted */
@@ -404,6 +434,7 @@ body:has(.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -
     pointer-events: none;
     z-index: -1;
   }
+  .notice { left: 16px; right: 16px; bottom: auto; top: 56px; max-width: none; }
   .panel, .panel-left, .panel-right {
     left: 16px;
     right: 16px;
