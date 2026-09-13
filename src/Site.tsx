@@ -1,6 +1,7 @@
 /**
  * The site. The shader cube in the middle is the menu: four sections around it stepped like a deck (arrows, 1–4,
- * wheel, swipe; every step turns a layer), the three ghost blooms at the base. Enter, or the active section clicked,
+ * wheel, swipe; every step turns a layer; a double click or tap on the cube runs an algorithm), the three ghost blooms at
+ * the base. Enter, or the active section clicked,
  * flies the cube into that section: the page around it fades, the cube spins up to the camera and lands with one
  * face filling the screen, the face stretches into the viewport and fades into the page's own dark ground, leaving
  * the section's first project. `n` turns the cube to the next project (the cube comes back, turns, fades again);
@@ -37,8 +38,9 @@ const WAKE = 0.6
 /** the florals' canvas is GROUP_OVER times taller than its layout footprint (`--fh` in styles.css) and the camera that much
  *  farther, so the flowers keep their size with headroom above and below */
 const GROUP_OVER = 1.5
-/** j k l run the famous algorithms at speedcubing pace */
-const ALG_KEYS: Record<string, string> = { j: 'T perm', k: 'U perm', l: 'Sune' }
+/** a double click or double tap on the cube runs the next of the famous algorithms at speedcubing pace */
+const ALG_CYCLE = ['T perm', 'U perm', 'Sune']
+const DOUBLE_TAP = 350
 
 export function Site() {
   const [active, setActive] = useState(0)
@@ -60,6 +62,8 @@ export function Site() {
   const [still, setStill] = useState(false)
   const reduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const narrow = typeof window !== 'undefined' && window.innerWidth < 900
+  // a short phone: the cube shrinks with the height so it clears the section's title (the lift is a fixed 10vh)
+  const short = typeof window !== 'undefined' ? Math.min(1, (window.innerHeight / 820) ** 1.6) : 1
 
   /** the landed square face ↔ the viewport: the paper window and the page layer's tiles move together; over the second half the
    *  text fades in; `onHalf` fires as k crosses .5 */
@@ -188,13 +192,15 @@ export function Site() {
     if (e.key === 'Enter') go(active)
     if (e.key === 'ArrowRight') step(active + 1)
     if (e.key === 'ArrowLeft') step(active - 1)
-    const alg = ALG_KEYS[e.key.toLowerCase()] // caps lock must not matter
-    if (alg) rubik.current?.run(ALGS[alg])
     const n = Number(e.key)
     if (n >= 1 && n <= SECTIONS.length) step(n - 1)
   }
   const stepRef = useRef(step)
   stepRef.current = step
+  const algIx = useRef(0)
+  const runAlg = () => { if (awayRef.current) return; rubik.current?.run(ALGS[ALG_CYCLE[algIx.current]]); algIx.current = (algIx.current + 1) % ALG_CYCLE.length }
+  const runAlgRef = useRef(runAlg)
+  runAlgRef.current = runAlg
   const activeRef = useRef(active)
   activeRef.current = active
   const awayRef = useRef(away)
@@ -208,24 +214,32 @@ export function Site() {
       last = performance.now()
       if (!awayRef.current) stepRef.current(activeRef.current + (e.deltaY > 0 ? 1 : -1))
     }
-    // touch: a horizontal swipe steps the deck (orbiting the cube is not a swipe)
+    // touch: a horizontal swipe steps the deck (orbiting the cube is not a swipe); a double tap on the cube runs an algorithm
     let x0 = 0
-    const onCanvas = (e: TouchEvent) => (e.target as Element | null)?.closest?.('canvas') != null
+    let lastTap = 0
+    const onCanvas = (e: Event) => (e.target as Element | null)?.closest?.('canvas') != null
     const ts = (e: TouchEvent) => { x0 = onCanvas(e) ? NaN : e.touches[0].clientX }
     const te = (e: TouchEvent) => {
-      if (Number.isNaN(x0)) return
+      if (Number.isNaN(x0)) {
+        const now = performance.now()
+        if (now - lastTap < DOUBLE_TAP) { lastTap = 0; runAlgRef.current() } else lastTap = now
+        return
+      }
       const dx = e.changedTouches[0].clientX - x0
       if (Math.abs(dx) > 48 && !awayRef.current) stepRef.current(activeRef.current + (dx < 0 ? 1 : -1))
     }
+    const dbl = (e: MouseEvent) => { if (onCanvas(e)) runAlgRef.current() }
     window.addEventListener('keydown', f)
     window.addEventListener('wheel', w, { passive: true })
     window.addEventListener('touchstart', ts, { passive: true })
     window.addEventListener('touchend', te, { passive: true })
+    window.addEventListener('dblclick', dbl)
     return () => {
       window.removeEventListener('keydown', f)
       window.removeEventListener('wheel', w)
       window.removeEventListener('touchstart', ts)
       window.removeEventListener('touchend', te)
+      window.removeEventListener('dblclick', dbl)
     }
   }, [])
 
@@ -235,7 +249,7 @@ export function Site() {
   return (
     <>
       <Canvas dpr={[1, 1.5]} camera={{ position: [0, 0, CUBE.camZ], fov: FOV }} gl={{ antialias: true, powerPreference: 'high-performance' }}>
-        <PaperCube size={narrow ? 768 : CUBE.size} scale={narrow ? LIQUID.scale * 0.53 : LIQUID.scale} spin={!reduced && !still} spinSpeed={0.12} auto={!reduced && !away} autoInterval={3600} combo={0.35} rubik={rubik} fly={fly} />
+        <PaperCube size={narrow ? 768 : CUBE.size} scale={narrow ? LIQUID.scale * 0.53 * short : LIQUID.scale} spin={!reduced && !still} spinSpeed={0.12} auto={!reduced && !away} autoInterval={3600} combo={0.35} rubik={rubik} fly={fly} />
         {/* the section page: the screen cube drawn in this same canvas, its tiles sampling the shader cube's captured image */}
         {section !== null && fly.current && <ScreenCube key={section} ref={grid} projects={projects} liquid={fly.current.shot} />}
       </Canvas>

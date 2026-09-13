@@ -483,3 +483,7 @@ Aaron: "flag this commit and start the official v1 version of this website, remo
 ### The icon (2026-09-12, later)
 
 Aaron: "for the icon can you recreate a 2D attempt of a freeze frame of a live liquid rubiks cube in the same green aesthetic?" `public/favicon.svg`: an isometric cube, nine rounded plates a face with near-black gaps, the top face pale mint with a pooled white highlight, the right face mid teal, the left dark, and three of the shader's blobs (dark teal, ringed blue then yellow) clipped to their plates. Drawn in a 64 box and scaled to fit. `scripts/favicon.mjs` renders it at 16 → 256 and on a light tab (`shots/favicon-sheet.png`). Gotcha: an SVG clip path may not reference a group, so the nine plates are repeated inside each clip.
+
+## Phones and the double tap (2026-09-13)
+
+Aaron: "on a mobile screen the flower covers parts of the info, also instead of j,k,l to make the cube spin can we make it cycle through the 3 algorithms we have from double clicking/tapping". Narrow screens: the florals' box no longer pulls itself up into the section's text row (`--fh` 100 px, no negative top margin, 58 vw wide) and the active section's text stacks above it; on a short phone (≤ 720 px tall) the cube is lifted 15 vh instead of 10 and shrunk by (height / 820)^1.6, so the section's title clears it (checked at 420 × 820 and 390 × 700, `scripts/home.mjs w h`). A double click, or two taps within 350 ms, on the cube runs the next of T perm → U perm → Sune (`ALG_CYCLE` in Site.tsx; j k l are gone); `scripts/dbltap.mjs` proves both with Playwright.

@@ -375,6 +375,9 @@ body:has(.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -
   .sec.on li::before { content: '·'; }
   .sec.on h2 { font-size: 26px; }
   .site-base { grid-area: 4 / 1; }
+  /* the florals smaller and no longer pulled up into the section's row; the section's text always above them */
+  .floral { --fh: 100px; width: 58vw; height: calc(var(--fh) * 1.4); margin: -8px 0 -22px; }
+  .sec.on { position: relative; z-index: 1; }
   .site-intro { display: none; }
   .portrait { display: none; }
   canvas { transform: translateY(-10vh); }
@@ -400,4 +403,9 @@ body:has(.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -
   }
   body:has(.has-panel .panel-left) canvas,
   body:has(.has-panel .panel-right) canvas { transform: translateY(-10vh); }
+}
+/* a short phone: the cube lifted further so the section's title clears it (Site.tsx also shrinks it with the height) */
+@media (max-width: 900px) and (max-height: 720px) {
+  canvas, body:has(.has-panel .panel-left) canvas, body:has(.has-panel .panel-right) canvas { transform: translateY(-15vh); }
+  body:has(.ui.away) canvas { transform: none; }
 }
