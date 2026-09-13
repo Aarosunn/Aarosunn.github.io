@@ -282,6 +282,7 @@ export function Site() {
                 return (
                   <li key={p.title} role="button" tabIndex={0} onClick={openIt} onKeyDown={(e) => e.key === 'Enter' && openIt(e)}>
                     {p.title}
+                    {p.icon === 'verilog' && <Wave />}
                   </li>
                 )
               })}
@@ -317,6 +318,15 @@ export function Site() {
         </div>
       </div>
     </>
+  )
+}
+
+/** a square wave: the mark for a Verilog project (Verilog has no logo; a digital signal says it) */
+function Wave() {
+  return (
+    <svg className="wave" viewBox="0 0 18 10" width="18" height="10" aria-label="Verilog" role="img">
+      <path d="M1 8 H4 V2 H8 V8 H12 V2 H16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
   )
 }
 

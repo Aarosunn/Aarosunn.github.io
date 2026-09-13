@@ -192,6 +192,7 @@ button:focus-visible {
 }
 .sec li { cursor: pointer; }
 .sec li.note, .sec li.more { cursor: default; color: var(--mute); }
+.sec li .wave { vertical-align: -1px; margin-left: 7px; color: var(--b); opacity: 0.8; }
 .sec li:not(.note):not(.more):hover,
 .sec li:not(.note):not(.more):focus-visible {
   color: var(--bright);

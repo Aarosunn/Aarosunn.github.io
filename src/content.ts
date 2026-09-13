@@ -28,6 +28,8 @@ export type Project = {
   stack?: string
   /** a link the detail panel offers */
   link?: { label: string; href: string }
+  /** a small mark after the title on the home page: 'verilog' draws a square wave (there is no official Verilog logo) */
+  icon?: 'verilog'
 }
 
 export const SITE = {
@@ -67,9 +69,12 @@ export const PROJECTS: Project[] = [
   { section: 'code', title: 'Scioly+' },
   { section: 'code', title: 'Euchre' },
   { section: 'code', title: 'Gradient Descent Visualizer' },
-  { section: 'hardware', title: 'synth voice', year: 2025, blurb: 'a wavetable voice on an FPGA, four oscillators, one very hot chip.' },
-  { section: 'hardware', title: 'camera rig', year: 2026, blurb: 'a hand-tracking camera rig that knows which finger is which.' },
-  { section: 'hardware', title: 'split keyboard', year: 2024, blurb: 'placeholder: a PCB for a split keyboard, and the firmware to match.' },
+  { section: 'hardware', title: 'Electric Vehicle' },
+  { section: 'hardware', title: 'Traffic Light Controller', icon: 'verilog' },
+  { section: 'hardware', title: 'Sequential Calculator', icon: 'verilog' },
+  { section: 'hardware', title: 'Robot Tour' },
+  { section: 'hardware', title: 'Air Trajectory' },
+  { section: 'hardware', title: 'Surprise' },
   { section: 'creatives', title: 'Art' },
   { section: 'creatives', title: 'Web Design' },
   { section: 'creatives', title: 'Polestar89' },
