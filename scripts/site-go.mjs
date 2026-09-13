@@ -30,7 +30,7 @@ for (const [w, h, name] of [[1440, 900, 'land'], [420, 820, 'port']]) {
   console.log(name, 'landed, section', await page.evaluate(() => window.__aarNav.section()))
   t0 = Date.now()
   await page.evaluate(() => { window.__aarNav.next() })
-  await shoot('next', t0, [200, 700, 1500, 2600])
+  await shoot('next', t0, [200, 700, 1500, 2600, 3400, 4200])
   await page.waitForFunction(() => !window.__aarNav.busy(), null, { timeout: 20000 })
   t0 = Date.now()
   await page.evaluate(() => { window.__aarNav.home() })

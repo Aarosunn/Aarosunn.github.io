@@ -72,6 +72,8 @@ const WELD = 1.3
 const SETTLE = 1.6
 /** s4: seconds for the liquid to fade to its faint layer and the seams to narrow, from the landing */
 const GHOST = 0.9
+/** s5: seconds for the liquid to come back before a turn, and to fade again after the weld */
+const WAKE = 0.6
 const SWEEP = 2.5
 /** the hand-placed floral group's canvas is `GROUP_OVER` times taller than its layout footprint (`--fh` in styles.css, 222 px on a
  *  900 px screen, shrinking with a shorter viewport so the base row never runs off the bottom) and the camera that much
@@ -199,6 +201,23 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     gsap.to(a, { v: on ? 1 : 0, duration, ease: 'power2.inOut', onUpdate: () => g.setAlpha(1 + (gh.alpha - 1) * a.v, c.copy(white).lerp(mint, a.v)) })
     return g.seams(on ? LANDED_SEAM : gh.gap, on ? gh.gap : LANDED_SEAM, duration)
   }
+  const waking = useRef(false)
+  /** the next project: s5 wakes the liquid first (tiles back, seams reopened), turns and welds, then fades it out again */
+  const nextProject = async () => {
+    const g = grid.current
+    if (!g || waking.current || g.busy()) return
+    if (!sv.ghost?.wake) return g.next()
+    waking.current = true
+    // the light text would sit on the pale liquid: it goes with the ground and comes back with it
+    const f = { v: 1 }, d = reduced ? 0.01 : WAKE
+    const text = (to: number) => gsap.to(f, { v: to, duration: d, ease: 'power2.inOut', onUpdate: () => g.setFade(f.v) })
+    text(0)
+    await ghost(false, d)
+    await g.next()
+    text(1)
+    await ghost(true, d)
+    waking.current = false
+  }
   /** 'frozen': the liquid is stopped where it is (freeze) and its highlights pressed down to the dark shades */
   const settleFrozen = (to: 0 | 1, duration: number) => new Promise<void>((res) => {
     const h = fly.current
@@ -252,9 +271,9 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     }
     t.reverse()
   }
-  const goRef = useRef({ go, home })
-  goRef.current = { go, home }
-  useEffect(() => { window.__aarNav = { go: (i) => goRef.current.go(i), home: () => goRef.current.home(), next: () => grid.current?.next() ?? Promise.resolve(), busy: () => phase.current === 'out' || (grid.current?.busy() ?? false), section: () => section, rotY: () => fly.current?.root.rotation.y ?? 0, dbg: () => grid.current?.dbg(), alpha: (a: number, tint?: string) => grid.current?.setAlpha(a, tint), setVersion: (n: string) => { const v = SITE_TRANSITION_OF(n); if (v) setSv(v) }, version: () => sv.name } }, [section, sv])
+  const goRef = useRef({ go, home, next: nextProject })
+  goRef.current = { go, home, next: nextProject }
+  useEffect(() => { window.__aarNav = { go: (i) => goRef.current.go(i), home: () => goRef.current.home(), next: () => goRef.current.next(), busy: () => phase.current === 'out' || waking.current || (grid.current?.busy() ?? false), section: () => section, rotY: () => fly.current?.root.rotation.y ?? 0, dbg: () => grid.current?.dbg(), alpha: (a: number, tint?: string) => grid.current?.setAlpha(a, tint), setVersion: (n: string) => { const v = SITE_TRANSITION_OF(n); if (v) setSv(v) }, version: () => sv.name } }, [section, sv])
   // the lab's v1 at its own camera (blur radii are frame-relative, so the cube stays crisp);
   // paper's `scale` shrinks the whole image on screen so the sections breathe
   const narrow = typeof window !== 'undefined' && window.innerWidth < 900
@@ -282,7 +301,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     // in a section (or on the way): escape flies home, n / right arrow is the next project; the deck keys are off
     if (away) {
       if (e.key === 'Escape') home()
-      if (section !== null && !flying && (e.key === 'n' || e.key === 'ArrowRight')) grid.current?.next()
+      if (section !== null && !flying && (e.key === 'n' || e.key === 'ArrowRight')) nextProject()
       return
     }
     if (e.key === 'Escape') setOpen(null)
@@ -348,7 +367,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
           {sv.join === 'fade' && <CubeScreen key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} look={sv.page} heroDraw={sv.page === 'site'} projects={projects} />}
           {sv.grain && <div className="grain" />}
           <button className="wordmark home" onClick={home} aria-label="home">aarcube</button>
-          <div className="page-hint"><span>{SECTIONS[section].title.toLowerCase()} · {sv.name}</span><button onClick={() => grid.current?.next()}>next (n)</button><button onClick={home}>home (esc)</button></div>
+          <div className="page-hint"><span>{SECTIONS[section].title.toLowerCase()} · {sv.name}</span><button onClick={nextProject}>next (n)</button><button onClick={home}>home (esc)</button></div>
         </div>
       )}
       {xray?.placement === 'bottom' && <BottomBed v={xray} seed={floralSeed} scheme={scheme} />}

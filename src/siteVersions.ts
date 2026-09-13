@@ -11,7 +11,9 @@
  *  cube's seams stay as real gaps at the landing and the laser weld closes them */
 export type SiteVersion = { name: string; flight: string; join: 'fade' | 'stretch'; page: 'classic' | 'site' | 'liquid' | 'solid'; grain: boolean; settle?: 'none' | 'gradient' | 'solid' | 'frozen'; weldIn?: boolean;
   /** the live liquid as a faint layer over the site's own dark ground (alpha), the seams narrowed to `gap` of a tile */
-  ghost?: { alpha: number; tint: string; gap: number }; note: string }
+  ghost?: { alpha: number; tint: string; gap: number;
+    /** s5: on `next` the tiles come back to the live liquid (seams reopening), the turns and weld run, then they fade out again */
+    wake?: boolean }; note: string }
 
 export const SITE_TRANSITIONS: SiteVersion[] = [
   { name: 's1', flight: 'v4', join: 'fade', page: 'classic', grain: false, note: 'the face overfills the viewport, the page fades in over it (2026-09-10 night)' },
@@ -23,5 +25,7 @@ export const SITE_TRANSITIONS: SiteVersion[] = [
   // s4 (2026-09-12, replacing the frozen shot, "I like nothing about s4"): s2's arrival, then the liquid fades to a faint live layer
   // over the site's own dark ground (the aura's glows through it), its pale areas tinted to the mint so they dim to teal rather than grey, the seams narrow, tiles sample only their plates (no seam glints)
   { name: 's4', flight: 'v5', join: 'stretch', page: 'solid', grain: false, settle: 'none', ghost: { alpha: 0, tint: '#9de8d4', gap: 0 }, note: 's2, then the liquid fades out and the seams close: the page is the site\'s own dark ground' },
+  // s5 (2026-09-12): s4, and on next the page wakes: "it shifts back to the live liquid, does the spin then merge"
+  { name: 's5', flight: 'v5', join: 'stretch', page: 'solid', grain: false, settle: 'none', ghost: { alpha: 0, tint: '#9de8d4', gap: 0, wake: true }, note: 's4, and on next the live liquid comes back, turns and welds, then fades into the ground again' },
 ]
 export const SITE_TRANSITION_OF = (name: string) => SITE_TRANSITIONS.find((v) => v.name === name)
