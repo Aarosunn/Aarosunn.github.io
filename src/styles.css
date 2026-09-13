@@ -203,7 +203,9 @@ button:focus-visible {
 .sec-hardware { grid-area: 3 / 3; justify-self: end; align-self: end; margin-bottom: 4vh; text-align: right; animation-delay: 0.7s; }
 .sec-creatives { grid-area: 3 / 1; justify-self: start; align-self: end; margin-bottom: 4vh; animation-delay: 0.8s; }
 .sec.on.sec-code h2::before, .sec.on.sec-hardware h2::before { left: auto; right: -16px; }
+/* the right-hand corners carry their bullets on the right, mirroring the left */
 .sec-code li::before, .sec-hardware li::before { content: none; }
+.sec-code li::after, .sec-hardware li::after { content: '·'; color: var(--mute); margin-left: 8px; }
 
 .portrait {
   display: inline-block;
@@ -379,6 +381,7 @@ body:has(.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -
   .sec.on { display: block; grid-area: 3 / 1; justify-self: start; align-self: end; text-align: left; margin: 0 0 8px 16px; max-width: none; }
   .sec.on h2::before { left: -16px; right: auto; }
   .sec.on li::before { content: '·'; }
+  .sec.on li::after { content: none; }
   .sec.on h2 { font-size: 2.15rem; }
   .site-base { grid-area: 4 / 1; }
   /* the florals smaller and no longer pulled up into the section's row; the section's text always above them */
