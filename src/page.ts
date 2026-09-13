@@ -80,10 +80,15 @@ export function paintPage(c: HTMLCanvasElement, p: Project, w: number, h: number
     let rx = area.x + (area.w - rw) / 2
     r.forEach((im) => {
       const dw = aspect(im) * rh
+      // corners rounded like a cubie's plate
+      const rad = Math.round(Math.min(dw, rh) * 0.045)
+      g.save()
+      g.beginPath(); g.roundRect(rx, ry, dw, rh, rad); g.clip()
       g.drawImage(im, rx, ry, dw, rh)
+      g.restore()
       g.strokeStyle = 'rgba(242, 245, 247, 0.16)'
       g.lineWidth = 1
-      g.strokeRect(rx + 0.5, ry + 0.5, dw - 1, rh - 1)
+      g.beginPath(); g.roundRect(rx + 0.5, ry + 0.5, dw - 1, rh - 1, rad); g.stroke()
       rx += dw + gap
     })
     ry += rh + gap
