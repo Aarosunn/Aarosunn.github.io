@@ -31,7 +31,7 @@ export type CubeHandle = ScreenHandle & { clear: () => Promise<void>; stretch: (
 /** a sticker in the liquid look: the cube's captured image under the page's text */
 const LIQUID_VERT = /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`
 const LIQUID_FRAG = /* glsl */ `
-  uniform sampler2D uLiquid; uniform sampler2D uPage; uniform float uFade; uniform vec4 uFace; uniform float uHasPage; uniform float uInset; uniform float uAlpha; uniform vec3 uTint; uniform float uCorner;
+  uniform sampler2D uLiquid; uniform sampler2D uPage; uniform float uFade; uniform vec4 uFace; uniform float uHasPage; uniform float uInset; uniform float uAlpha; uniform vec3 uTint; uniform float uRound; uniform float uPlate;
   varying vec2 vUv;
   void main() {
     // uInset: sample only the cubie's plate (inside the landed cube's seams), so the seams can be real gaps between the tiles
@@ -39,16 +39,13 @@ const LIQUID_FRAG = /* glsl */ `
     vec2 local = vUv * 3.0 - cell;
     vec2 cu = (cell + uInset + local * (1.0 - 2.0 * uInset)) / 3.0;
     vec3 liq = texture2D(uLiquid, uFace.xy + cu * uFace.zw).rgb;
-    // uCorner: the paper's four rounded plates leave a bright star where they meet; near a corner the tile shows the same seam
-    // sampled at that edge's midpoint instead (the nearer edge kept, the other coordinate moved to the middle)
-    if (uCorner > 0.0) {
-      vec2 e = min(local, 1.0 - local);
-      float d = max(e.x, e.y); // the seam square at the corner only, never the plate
-      // the same seam at the cell's two edges' midpoints (always inside the dark seam); the corner can only get darker
-      vec2 la = vec2(step(0.5, local.x), 0.5), lb = vec2(0.5, step(0.5, local.y));
-      vec3 sa = texture2D(uLiquid, uFace.xy + (cell + uInset + la * (1.0 - 2.0 * uInset)) / 3.0 * uFace.zw).rgb;
-      vec3 sb = texture2D(uLiquid, uFace.xy + (cell + uInset + lb * (1.0 - 2.0 * uInset)) / 3.0 * uFace.zw).rgb;
-      liq = mix(liq, min(liq, min(sa, sb)), 1.0 - smoothstep(uCorner * 0.6, uCorner, d));
+    // uRound: every plate a rounded rectangle (its edge uPlate inside the cell, corners of radius uRound); outside it the pixel
+    // darkens to the seam's shade, so the paper's bright stars where four rounded plates meet and the corners of its
+    // square plates go dark, and its straight edges stay where the paper drew them
+    if (uRound > 0.0) {
+      vec2 q = abs(local - 0.5) - (0.5 - uPlate - uRound);
+      float sd = length(max(q, 0.0)) - uRound;
+      liq *= mix(1.0, 0.25, smoothstep(-0.003, 0.003, sd));
     }
     vec4 pg = uHasPage > 0.5 ? texture2D(uPage, vUv) : vec4(0.0);
     // uAlpha < 1 (Site s4): the liquid a faint layer over the page's dark ground, the text always full
@@ -145,7 +142,7 @@ const LASER_FRAG = /* glsl */ `
 /** the screen cube itself: its own scene and camera (z = 0 is the viewport in CSS px), rendered by hand after everything else in
  *  the canvas it sits in (the transition tab's own, or the site's, where `liquid` is the shader cube's captured image and the
  *  tiles show it under the page's text); `live` off = not drawn at all */
-export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: boolean; weld: boolean; projects: typeof PROJECTS; blank: boolean; look: PageLook; heroDraw: boolean; liquid?: THREE.Texture | null; live?: boolean; inset?: number; corner?: number }>(function ScreenCube({ v, scheme, recoil, weld, projects, blank, look, heroDraw, liquid = null, live = true, inset = 0, corner = 0 }, ref) {
+export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: string; recoil: boolean; weld: boolean; projects: typeof PROJECTS; blank: boolean; look: PageLook; heroDraw: boolean; liquid?: THREE.Texture | null; live?: boolean; inset?: number; round?: number; plate?: number }>(function ScreenCube({ v, scheme, recoil, weld, projects, blank, look, heroDraw, liquid = null, live = true, inset = 0, round: round_ = 0, plate = 0 }, ref) {
   const { size, gl } = useThree()
   const W = size.width, H = size.height
   const cw = W / 3, ch = H / 3
@@ -204,7 +201,7 @@ export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: strin
         for (let k = 0; k < uv.count; k++) uv.setXY(k, (s.col + uv.getX(k)) / 3, (2 - s.row + uv.getY(k)) / 3)
         const page = s.tex < 0 ? null : textures[s.tex % textures.length]
         const mat = liquid
-          ? new THREE.ShaderMaterial({ uniforms: { uLiquid: { value: liquid }, uPage: { value: page }, uHasPage: { value: page ? 1 : 0 }, uFade: { value: liquidU.current.fade }, uFace: { value: liquidU.current.face }, uInset: { value: inset }, uAlpha: { value: liquidU.current.alpha }, uTint: { value: liquidU.current.tint }, uCorner: { value: corner } }, vertexShader: LIQUID_VERT, fragmentShader: LIQUID_FRAG, transparent: true })
+          ? new THREE.ShaderMaterial({ uniforms: { uLiquid: { value: liquid }, uPage: { value: page }, uHasPage: { value: page ? 1 : 0 }, uFade: { value: liquidU.current.fade }, uFace: { value: liquidU.current.face }, uInset: { value: inset }, uAlpha: { value: liquidU.current.alpha }, uTint: { value: liquidU.current.tint }, uRound: { value: round_ }, uPlate: { value: plate } }, vertexShader: LIQUID_VERT, fragmentShader: LIQUID_FRAG, transparent: true })
           : new THREE.MeshBasicMaterial({ map: page ?? blankTex, transparent: s.tex < 0 })
         if (mat instanceof THREE.ShaderMaterial) liquidMats.current.push(mat)
         const m = new THREE.Mesh(geo, mat)

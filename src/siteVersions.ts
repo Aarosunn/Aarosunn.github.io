@@ -14,9 +14,10 @@ export type SiteVersion = { name: string; flight: string; join: 'fade' | 'stretc
   ghost?: { alpha: number; tint: string; gap: number;
     /** s5: on `next` the tiles come back to the live liquid (seams reopening), the turns and weld run, then they fade out again */
     wake?: boolean;
-    /** s6: s2's tile look (the paper's rounded plates and dark seams inside touching tiles) with each tile sampling `plates` of a
-     *  cell inside its edges (the seams trimmed narrower) and the bright stars at the crossings masked over `corner` of a cell */
-    plates?: number; corner?: number }; note: string }
+    /** s6: s2's tile look (the paper's plates and dark seams inside touching tiles) with each tile sampling `plates` of a cell
+     *  inside its edges (the seams trimmed narrower), every plate drawn as a rounded rectangle of corner radius `round` (of a
+     *  cell), and `bare`: the turns without the break and the weld (no seam lines, the gaps never open) */
+    plates?: number; round?: number; bare?: boolean }; note: string }
 
 export const SITE_TRANSITIONS: SiteVersion[] = [
   { name: 's1', flight: 'v4', join: 'fade', page: 'classic', grain: false, note: 'the face overfills the viewport, the page fades in over it (2026-09-10 night)' },
@@ -32,7 +33,8 @@ export const SITE_TRANSITIONS: SiteVersion[] = [
   { name: 's5', flight: 'v5', join: 'stretch', page: 'solid', grain: false, settle: 'none', ghost: { alpha: 0, tint: '#9de8d4', gap: 0, wake: true }, note: 's4, and on next the live liquid comes back, turns and welds, then fades into the ground again' },
   // s6 (2026-09-12): "I dont like the thin break, also it went wide then back thin, I like s2's version of some round some
   // straight edges (still slightly round), but close the gaps slightly": s5 with the tiles touching and showing the paper's own
-  // plates and seams (s2), the seams trimmed by sampling .03 of a cell inside, the crossing stars masked; no gap tweens
-  { name: 's6', flight: 'v5', join: 'stretch', page: 'solid', grain: false, settle: 'none', ghost: { alpha: 0, tint: '#9de8d4', gap: 0, wake: true, plates: 0.03, corner: 0.045 }, note: 's5 with s2\'s plates in the tiles, the seams a little narrower, the crossing stars gone' },
+  // plates and seams (s2), the seams trimmed by sampling .03 of a cell inside; no gap tweens. Then "no more divided lines no
+  // weld, also try making all edges slightly rounded": every plate a rounded rectangle, the turns bare
+  { name: 's6', flight: 'v5', join: 'stretch', page: 'solid', grain: false, settle: 'none', ghost: { alpha: 0, tint: '#9de8d4', gap: 0, wake: true, plates: 0.03, round: 0.08, bare: true }, note: 's5 with s2\'s plates in the tiles, the seams a little narrower, every plate rounded, turns without seam lines or weld' },
 ]
 export const SITE_TRANSITION_OF = (name: string) => SITE_TRANSITIONS.find((v) => v.name === name)

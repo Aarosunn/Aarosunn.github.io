@@ -54,6 +54,8 @@ const SECTIONS: Section[] = [
  *  square, dims, stretches and solves the page in); the page is the screen-as-cube with Aaron's picks (w4 branching eased
  *  weld, no recoil); home reverses the same flight */
 const PAGE = CUBE_OF('w4 branching eased')!
+/** s6: the same turns with no break and no weld (the gaps never open, no seam lines) */
+const PAGE_BARE = { ...PAGE, gap: 0, open: 0, hold: 0 }
 const FOV = 30 // the mask camera's vertical fov (Canvas below)
 /** before take-off the page around the cube fades out (and the ascii outline with it, `UI_EASE` = the CSS --ease); the flight
  *  starts `LEAD` s into that fade so the cube is already moving as the last of the text goes; on the way home they fade back in as the cube lands */
@@ -361,7 +363,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       <Canvas key={version} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
         <PaperCube version={PV} params={params} spin={!reduced && !still} spinSpeed={0.12} auto={!reduced && !away} autoInterval={3600} combo={0.35} rubik={rubik} fly={fly} />
         {/* s2's page: the screen cube drawn in this same canvas, its tiles sampling the shader cube's captured image */}
-        {sv.join === 'stretch' && section !== null && fly.current && <ScreenCube key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} weld projects={projects} blank={false} look={sv.page} heroDraw={false} liquid={fly.current.shot} live={false} inset={sv.ghost?.plates ?? (sv.weldIn || sv.ghost ? LANDED_INSET : 0)} corner={sv.ghost?.corner ?? 0} />}
+        {sv.join === 'stretch' && section !== null && fly.current && <ScreenCube key={section} ref={grid} v={sv.ghost?.bare ? PAGE_BARE : PAGE} scheme={scheme} recoil={false} weld={!sv.ghost?.bare} projects={projects} blank={false} look={sv.page} heroDraw={false} liquid={fly.current.shot} live={false} inset={sv.ghost?.plates ?? (sv.weldIn || sv.ghost ? LANDED_INSET : 0)} round={sv.ghost?.round ?? 0} plate={sv.ghost?.plates !== undefined ? (LANDED_SEAM / 2 - sv.ghost.plates) / (1 - 2 * sv.ghost.plates) : 0} />}
       </Canvas>
       {/* the section page: the screen as a cube, faded in over the landing; the wordmark (or escape) flies home */}
       {section !== null && (
