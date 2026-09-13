@@ -38,8 +38,8 @@ export const SITE = {
 }
 
 export const SECTIONS: Section[] = [
-  { id: 'about', title: 'About', blurb: 'Undergraduate Computer Engineering student at the University of Michigan enthralled by anything and everything in tech, whether that\u2019s with full-stack, AI/ML, hardware, AR, BCIs, computational chemistry, or quantum computing.' },
-  { id: 'code', title: 'Code', blurb: 'Projects I\u2019m working on.' },
+  { id: 'about', title: 'About', blurb: 'Undergraduate Computer Engineering student at the University of Michigan.' },
+  { id: 'code', title: 'Code', blurb: 'Projects I\u2019ve worked on.' },
   { id: 'hardware', title: 'Hardware', blurb: 'Physical engineering projects.' },
   { id: 'creatives', title: 'Creatives', blurb: 'Art pieces, designs and various other passions.' },
 ]
@@ -58,6 +58,7 @@ export const PROJECTS: Project[] = [
   { section: 'code', title: 'Text Editor' },
   { section: 'code', title: 'Scioly+' },
   { section: 'code', title: 'Euchre' },
+  { section: 'code', title: 'Gradient Descent Visualizer' },
   { section: 'hardware', title: 'synth voice', year: 2025, blurb: 'a wavetable voice on an FPGA, four oscillators, one very hot chip.' },
   { section: 'hardware', title: 'camera rig', year: 2026, blurb: 'a hand-tracking camera rig that knows which finger is which.' },
   { section: 'hardware', title: 'split keyboard', year: 2024, blurb: 'placeholder: a PCB for a split keyboard, and the firmware to match.' },
