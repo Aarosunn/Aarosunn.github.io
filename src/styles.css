@@ -1,13 +1,13 @@
 :root {
-  --bg: #07080c;
-  --bg2: #0e1017;
-  --line: #2a2e3a;
-  --mute: #6b7185;
-  --text: #c9cdd8;
-  --bright: #f2f3f7;
+  --bg: #07090c;
+  --bg2: #0e1216;
+  --line: #28303a;
+  --mute: #6b7c85;
+  --text: #c9d2d8;
+  --bright: #f2f5f7;
   --accent: #8fb8ff;
   --a: #8fb8ff;
-  --b: #3a4a9e;
+  --b: #9de8d4;
 
   --display: 'Unbounded', sans-serif;
   --mono: 'Geist Mono', ui-monospace, monospace;
@@ -30,19 +30,21 @@ body {
   background: var(--bg);
   color: var(--text);
   font: 400 12px/1.5 var(--mono);
-  transition: background 0.6s var(--ease);
 }
 
-/* the R3F canvas only; paper's shader canvases stay in flow */
-.paper-canvas canvas {
-  position: static;
-}
+/* the cube's canvas fills the viewport; one load moment: it fades up first, the sections rise after */
 canvas {
   position: fixed;
   inset: 0;
+  transition: transform 0.7s var(--ease);
+  animation: fadein 1.4s var(--ease) both;
+}
+@keyframes fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-/* Aura wash: two scheme colours, screened over the canvas, drifting. */
+/* aura: two colours screened over the canvas, drifting */
 .aura {
   position: fixed;
   inset: -20%;
@@ -54,19 +56,10 @@ canvas {
     radial-gradient(35% 45% at 72% 70%, var(--b), transparent 70%);
   filter: blur(60px);
   animation: drift 26s ease-in-out infinite alternate;
-  transition: opacity 0.6s var(--ease);
-}
-[data-scheme='paper'] .aura {
-  mix-blend-mode: multiply;
-  opacity: 0.35;
 }
 @keyframes drift {
-  from {
-    transform: translate(-3%, -2%) rotate(0deg);
-  }
-  to {
-    transform: translate(3%, 3%) rotate(6deg);
-  }
+  from { transform: translate(-3%, -2%) rotate(0deg); }
+  to { transform: translate(3%, 3%) rotate(6deg); }
 }
 
 .grain {
@@ -78,50 +71,12 @@ canvas {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-.ui {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  display: grid;
-  grid-template-columns: 1fr minmax(320px, 36vw) 1fr;
-  grid-template-rows: 1fr minmax(240px, 36vw) 1fr;
-  padding: 28px;
-}
-.ui > * {
-  pointer-events: auto;
-}
-
 .wordmark {
-  position: fixed;
-  top: 28px;
-  left: 28px;
   font: 700 18px/1 var(--display);
   letter-spacing: -0.02em;
   color: var(--bright);
-  animation: rise 0.9s var(--ease) 0.5s both;
 }
 
-
-.controls {
-  position: fixed;
-  top: 28px;
-  right: 28px;
-  display: grid;
-  gap: 6px;
-  animation: rise 0.9s var(--ease) 0.6s both;
-}
-.row {
-  display: flex;
-  gap: 4px;
-  justify-content: flex-end;
-  align-items: center;
-  flex-wrap: wrap;
-  max-width: 62vw;
-}
-.k {
-  color: var(--mute);
-  margin-right: 8px;
-}
 button {
   font: inherit;
   color: var(--text);
@@ -129,158 +84,42 @@ button {
   border: 1px solid var(--line);
   padding: 4px 9px;
   cursor: pointer;
-  transition:
-    border-color 0.2s,
-    color 0.2s;
+  transition: border-color 0.2s, color 0.2s;
 }
 button:hover {
   border-color: var(--mute);
   color: var(--bright);
-}
-button.on {
-  border-color: var(--accent);
-  color: var(--accent);
 }
 button:focus-visible {
   outline: 1px solid var(--accent);
   outline-offset: 2px;
 }
 
-.floral-stage-pose { margin-top: 72px; }
-.pose { display: inline-flex; align-items: center; gap: 4px; margin-left: 10px; }
-.pose input[type='range'] { width: 200px; accent-color: var(--text); }
-.pose input[type='range']:focus-visible { outline: 1px solid var(--text); outline-offset: 3px; }
-.pose .val { color: var(--mute); min-width: 4ch; font-variant-numeric: tabular-nums; }
-.readout .place { color: var(--text); margin-bottom: 6px; white-space: pre-wrap; text-align: right; }
-.readout .note {
-  color: var(--text);
-  margin-bottom: 6px;
-}
-.readout {
-  position: fixed;
-  right: 28px;
-  bottom: 28px;
-  display: grid;
-  justify-items: end;
-  color: var(--mute);
-  max-width: 44ch;
-  text-align: right;
-  animation: rise 0.9s var(--ease) 1.2s both;
-}
-
 @keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .aura,
-  .wordmark,
-
-  .controls,
-  .readout {
-    animation: none;
-  }
-}
-
-@media (max-width: 720px) {
-  .ui {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr;
-  }
-  .controls {
-    top: auto;
-    bottom: 120px;
-    right: 16px;
-    left: 16px;
-  }
-  .row {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-}
-
-/* tab switch, next to the wordmark */
-.tabs {
+/* ---------- the home page: cube centre, four sections in the corners, the florals at the base ---------- */
+.ui {
   position: fixed;
-  top: 26px;
-  left: 140px;
-  display: flex;
-  gap: 4px;
-}
-
-/* paper shaders tab: three panels, scrolls if the viewport is short */
-.paper-ui {
-  display: block;
-  overflow: auto;
-  padding: 84px 28px 28px;
-}
-.paper {
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  max-width: 1500px;
-  margin: 0 auto;
-}
-.paper-cubes {
-  grid-template-columns: repeat(4, 1fr);
-  margin-top: 28px;
-}
-.paper-cubes .paper-panel header span {
-  color: var(--mute);
-  text-align: right;
-  max-width: 24ch;
-}
-.paper-panel header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 8px;
-}
-.paper-panel h2 {
-  font: 300 20px/1 var(--display);
-  color: var(--bright);
-  letter-spacing: -0.01em;
-}
-.paper-panel a {
-  color: var(--mute);
-  text-decoration: none;
-}
-.paper-panel a:hover {
-  color: var(--accent);
-}
-.paper-canvas {
-  position: relative;
-  aspect-ratio: 16 / 9;
-  border: 1px solid var(--line);
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-.paper-panel .row {
-  justify-content: flex-start;
-  flex-wrap: wrap;
-}
-@media (max-width: 1100px) {
-  .paper {
-    grid-template-columns: 1fr;
-  }
-  .paper-cubes {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-/* ---------- site mock: cube centre, four sections stepped like a deck, floral at the base ---------- */
-.site {
   grid-template-columns: minmax(220px, 1fr) minmax(320px, 40vw) minmax(220px, 1fr);
   grid-template-rows: auto 1fr 1fr auto;
   padding: 28px 40px 24px;
   row-gap: 12px;
+  transition: opacity 1s var(--ease);
+}
+.ui > * {
+  pointer-events: auto;
+}
+/* the section transition: the page around the cube fades as it takes off */
+.ui.away {
+  opacity: 0;
+  pointer-events: none;
 }
 .site-head {
   grid-column: 1 / -1;
@@ -288,10 +127,6 @@ button:focus-visible {
   display: flex;
   align-items: baseline;
   gap: 28px;
-}
-.site-head .wordmark {
-  position: static;
-  animation: none;
 }
 .site-intro {
   color: var(--mute);
@@ -308,12 +143,8 @@ button:focus-visible {
   transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
   animation: rise 0.9s var(--ease) both;
 }
-.sec:hover {
-  opacity: 0.8;
-}
-.sec.on {
-  opacity: 1;
-}
+.sec:hover { opacity: 0.8; }
+.sec.on { opacity: 1; }
 .sec h2 {
   font: 300 22px/1.1 var(--display);
   letter-spacing: -0.01em;
@@ -354,6 +185,13 @@ button:focus-visible {
   color: var(--mute);
   margin-right: 8px;
 }
+.sec li { cursor: pointer; }
+.sec li.note { cursor: default; color: var(--mute); }
+.sec li:not(.note):hover,
+.sec li:not(.note):focus-visible {
+  color: var(--bright);
+  outline: none;
+}
 .sec-about { grid-area: 2 / 1; justify-self: start; align-self: start; margin-top: 6vh; animation-delay: 0.5s; }
 .sec-code { grid-area: 2 / 3; justify-self: end; align-self: start; margin-top: 6vh; text-align: right; animation-delay: 0.6s; }
 .sec-hardware { grid-area: 3 / 3; justify-self: end; align-self: end; margin-bottom: 4vh; text-align: right; animation-delay: 0.7s; }
@@ -361,52 +199,50 @@ button:focus-visible {
 .sec.on.sec-code h2::before, .sec.on.sec-hardware h2::before { left: auto; right: -16px; }
 .sec-code li::before, .sec-hardware li::before { content: none; }
 
+.portrait {
+  display: inline-block;
+  color: var(--text);
+  margin: 2px 0 10px;
+  opacity: 0.85;
+}
+.portrait canvas {
+  position: static;
+  display: block;
+  animation: none;
+  transition: none;
+}
+/* a short window (a laptop with browser chrome): the portrait is what keeps the left column from shrinking */
+@media (max-height: 840px) { .portrait { display: none; } }
+
+/* the base row: the florals, then the deck */
 .site-base {
   grid-column: 1 / -1;
   grid-row: 4;
   display: grid;
   justify-items: center;
   gap: 10px;
-  padding-top: 24px;
+  padding-top: 12px;
   animation: rise 1s var(--ease) 0.9s both;
 }
+/* the florals' box: --fh is its layout footprint (222 px on a 900 px screen, shrinking with a short viewport); the canvas is
+   1.5× taller than that (GROUP_OVER in Site.tsx, the camera that much farther) and hangs over both ends by negative margins,
+   so the flowers keep their size with headroom above and below instead of being cut at the canvas edge */
 .floral {
+  --fh: clamp(120px, calc(100vh - 678px), 222px);
   width: min(640px, 70vw);
-  height: 96px;
-  color: var(--text);
-  opacity: 0.26;
+  height: calc(var(--fh) * 1.5);
+  margin-top: calc(-74px - var(--fh) * 0.25);
+  margin-bottom: calc(var(--fh) * -0.25);
+  opacity: 0.9;
   pointer-events: none;
 }
-/* the hand-placed group: --fh is its layout footprint (222 px on a 900 px screen, shrinking with a short viewport); the
-   canvas is 1.5× taller than that (GROUP_OVER in Site.tsx, the camera that much farther) and hangs over both ends by
-   negative margins, so the flowers keep their size with headroom above and below instead of being cut at the canvas edge */
-.floral.xray.group { --fh: clamp(120px, calc(100vh - 678px), 222px); height: calc(var(--fh) * 1.5); margin-top: calc(-74px - var(--fh) * 0.25); margin-bottom: calc(var(--fh) * -0.25); }
-.site-base:has(.floral.xray.group) { padding-top: 12px; }
-/* a short window (a laptop with browser chrome): the About portrait is what keeps the left column from shrinking */
-@media (max-height: 840px) { .site .portrait { display: none; } }
-.floral.xray {
-  height: 140px;
-  opacity: 0.9;
-  position: relative;
+.xf3d canvas {
+  position: absolute !important;
+  inset: 0;
+  transform: none !important;
+  animation: none;
+  transition: none;
 }
-/* the flower bed along the bottom of the page: above the cube canvas, under the UI */
-.floral-bottom { position: fixed !important; left: 0; bottom: 0; z-index: 1; pointer-events: none; }
-.ui { z-index: 2; }
-.site-tabs .tabs { z-index: 4; }
-.floral-stage-page { padding: 0; overflow: hidden; }
-/* the mesh floral's own canvas sits in its box, not fixed over the page like the cube's */
-.xf3d canvas { position: absolute !important; inset: 0; transform: none !important; }
-/* floral tab */
-.floral-tab { display: grid; gap: 18px; justify-items: center; padding: 8px 0 40px; }
-.floral-tab .controls { justify-self: start; }
-.floral-stage { padding: 16px 24px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); }
-.floral-stage-site { padding: 8px 24px; }
-.floral-tab .readout { position: static; display: grid; gap: 4px; justify-items: center; color: var(--mute); }
-.xf-blink { animation: xf-blink 4s steps(1) infinite; }
-@keyframes xf-blink { 0%, 88%, 100% { opacity: 1; } 90%, 93% { opacity: 0.15; } 91% { opacity: 0.8; } }
-.xf-dash { animation: xf-dash 9s linear infinite; }
-@keyframes xf-dash { to { stroke-dashoffset: -50; } }
-@media (prefers-reduced-motion: reduce) { .xf-blink, .xf-dash { animation: none; } }
 .deck {
   display: flex;
   gap: 18px;
@@ -426,48 +262,16 @@ button:focus-visible {
   background: var(--line);
   transition: background 0.3s, transform 0.3s var(--ease);
 }
-.deck button.on {
-  color: var(--bright);
-}
+.deck button.on { color: var(--bright); }
 .deck button.on i {
   background: var(--accent);
   transform: scaleX(1.4);
 }
-.deck button:hover i {
-  background: var(--mute);
-}
-.sec li {
-  cursor: pointer;
-}
-.sec li:hover,
-.sec li:focus-visible {
-  color: var(--bright);
-  outline: none;
-}
+.deck button:hover i { background: var(--mute); }
 
-/* one load moment: the cube fades up first, sections rise after */
-canvas {
-  transition: transform 0.7s var(--ease);
-  animation: fadein 1.4s var(--ease) both;
-}
-@keyframes fadein {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-.portrait {
-  display: inline-block;
-  color: var(--text);
-  margin: 2px 0 10px;
-  opacity: 0.85;
-}
-.portrait canvas {
-  position: static;
-  display: block;
-}
-body:has(.site.has-panel .panel-left) canvas { transform: translateX(clamp(60px, 9vw, 130px)); }
-body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -9vw, -60px)); }
-
-/* glass detail panel beside the cube: the cube's glow is the light behind the glass */
+/* the detail panel beside the cube: glass, the cube's glow is the light behind it */
+body:has(.has-panel .panel-left) canvas { transform: translateX(clamp(60px, 9vw, 130px)); }
+body:has(.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -9vw, -60px)); }
 .panel {
   position: fixed;
   top: 50%;
@@ -481,10 +285,11 @@ body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--bright) 10%, transparent);
   animation: glass 0.6s var(--ease) both;
+  transform-origin: var(--origin, 100% 50%);
   z-index: 2;
 }
 .panel-right { right: 40px; }
-.panel-left { left: 40px; }
+.panel-left { left: 40px; --from: 26vw; --origin: 0% 50%; }
 .panel-k {
   display: block;
   color: var(--mute);
@@ -500,15 +305,9 @@ body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130
   max-width: 40ch;
   margin-bottom: 12px;
 }
-.panel-media {
-  height: 120px;
-  border: 1px dashed var(--line);
-  margin-bottom: 12px;
-  background: color-mix(in srgb, var(--bg) 40%, transparent);
-}
-.panel-meta {
-  color: var(--mute);
-}
+.panel-meta { color: var(--mute); }
+.panel-meta a { color: var(--text); text-decoration: none; border-bottom: 1px solid var(--line); }
+.panel-meta a:hover { color: var(--bright); border-color: var(--mute); }
 .panel-close {
   position: absolute;
   top: 14px;
@@ -524,9 +323,72 @@ body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130
   60% { opacity: 1; }
   to { opacity: 1; transform: translateY(-50%); filter: blur(0); }
 }
-.panel { transform-origin: var(--origin, 100% 50%); }
-.panel-left { --from: 26vw; --origin: 0% 50%; }
+.has-panel .sec:not(.on) { opacity: 0.12; }
+
+/* the section page: over the cube canvas, transparent (the page is drawn in the canvas), faded in with the spread;
+   the wordmark flies home */
+.section-page {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  opacity: 0;
+  pointer-events: none;
+}
+.section-page .home {
+  position: fixed;
+  top: 28px;
+  left: 40px;
+  z-index: 2;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.page-hint {
+  position: fixed;
+  right: 40px;
+  bottom: 24px;
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--mute);
+  pointer-events: auto;
+}
+.page-hint span { margin-right: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .aura, .site-intro, .sec, .site-base, .panel, canvas { animation: none; }
+}
+
+/* narrow screens: one column, the active section above the base row, the cube lifted */
 @media (max-width: 900px) {
+  .ui {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto auto;
+    padding: 20px 20px 16px;
+  }
+  .sec { display: none; }
+  .sec.on { display: block; grid-area: 3 / 1; justify-self: start; align-self: end; text-align: left; margin: 0 0 8px 16px; max-width: none; }
+  .sec.on h2::before { left: -16px; right: auto; }
+  .sec.on li::before { content: '·'; }
+  .sec.on h2 { font-size: 26px; }
+  .site-base { grid-area: 4 / 1; }
+  .site-intro { display: none; }
+  .portrait { display: none; }
+  canvas { transform: translateY(-10vh); }
+  /* no lift while a section is open or the cube is flying: the page layer draws in this same canvas and must sit on the viewport */
+  body:has(.ui.away) canvas { transform: none; }
+  /* scrim so the copy stays legible over the cube */
+  .ui::after {
+    content: '';
+    position: fixed;
+    inset: 50% 0 0;
+    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--bg) 85%, transparent) 45%);
+    pointer-events: none;
+    z-index: -1;
+  }
   .panel, .panel-left, .panel-right {
     left: 16px;
     right: 16px;
@@ -536,109 +398,6 @@ body:has(.site.has-panel .panel-right) canvas { transform: translateX(clamp(-130
     transform: none;
     animation: rise 0.5s var(--ease) both;
   }
+  body:has(.has-panel .panel-left) canvas,
+  body:has(.has-panel .panel-right) canvas { transform: translateY(-10vh); }
 }
-.site.has-panel .sec:not(.on) {
-  opacity: 0.12;
-}
-/* deck-only layout: corners empty, the active section lives above the deck */
-.layout-deck .sec, .layout-deck .sec.on { display: none; }
-.layout-deck .floral { opacity: 0.16; }
-.deck-blurb {
-  display: grid;
-  justify-items: center;
-  text-align: center;
-  gap: 4px;
-  margin-bottom: 6px;
-  animation: rise 0.5s var(--ease) both;
-}
-.deck-blurb h2 {
-  font: 300 26px/1.1 var(--display);
-  color: var(--bright);
-  letter-spacing: -0.01em;
-}
-.deck-blurb p {
-  color: var(--mute);
-  max-width: 44ch;
-}
-.deck-blurb ul {
-  list-style: none;
-  display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
-  justify-content: center;
-  color: var(--text);
-  opacity: 0.85;
-}
-.deck-blurb li { cursor: pointer; }
-.deck-blurb li:hover { color: var(--bright); }
-
-@media (max-width: 900px) {
-  .site {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr auto auto;
-    padding: 20px 20px 16px;
-  }
-  .sec { display: none; }
-  .sec.on { display: block; grid-area: 3 / 1; justify-self: start; align-self: end; text-align: left; margin: 0 0 8px 16px; max-width: none; }
-  .sec.on h2::before { left: -16px; right: auto; }
-  .sec.on li::after { content: none; }
-  .sec.on li::before { content: '·'; }
-  .site-base { grid-area: 4 / 1; }
-  .site-intro { display: none; }
-  .site-tabs { display: none; }
-  .portrait { display: none; }
-  .site ~ canvas, canvas { transform: translateY(-10vh); }
-  /* no lift while a section is open or the cube is flying: the page layer draws in this same canvas and must sit on the viewport */
-  body:has(.site.away) canvas { transform: none; }
-  .sec.on h2 { font-size: 26px; }
-  /* scrim so the copy stays legible over the cube */
-  .site::after {
-    content: '';
-    position: fixed;
-    inset: 50% 0 0;
-    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--bg) 85%, transparent) 45%);
-    pointer-events: none;
-    z-index: -1;
-  }
-}
-/* lab tabs live top-right on the site mock, out of the header's way */
-.site-tabs .tabs {
-  left: auto;
-  right: 40px;
-  opacity: 0.6;
-}
-.site-tabs .tabs:hover {
-  opacity: 1;
-}
-/* narrow: the panel is a bottom sheet, the cube stays put (and keeps its 10vh lift) */
-@media (max-width: 900px) {
-  body:has(.site.has-panel .panel-left) canvas,
-  body:has(.site.has-panel .panel-right) canvas {
-    transform: translateY(-10vh);
-  }
-}
-
-/* transition tab: the canvas fills the viewport under the controls; the next page fades in over it */
-.transition-tab { position: fixed; inset: 0; }
-.transition-tab .transition-canvas { position: absolute !important; inset: 0; }
-.transition-tab .controls { z-index: 2; pointer-events: auto; }
-.transition-tab .readout { z-index: 2; }
-.next-page { position: absolute; inset: 0; z-index: 1; display: grid; place-content: center; gap: 12px; text-align: center; background: var(--bg); color: var(--text); }
-.next-page .wordmark { position: absolute; top: 28px; left: 40px; }
-.next-page h1 { font-size: 44px; font-weight: 300; margin: 0; }
-.next-page p { color: var(--mute); margin: 0; }
-.next-page button { justify-self: center; pointer-events: auto; }
-
-/* the section transition: the site's UI fades as the cube takes off; the section page sits over the cube canvas and
-   fades in over the landing (its opacity is driven by the flight); the wordmark flies home */
-.ui.site { transition: opacity 1s var(--ease); }
-.ui.site.away { opacity: 0; pointer-events: none; }
-.section-page { position: fixed; inset: 0; z-index: 3; opacity: 0; background: var(--bg); }
-.section-page.bare { background: transparent; pointer-events: none; }
-.section-page.bare .home, .section-page.bare .page-hint { pointer-events: auto; }
-.section-page .grain { position: absolute; z-index: 1; }
-.section-page .transition-canvas { position: absolute !important; inset: 0; }
-.section-page canvas { animation: none; transition: none; transform: none !important; }
-.section-page .home { position: fixed; top: 28px; left: 40px; z-index: 2; border: 0; padding: 0; background: transparent; animation: none; cursor: pointer; }
-.page-hint { position: fixed; right: 40px; bottom: 24px; z-index: 2; display: flex; gap: 6px; align-items: center; color: var(--mute); }
-.page-hint span { margin-right: 8px; }

@@ -1,5 +1,5 @@
-// The site's section transition: fly the cube into a section, one next project, then home -> frames + sheets.
-// Usage: [SV=s1] node scripts/site-go.mjs [section index, default 1 = code]   (SV = the site version, ?sv=)
+// The section transition: fly the cube into a section, one next project, then home -> frames + sheets.
+// Usage: node scripts/site-go.mjs [section index, default 1 = code]
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 import { execSync } from 'node:child_process'
@@ -10,7 +10,7 @@ for (const [w, h, name] of [[1440, 900, 'land'], [420, 820, 'port']]) {
   const page = await browser.newPage({ viewport: { width: w, height: h } })
   page.on('pageerror', (e) => console.error('pageerror', e.message))
   page.on('console', (m) => m.type() === 'error' && !m.text().includes('404') && console.error('console', m.text().slice(0, 300)))
-  await page.goto('http://localhost:5173/' + (process.env.SV ? '?sv=' + process.env.SV : ''))
+  await page.goto('http://localhost:5173/')
   await page.waitForFunction(() => window.__aarNav && document.querySelector('canvas')?.width > 300)
   await page.waitForTimeout(2500)
   const files = []
@@ -39,6 +39,6 @@ for (const [w, h, name] of [[1440, 900, 'land'], [420, 820, 'port']]) {
   await page.waitForTimeout(300)
   console.log(name, 'home, section', await page.evaluate(() => window.__aarNav.section()))
   await page.close()
-  execSync(`node scripts/sheet.mjs shots/sheet-site-go-${process.env.SV ?? 's1'}-${name}.png ${files.join(' ')} --cols 4 --w ${name === 'land' ? 2400 : 1600}`, { stdio: 'inherit' })
+  execSync(`node scripts/sheet.mjs shots/sheet-site-go-${name}.png ${files.join(' ')} --cols 4 --w ${name === 'land' ? 2400 : 1600}`, { stdio: 'inherit' })
 }
 await browser.close()

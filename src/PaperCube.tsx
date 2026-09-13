@@ -1,32 +1,24 @@
 /**
- * paper.design's heatmap / liquid metal / gem smoke (Apache 2.0) on the Rubik's cube.
- * Each is a 2D effect over a preprocessed mask image; the preprocess runs on the GPU every frame from a
- * render of the cube, and their fragment shader runs verbatim over the screen. Versions in paperVersions.ts.
- *
- * Mask channels written by the cubie faces:
- *   heat:          R = luminance (0 face / 1 seam and outside), G = lambert shade, B = 1 inside
- *   liquid, smoke: R = Poisson-like field (1 boundary -> 0 deep inside), G = 1 inside (0 on seams), B = lambert
- * Their preprocess then: heat = three box blurs (contour / inner / big); liquid + smoke = a plate per face or
- * their real Poisson field solved here. The final pass gets the raw mask too, for silhouette clip and shading.
+ * paper.design's liquid metal (Apache 2.0) on the Rubik's cube. Their shader is a 2D effect over a preprocessed
+ * image; here that image is rendered every frame from the cube: a mask of the 27 cubies (R = cubie id or plate,
+ * G = 1 inside / 0 on seams, B = lambert shade, A = view depth), occlusion edges cut in, a Poisson field solved on
+ * the GPU per cubie (∇²u = -1 inside each plate, warm-started, 60 Jacobi steps at 256²), then their fragment runs
+ * verbatim over the screen with a tail of ours: silhouette clip, shade, grain, the ascii outline, and the hooks the
+ * section transition needs (a zoom and a stretch of paper's window, a capture of the final image to a texture).
  */
 import { useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
-import { gemSmokeFragmentShader, getShaderColorFromString, heatmapFragmentShader, liquidMetalFragmentShader } from '@paper-design/shaders'
+import { getShaderColorFromString, liquidMetalFragmentShader } from '@paper-design/shaders'
 import { RubikMask, type RubikHandle } from './RubikMask'
-import type { AsciiParams, PaperShader, PaperVersion } from './paperVersions'
-import { presetNamed } from './paperPresets'
-
-export type PaperDebug = 'off' | 'mask' | 'combined'
-
-const IMG = 1000 / 1750 // heat: image fraction of paper's padded canvas
+import { CUBE, LIQUID } from './cube'
 
 const QUAD_VERT = /* glsl */ `
   in vec3 position; in vec2 uv; out vec2 vUv;
   void main() { vUv = uv; gl_Position = vec4(position, 1.0); }
 `
-// separable box blur of one channel; one pass = one direction
+// separable box blur of one channel; one pass = one direction (radius 0 = one bilinear tap: a downsample)
 const BLUR = /* glsl */ `
   precision highp float;
   in vec2 vUv; out vec4 o;
@@ -38,26 +30,6 @@ const BLUR = /* glsl */ `
       s += dot(texture(t, vUv + dir * float(i)), ch);
     }
     o = vec4(vec3(s / float(2 * radius + 1)), 1.0);
-  }
-`
-// heat: paper's processed image = (contour, big, inner); flipped to their y-down convention
-const COMBINE_HEAT = /* glsl */ `
-  precision highp float;
-  in vec2 vUv; out vec4 o;
-  uniform sampler2D contour; uniform sampler2D big; uniform sampler2D inner;
-  void main() {
-    vec2 uv = vec2(vUv.x, 1.0 - vUv.y);
-    o = vec4(texture(contour, uv).r, texture(big, uv).r, texture(inner, uv).r, 1.0);
-  }
-`
-// liquid / smoke plates: (field, alpha, 1, 1), flipped
-const COMBINE_FIELD = /* glsl */ `
-  precision highp float;
-  in vec2 vUv; out vec4 o;
-  uniform sampler2D mask;
-  void main() {
-    vec4 m = texture(mask, vec2(vUv.x, 1.0 - vUv.y));
-    o = vec4(m.r, m.g, 1.0, 1.0);
   }
 `
 // occlusion edges: where a nearer cubie overlaps a farther one there is no painted seam, so cut one from the depth
@@ -77,25 +49,6 @@ const EDGE = /* glsl */ `
     o = vec4(m.r, m.g * (1.0 - edge), m.b, m.a);
   }
 `
-// min-filtered downsample of the alpha (G): a hairline seam stays a hole in the coarse Poisson grid
-const DOWNMIN = /* glsl */ `
-  precision highp float;
-  in vec2 vUv; out vec4 o;
-  uniform sampler2D t; uniform float texel; uniform float taps;
-  void main() {
-    float m = 1.0;
-    float n = taps;
-    for (float y = 0.0; y < 8.0; y++) {
-      if (y >= n) break;
-      for (float x = 0.0; x < 8.0; x++) {
-        if (x >= n) break;
-        vec2 off = (vec2(x, y) - 0.5 * (n - 1.0)) * texel;
-        m = min(m, texture(t, vUv + off).g);
-      }
-    }
-    o = vec4(vec3(m), 1.0);
-  }
-`
 // poisson: field = 1 - u / max(u), like their toProcessed*
 const COMBINE_POISSON = /* glsl */ `
   precision highp float;
@@ -109,7 +62,7 @@ const COMBINE_POISSON = /* glsl */ `
     o = vec4(f, m.g, 1.0, 1.0);
   }
 `
-// Jacobi step for  ∇²u = -1  inside the shape (mask G > .5), u = 0 outside. Their preprocess, on the GPU.
+// Jacobi step for  ∇²u = -1  inside the shape (mask G > thresh), u = 0 outside. Their preprocess, on the GPU.
 const POISSON = /* glsl */ `
   precision highp float;
   in vec2 vUv; out vec4 o;
@@ -139,92 +92,54 @@ const REDUCE_MAX = /* glsl */ `
     o = vec4(vec3(m), 1.0);
   }
 `
-// fusion: heat (a) over the fused shader (b) by heat's alpha (halo + seam rim)
-const COMPOSITE = /* glsl */ `
-  precision highp float;
-  in vec2 vUv; out vec4 o; uniform sampler2D a; uniform sampler2D b;
-  void main() { vec4 h = texture(a, vUv); o = vec4(mix(texture(b, vUv).rgb, h.rgb, h.a), 1.0); }
-`
-const COPY = /* glsl */ `
-  precision highp float;
-  in vec2 vUv; out vec4 o; uniform sampler2D t;
-  void main() { o = vec4(texture(t, vUv).rgb, 1.0); }
-`
-// cubie faces
+// cubie faces: the plate and seam of each face are found from the fragment's position in the cubie's own frame
+// (never from the interpolated normal, which drifts across a rounded face), with the v11 mapping's +0.07 plate shift
+// brought into that frame, so the look is the same at rest and through turns
 const FACE_VERT = /* glsl */ `
-  in vec3 position; in vec3 normal; in vec2 uv; out vec3 vN; out vec2 vUv; out vec3 vLocal; out vec3 vLocalN; out vec3 vCube; out vec3 vCubeN; out vec3 vShift; out vec3 vCap; out float vViewZ;
+  in vec3 position; in vec3 normal; out vec3 vN; out vec3 vLocal; out vec3 vShift; out float vViewZ;
   uniform mat4 modelViewMatrix; uniform mat4 projectionMatrix; uniform mat3 normalMatrix; uniform mat4 modelMatrix; uniform mat4 uRootInv;
   void main() {
-    vN = normalMatrix * normal; vUv = uv; vLocal = position; vLocalN = normal;
-    mat4 toCube = uRootInv * modelMatrix;
-    vCube = (toCube * vec4(position, 1.0)).xyz;
-    // the v11 mapping's cube-space constants brought into this cubie's own frame (rotation only, no scale):
-    // the +0.07 plate shift along cube +x+y+z, and the cube z axis (the extrusion's cap axis)
-    mat3 R = mat3(toCube);
+    vN = normalMatrix * normal; vLocal = position;
+    mat3 R = mat3(uRootInv * modelMatrix);
     vShift = transpose(R) * vec3(0.07);
-    vCap = transpose(R) * vec3(0.0, 0.0, 1.0);
-    vCubeN = mat3(toCube) * normal;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vViewZ = -mv.z;
+    gl_Position = projectionMatrix * mv;
   }
 `
 const FACE_FRAG = /* glsl */ `
   precision highp float;
-  in vec3 vN; in vec2 vUv; in vec3 vLocal; in vec3 vLocalN; in vec3 vCube; in vec3 vCubeN; in vec3 vShift; in vec3 vCap; in float vViewZ; out vec4 o;
-  uniform float uCamZ;    // alpha = view depth relative to the camera distance, over 6 units (occlusion edges)
-  uniform float mode;   // 0 heat, 2 plate per cubie face, 3 plate per whole cube face (cube space)
-  uniform float k;      // plate sharpness
-  uniform float uHalf;  // cube half extent in cube space (mode 3)
-  uniform float uSeam;  // hairline along each cubie face border, in cubie units (cubie = 1)
-  uniform float uSeamSym; // mode 2: seams on all four sides (1) or v11's two (0)
-  uniform float uId;      // this cubie's id, written to R in plate mode when uIdOut = 1 (Poisson keeps cubies apart)
+  in vec3 vN; in vec3 vLocal; in vec3 vShift; in float vViewZ; out vec4 o;
+  uniform float uCamZ;   // alpha = view depth relative to the camera distance, over 6 units (occlusion edges)
+  uniform float k;       // plate sharpness
+  uniform float uSeam;   // hairline along each cubie face border, in cubie units (cubie = 1)
+  uniform float uId;     // this cubie's id, written to R when uIdOut = 1 (the Poisson solver keeps cubies apart)
   uniform float uIdOut;
-  uniform float uCapCos; // mode 2: a fragment counts as a cap (z face) only if |n.z| exceeds this, like the extrusion's cap / side-wall split
-  uniform float uSeamUv; // 0: from local geometry (true edges); 1: from the geometry's uv (v1-v11 look; drifts on rounded cubies after turns);
-                         // 2: the v11 mapping (extrude uv = coordinate + 0.43: one-sided seams, plate centre at +0.07) rebuilt in cube-space axes
-                         //    around each cubie's centre, so it matches v11 at rest and stays consistent through turns
   float plate(vec2 p) { float b = (1.0 - p.x * p.x) * (1.0 - p.y * p.y); return 1.0 - pow(clamp(b, 0.0, 1.0), k); }
-  // the two coordinates across the face this fragment lies on (dominant local normal axis), -.5..+.5
-  vec2 across(vec3 pos, vec3 n) { vec3 a = abs(n); return a.x > a.y && a.x > a.z ? pos.yz : a.y > a.z ? pos.xz : pos.xy; }
-  // which face of the cubie a fragment lies on, from its position alone (the largest |coordinate|); never from
-  // the interpolated normal, which drifts across a rounded face and splits it. Returns the two coordinates across
-  // that face, taken from the shifted position (v11's +0.07 plate offset).
+  // which face of the cubie a fragment lies on, from its position alone (the largest |coordinate|); returns the two
+  // coordinates across that face, taken from the shifted position
   vec2 acrossRigid(vec3 pos, vec3 shifted) {
     vec3 ap = abs(pos);
     return ap.x >= ap.y && ap.x >= ap.z ? shifted.yz : ap.y >= ap.z ? shifted.xz : shifted.xy;
   }
   void main() {
     float l = 0.35 + 0.65 * max(dot(normalize(vN), normalize(vec3(0.35, 0.8, 0.6))), 0.0);
-    // face coordinates -.5..+.5 for the plate, and for the seam. v11's uv shifts both by the same +0.07, so seams
-    // fall on two sides of each face only and neighbouring faces merge into one field island across the edge;
-    // that island creases when the cubie turns. Mode 2 keeps the shifted plate but seams every side (uSeamSym).
-    vec2 f = uSeamUv > 1.5 ? acrossRigid(vLocal, vLocal - vShift) : uSeamUv > 0.5 ? vUv - 0.5 : across(vLocal, vLocalN);
-    vec2 fs = uSeamUv > 1.5 && uSeamSym > 0.5 ? acrossRigid(vLocal, vLocal) : f;
-    float e = 0.5 - max(abs(fs.x), abs(fs.y));
+    vec2 f = acrossRigid(vLocal, vLocal - vShift);
+    float e = 0.5 - max(abs(f.x), abs(f.y));
     float seam = uSeam > 0.0 ? 1.0 - smoothstep(uSeam * 0.6, uSeam, e) : 0.0;
     float depth = clamp((vViewZ - uCamZ) / 6.0 + 0.5, 0.0, 1.0);
-    if (mode < 1.0) {
-      o = vec4(seam, l, 1.0, depth);
-    } else if (mode < 2.5) {
-      // seams become holes in the alpha, so a Poisson field sees every cubie face as its own shape;
-      // with uIdOut the R channel carries the cubie id instead of the plate (the solver uses it as a wall)
-      o = vec4(uIdOut > 0.5 ? uId : plate(2.0 * f), 1.0 - seam, l, depth);
-    } else {
-      // the whole cube face this fragment lies on, in cube space: coords perpendicular to the dominant normal axis
-      vec3 n = abs(normalize(vCubeN));
-      vec3 c = vCube / uHalf;
-      vec2 p = n.x > n.y && n.x > n.z ? c.yz : n.y > n.z ? c.xz : c.xy;
-      o = vec4(plate(clamp(p, -1.0, 1.0)), 1.0, l, depth);
-    }
+    // seams become holes in the alpha, so the Poisson field sees every cubie face as its own shape
+    o = vec4(uIdOut > 0.5 ? uId : plate(2.0 * f), 1.0 - seam, l, depth);
   }
 `
-// paper's vertex semantics for fit = contain, square image, no rotation / offset
+// paper's vertex semantics for fit = contain, square image, no rotation / offset; u_stretch pulls the window (and the
+// mask in it) to a non-square shape: the landed face stretching into the viewport
 const FINAL_VERT = /* glsl */ `
   in vec3 position; in vec2 uv;
   uniform float u_aspect; uniform float u_scale; uniform vec2 u_stretch;
   out vec2 v_imageUV; out vec2 v_objectUV; out vec2 v_responsiveUV; out vec2 v_responsiveBoxGivenSize;
   void main() {
     vec2 p = uv - 0.5;
-    // u_stretch: the window (and the mask in it) pulled to a non-square shape, the site's landed face stretching into the viewport
     vec2 q = p * vec2(u_aspect, 1.0) / (u_scale * u_stretch);
     v_objectUV = q;
     v_imageUV = vec2(q.x + 0.5, 0.5 - q.y);
@@ -234,85 +149,29 @@ const FINAL_VERT = /* glsl */ `
   }
 `
 
-const FRAG: Record<PaperShader, string> = { heat: heatmapFragmentShader, liquid: liquidMetalFragmentShader, smoke: gemSmokeFragmentShader }
-
-/** their fragment verbatim, plus: raw mask uniform, silhouette clip, lambert shade multiply, fusion alpha */
-function finalFragment(shader: PaperShader) {
-  const src = FRAG[shader].replace('#version 300 es', '').replace(/precision mediump float;/, 'precision highp float;')
+/** their fragment verbatim, plus our tail */
+function finalFragment() {
+  const src = liquidMetalFragmentShader.replace('#version 300 es', '').replace(/precision mediump float;/, 'precision highp float;')
   const tail = `
   {
     vec2 mUV = v_imageUV;
-    ${shader === 'heat' ? 'mUV = (mUV - 0.5) * 0.5714285714285714 + 0.5;' : ''}
     vec4 m = texture(u_mask, vec2(mUV.x, 1.0 - mUV.y));
     float inFrame = step(0.0, mUV.x) * step(mUV.x, 1.0) * step(0.0, mUV.y) * step(mUV.y, 1.0);
-    float inside = ${shader === 'heat' ? 'm.b' : 'm.g'} * inFrame;
-    float shade = ${shader === 'heat' ? 'm.g' : 'm.b'};
-    fragColor = mix(u_colorBack, fragColor, max(inside, u_halo));
-    fragColor.rgb *= mix(1.0, shade, u_shade * inside);
-    ${shader === 'heat' ? '' : `
-    // colour ramp: the effect's luminance through a palette (heatmap / icemint), with optional static grain
+    float inside = m.g * inFrame;
+    fragColor = mix(u_colorBack, fragColor, inside);
+    fragColor.rgb *= mix(1.0, m.b, u_shade * inside);
+    // static grain over the cube body
     float grainN = u_grain * 0.35 * (fract(sin(dot(v_imageUV * 1000.0, vec2(12.9898, 78.233))) * 43758.5453123) - 0.5);
-    if (u_rampCount < 0.5) fragColor.rgb *= mix(1.0, 1.0 + grainN, inside);
-    if (u_rampCount > 0.5) {
-      float l = dot(fragColor.rgb, vec3(0.299, 0.587, 0.114));
-      l += grainN;
-      l = pow(clamp(l, 0.0, 1.0), abs(u_rampGamma));
-      if (u_rampGamma < 0.0) l = 1.0 - l;
-      l = mix(u_rampFloor, 1.0, l); // floor: the darkest chrome still lands on a visible stop, not the page colour
-      float mixer = l * u_rampCount;
-      vec4 g = u_ramp[0];
-      for (int i = 1; i < 11; i++) {
-        if (i > int(u_rampCount)) break;
-        g = mix(g, u_ramp[i - 1], clamp(mixer - float(i - 1), 0.0, 1.0));
-      }
-      fragColor.rgb = mix(fragColor.rgb, g.rgb, inside);
-    }`}
-    // look controls, cube body only: brightness scales it, opacity fades it toward the page
-    fragColor.rgb = mix(fragColor.rgb, fragColor.rgb * u_gain, inside);
-    fragColor.rgb = mix(u_colorBack.rgb, fragColor.rgb, mix(1.0, u_alpha, inside));
-    // settled (the site's section page): the liquid gives way to a still gradient drawn from the cube's own field, light where
-    // the field is high and toward the lower left, dark teal toward the upper right, the grain kept
-    if (u_flat > 0.0 && u_flatMode > 1.5) {
-      // frozen: the highlights pressed down (luminance capped at u_cap), the dark shades left alone: a still of the shader
-      float lum = dot(fragColor.rgb, vec3(0.299, 0.587, 0.114));
-      float s = u_cap / max(lum, u_cap);
-      vec3 pressed = mix(fragColor.rgb * s, u_flatSolid * (u_cap / 0.17), 0.6 * (1.0 - s)); // the brighter it was, the more it takes the mint
-      fragColor.rgb = mix(fragColor.rgb, pressed, u_flat * inside);
-    } else if (u_flat > 0.0 && u_flatMode > 0.5) fragColor.rgb = mix(fragColor.rgb, u_flatSolid, u_flat * inside); // solid: one dark mint
-    if (u_flat > 0.0 && u_flatMode < 0.5) {
-      float fieldV = texture(u_image, vec2(mUV.x, 1.0 - mUV.y)).r;
-      // light at the lower left, dark teal at the upper right, a touch of the field for depth
-      float diag = smoothstep(0.0, 1.0, 0.5 * ((1.0 - mUV.x) + mUV.y));
-      float tone = clamp(0.03 + 0.85 * pow(diag, 1.5) + 0.12 * (fieldV - 0.5), 0.0, 1.0);
-      float gr = u_grain * 0.22 * (fract(sin(dot(v_imageUV * 1000.0, vec2(12.9898, 78.233))) * 43758.5453123) - 0.5);
-      vec3 settled = mix(u_flatDark, u_flatColor, clamp(tone + gr, 0.0, 1.0));
-      fragColor.rgb = mix(fragColor.rgb, settled, u_flat * inside);
-    }
-    // outline behind the silhouette: 1 = a line of constant width, 2 = a soft glow; drawn where the pixel is
-    // outside the cube but within reach of it (mask B = lambert > 0 inside, seams included, 0 outside)
-    if (u_outline > 0.5 && u_outline < 2.5) {
-      float sil = step(0.01, m.b) * inFrame;
-      float near = 0.0;
-      for (int i = 0; i < 16; i++) {
-        float a = float(i) * 0.392699;
-        vec2 dir = vec2(cos(a), sin(a));
-        float n1 = step(0.01, texture(u_mask, vec2(mUV.x, 1.0 - mUV.y) + dir * u_outlineW).b);
-        float n2 = step(0.01, texture(u_mask, vec2(mUV.x, 1.0 - mUV.y) + dir * u_outlineW * 2.2).b);
-        float n3 = step(0.01, texture(u_mask, vec2(mUV.x, 1.0 - mUV.y) + dir * u_outlineW * 3.6).b);
-        near = max(near, u_outline > 1.5 ? max(n1, max(n2 * 0.55, n3 * 0.25)) : n1);
-      }
-      float ring = (1.0 - sil) * near;
-      fragColor.rgb = mix(fragColor.rgb, u_outlineColor, ring);
-    }
+    fragColor.rgb *= mix(1.0, 1.0 + grainN, inside);
     // ascii outline: the screen in glyph cells; a cell's density is how near the cube is when looking out from its
     // centre, with a longer reach toward the left (u_asciiBias) so the glyphs trail off to the right of the cube;
     // a per-cell hash thins the far cells so the trail scatters. Glyphs are 5x5 bitmaps packed into ints.
-    if (u_outline > 2.5) {
+    // Measured from the un-turned cube's shape (u_asciiMask), so a turning layer does not drag the glyphs along.
+    if (u_asciiMul > 0.001) {
       vec2 cid = floor(gl_FragCoord.xy / u_asciiCell);
       vec2 cuv = (cid + 0.5) * u_asciiCell / u_resolution;
       vec2 cq = (cuv - 0.5) * vec2(u_aspect, 1.0) / (u_scale * u_stretch);
       vec2 cm = vec2(cq.x + 0.5, 0.5 - cq.y);
-      ${shader === 'heat' ? 'cm = (cm - 0.5) * 0.5714285714285714 + 0.5;' : ''}
       float dens = 0.0;
       for (int i = 0; i < 12; i++) {
         float a = float(i) * 0.5235988;
@@ -332,15 +191,10 @@ function finalFragment(shader: PaperShader) {
       float bayer = float(((bi.y & 1) << 3) | ((bx & 1) << 2) | ((bi.y & 2) << 0) | ((bx & 2) >> 1)) / 16.0;
       float level = dens * (1.0 - u_asciiScatter * hc) * 8.0 + (bayer - 0.5) * u_asciiDither;
       int idx = int(clamp(level, 0.0, 7.99));
-      // 5x5 bitmaps: dots  . : * o & 8 @ (v15)   marks  . - ~ + x % #   code  . ; / < = { #
-      int glyph = u_asciiGlyphs < 0.5
-        ? (idx == 0 ? 0 : idx == 1 ? 4096 : idx == 2 ? 65600 : idx == 3 ? 332772 : idx == 4 ? 15255086 : idx == 5 ? 23385164 : idx == 6 ? 15252014 : 13199452)
-        : u_asciiGlyphs < 1.5
-        ? (idx == 0 ? 0 : idx == 1 ? 4194304 : idx == 2 ? 14336 : idx == 3 ? 283712 : idx == 4 ? 4357252 : idx == 5 ? 18157905 : idx == 6 ? 27070835 : 11512810)
-        : (idx == 0 ? 0 : idx == 1 ? 4194304 : idx == 2 ? 2232324 : idx == 3 ? 1118480 : idx == 4 ? 8521864 : idx == 5 ? 1016800 : idx == 6 ? 12720268 : 11512810);
+      // 5x5 bitmaps, the code ramp: . ; / < = { #
+      int glyph = idx == 0 ? 0 : idx == 1 ? 4194304 : idx == 2 ? 2232324 : idx == 3 ? 1118480 : idx == 4 ? 8521864 : idx == 5 ? 1016800 : idx == 6 ? 12720268 : 11512810;
       vec2 fc = fract(gl_FragCoord.xy / u_asciiCell);
-      // dots keep v15's decode (x mirrored, y up); marks are bit x + 5y with y down
-      vec2 pc = u_asciiGlyphs < 0.5 ? floor((fc - 0.5) * vec2(-8.0, 8.0) + 2.5) : floor(vec2(fc.x, 1.0 - fc.y) * 8.0 - 1.5);
+      vec2 pc = floor(vec2(fc.x, 1.0 - fc.y) * 8.0 - 1.5);
       float ink = 0.0;
       if (pc.x >= 0.0 && pc.x <= 4.0 && pc.y >= 0.0 && pc.y <= 4.0) ink = float((glyph >> int(pc.x + 5.0 * pc.y)) & 1);
       float silA = step(0.01, m.b) * inFrame;
@@ -350,158 +204,94 @@ function finalFragment(shader: PaperShader) {
       fragColor.rgb = mix(fragColor.rgb, gcol, u_asciiMul * u_asciiGlow * dens * blob * step(0.5, level) * (1.0 - silA));
       fragColor.rgb = mix(fragColor.rgb, gcol, u_asciiMul * ink * mix(1.0, dens, u_asciiFade) * (1.0 - silA));
     }
-    ${shader === 'heat' ? 'fragColor.a = mix(fragColor.a, max(1.0 - inside, smoothstep(0.0, 0.35, img.r)), u_fuse);' : ''}
   }`
   const marker = 'fragColor = vec4(color, opacity);'
   const i = src.lastIndexOf(marker)
   const body = src.slice(0, i + marker.length) + tail + src.slice(i + marker.length)
-  // heatmap's fragment never declares u_resolution; the ascii outline needs it
   const res = body.includes('uniform vec2 u_resolution') ? '' : ' uniform vec2 u_resolution;'
-  return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform float u_halo; uniform float u_shade; uniform float u_fuse; uniform float u_gain; uniform float u_alpha; uniform vec4 u_ramp[10]; uniform float u_rampCount; uniform float u_rampGamma; uniform float u_rampFloor; uniform float u_grain; uniform float u_outline; uniform float u_outlineW; uniform vec3 u_outlineColor; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiGlyphs; uniform float u_asciiSquash; uniform float u_asciiDither; uniform float u_asciiFade; uniform float u_asciiGlow; uniform float u_asciiMul; uniform float u_flat; uniform vec3 u_flatColor; uniform vec3 u_flatDark; uniform float u_flatMode; uniform vec3 u_flatSolid; uniform float u_cap; uniform sampler2D u_asciiMask; uniform float u_aspect; uniform float u_scale; uniform vec2 u_stretch; precision highp int;')
+  return body.replace('uniform float u_time;', 'uniform float u_time;' + res + ' uniform sampler2D u_mask; uniform sampler2D u_asciiMask; uniform float u_shade; uniform float u_grain; uniform float u_asciiCell; uniform float u_asciiReach; uniform float u_asciiBias; uniform float u_asciiScatter; uniform vec3 u_asciiColor; uniform vec3 u_asciiColor2; uniform float u_asciiSquash; uniform float u_asciiDither; uniform float u_asciiFade; uniform float u_asciiGlow; uniform float u_asciiMul; uniform float u_aspect; uniform float u_scale; uniform vec2 u_stretch; precision highp int;')
 }
 
-const rt = (size: number, depth = false, samples = 0) =>
-  new THREE.WebGLRenderTarget(size, size, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: depth, samples })
-const frt = (size: number) =>
-  new THREE.WebGLRenderTarget(size, size, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false })
+const rt = (size: number, depth = false, samples = 0) => new THREE.WebGLRenderTarget(size, size, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: depth, samples })
+const frt = (size: number) => new THREE.WebGLRenderTarget(size, size, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false })
 const rt2 = (w: number, h: number) => new THREE.WebGLRenderTarget(w, h, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false })
+const rgb = (hex: string) => new THREE.Vector3(...new THREE.Color(hex).toArray())
 
-/** the superset of paper uniforms for one final pass (unused ones are harmless) */
 const finalUniforms = (): Record<string, THREE.IUniform> => ({
   u_image: { value: null },
   u_mask: { value: null },
+  u_asciiMask: { value: null },
   u_time: { value: 0 },
   u_resolution: { value: new THREE.Vector2(1, 1) },
   u_imageAspectRatio: { value: 1 },
   u_isImage: { value: true },
   u_shape: { value: 0 },
-  u_halo: { value: 1 },
-  u_shade: { value: 0 },
-  u_fuse: { value: 0 },
-  u_gain: { value: 1 },
-  u_alpha: { value: 1 },
-  u_ramp: { value: new Float32Array(40) },
-  u_rampCount: { value: 0 },
-  u_rampGamma: { value: 1 },
-  u_rampFloor: { value: 0 },
-  u_outline: { value: 0 },
-  u_outlineW: { value: 0.008 },
-  u_outlineColor: { value: new THREE.Vector3(1, 1, 1) },
-  u_asciiCell: { value: 12 },
-  u_asciiReach: { value: 0.05 },
-  u_asciiBias: { value: 3 },
-  u_asciiScatter: { value: 0.5 },
-  u_asciiColor: { value: new THREE.Vector3(1, 1, 1) },
-  u_asciiColor2: { value: new THREE.Vector3(1, 1, 1) },
-  u_asciiGlyphs: { value: 0 },
-  u_asciiSquash: { value: 0 },
-  u_asciiDither: { value: 0 },
-  u_asciiFade: { value: 0 },
-  u_asciiGlow: { value: 0 },
-  u_asciiMul: { value: 1 }, // the flight fades the ascii outline out (Site)
-  u_flat: { value: 0 }, // the flight drains the look to flat tiles as it lands (Site)
-  u_flatColor: { value: new THREE.Vector3(0.78, 0.86, 0.85) }, // the settled gradient's light end
-  u_flatDark: { value: new THREE.Vector3(0.01, 0.17, 0.17) }, // and its dark teal end
-  u_flatMode: { value: 0 }, // 0 gradient, 1 solid, 2 frozen (highlights capped)
-  u_cap: { value: 0.3 }, // frozen: the luminance the highlights are pressed down to
-  u_flatSolid: { value: new THREE.Vector3(0.05, 0.22, 0.2) }, // the cube's darker mint (the site's s3 page)
-  u_asciiMask: { value: null },
-  u_grain: { value: 0 },
+  u_shade: { value: CUBE.shade },
+  u_grain: { value: LIQUID.grain },
+  u_asciiCell: { value: CUBE.ascii.cell },
+  u_asciiReach: { value: CUBE.ascii.reach },
+  u_asciiBias: { value: CUBE.ascii.bias },
+  u_asciiScatter: { value: CUBE.ascii.scatter },
+  u_asciiColor: { value: rgb(CUBE.ascii.color) },
+  u_asciiColor2: { value: rgb(CUBE.ascii.color2) },
+  u_asciiSquash: { value: CUBE.ascii.squash },
+  u_asciiDither: { value: CUBE.ascii.dither },
+  u_asciiFade: { value: CUBE.ascii.fade },
+  u_asciiGlow: { value: CUBE.ascii.glow },
+  u_asciiMul: { value: 1 },
   u_aspect: { value: 1 },
-  u_scale: { value: 1 },
+  u_scale: { value: LIQUID.scale },
   u_stretch: { value: new THREE.Vector2(1, 1) },
-  u_colorBack: { value: [0, 0, 0, 1] },
-  u_colorTint: { value: [1, 1, 1, 1] },
-  u_colorInner: { value: [1, 1, 1, 1] },
-  u_colors: { value: new Float32Array(40) },
-  u_colorsCount: { value: 0 },
-  u_angle: { value: 0 },
-  u_noise: { value: 0 },
-  u_innerGlow: { value: 0.5 },
-  u_outerGlow: { value: 0.5 },
-  u_contour: { value: 0.5 },
-  u_softness: { value: 0.1 },
-  u_repetition: { value: 2 },
-  u_shiftRed: { value: 0.3 },
-  u_shiftBlue: { value: 0.3 },
-  u_distortion: { value: 0.07 },
-  u_innerDistortion: { value: 0.8 },
-  u_outerDistortion: { value: 0.6 },
-  u_offset: { value: 0 },
-  u_size: { value: 0.8 },
+  // the paper pass writes to the screen raw: the hex as-is, not THREE's linear conversion
+  u_colorBack: { value: getShaderColorFromString(LIQUID.colorBack) },
+  u_colorTint: { value: getShaderColorFromString(LIQUID.colorTint) },
+  u_softness: { value: LIQUID.softness },
+  u_repetition: { value: LIQUID.repetition },
+  u_shiftRed: { value: LIQUID.shiftRed },
+  u_shiftBlue: { value: LIQUID.shiftBlue },
+  u_distortion: { value: LIQUID.distortion },
+  u_contour: { value: LIQUID.contour },
+  u_angle: { value: LIQUID.angle },
 })
-const NUMERIC = ['angle', 'noise', 'innerGlow', 'outerGlow', 'contour', 'softness', 'repetition', 'shiftRed', 'shiftBlue', 'distortion', 'innerDistortion', 'outerDistortion', 'offset', 'size']
-const applyParams = (u: Record<string, THREE.IUniform>, params: Record<string, unknown>) => {
-  const color = (v: unknown, fallback: string) => getShaderColorFromString(typeof v === 'string' ? v : fallback)
-  if (Array.isArray(params.colors)) {
-    const flat = new Float32Array(40)
-    const cs = (params.colors as string[]).map(getShaderColorFromString)
-    cs.forEach((c, i) => flat.set(c, i * 4))
-    u.u_colors.value = flat
-    u.u_colorsCount.value = cs.length
-  }
-  u.u_colorBack.value = color(params.colorBack, '#000000')
-  u.u_colorTint.value = color(params.colorTint, '#ffffff')
-  u.u_colorInner.value = color(params.colorInner, '#ffffff')
-  for (const k of NUMERIC) if (typeof params[k] === 'number') u[`u_${k}`].value = params[k]
-  u.u_scale.value = typeof params.scale === 'number' ? params.scale : 1
-  // ours: a palette over the effect's luminance
-  const ramp = new Float32Array(40)
-  const stops = Array.isArray(params.ramp) ? (params.ramp as string[]).map(getShaderColorFromString) : []
-  stops.forEach((c, i) => ramp.set(c, i * 4))
-  u.u_ramp.value = ramp
-  u.u_rampCount.value = stops.length
-  u.u_rampGamma.value = typeof params.rampGamma === 'number' ? params.rampGamma : 1
-  u.u_rampFloor.value = typeof params.rampFloor === 'number' ? params.rampFloor : 0
-  u.u_grain.value = typeof params.grain === 'number' ? params.grain : 0
-}
 
-export type PaperCubeProps = {
-  version: PaperVersion
-  params: Record<string, unknown>
-  spin: boolean
-  /** idle spin, rad/s */
-  spinSpeed?: number
-  /** chain random turns, with this pause between them (ms) */
-  auto?: boolean
-  autoInterval?: number
-  /** chance an idle turn is a burst of two or three (RubikMask) */
-  combo?: number
-  debug?: PaperDebug
-  /** look controls: brightness multiplier and cube-body opacity */
-  gain?: number
-  alpha?: number
-  /** outline behind the silhouette: 'line' (constant width) or 'glow' (soft) in this colour, or 'ascii' glyph cells; defaults to the version's */
-  outline?: 'off' | 'line' | 'glow' | 'ascii'
-  outlineColor?: string
-  /** ascii outline overrides on top of the version's */
-  ascii?: Partial<AsciiParams>
-  rubik?: React.RefObject<RubikHandle | null>
-  /** the flight (Site): the mask scene's root and camera, the cube's half extent, and a zoom on paper's window */
-  fly?: React.RefObject<FlyHandle | null>
-}
-/** half: the cube's true half extent (the face plane's distance from its centre, and the face's half size) */
-export type FlyHandle = { root: THREE.Group; camera: THREE.PerspectiveCamera; half: number; scale0: number; zoom: (k: number) => void; ascii: (k: number) => void; flat: (k: number, color: string) => void;
+/** the section transition's hooks. half: the cube's true half extent (the face plane's distance from its centre, and the
+ *  face's half size); scale0: paper's window scale at rest */
+export type FlyHandle = {
+  root: THREE.Group
+  camera: THREE.PerspectiveCamera
+  half: number
+  scale0: number
+  /** paper's window scaled (the flight zooms it so the cube can fill the whole viewport) */
+  zoom: (k: number) => void
+  /** the ascii outline's opacity */
+  ascii: (k: number) => void
   /** the window pulled to a non-square shape (x, y multipliers) */
   stretch: (x: number, y: number) => void
-  /** settle (0..1): the cubies close up (spacing → touching), the hairline seams fade, the field merges into one surface and the
-   *  liquid gives way to the still gradient */
-  settle: (k: number, mode?: 'gradient' | 'solid' | 'frozen') => void
-  /** freeze the liquid's clock where it is (on) or let it run again (off) */
-  freeze: (on: boolean) => void
-  /** extra seconds on the liquid's clock, so a highlight can sweep through during the settle */
-  sweep: (extra: number) => void
   /** capture on: the final image goes to a screen-sized target instead of the screen (the section page's tiles sample it) */
   capture: (on: boolean) => void
   /** that target's texture (valid content only while capturing) */
-  shot: THREE.Texture }
+  shot: THREE.Texture
+  /** asleep: nothing is rendered at all (the section page at rest shows none of the cube) */
+  sleep: (on: boolean) => void
+}
 
-export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = false, autoInterval = 900, combo = 0, debug = 'off', gain = 1, alpha = 1, outline: outlineProp, outlineColor = '#ffffff', ascii, rubik, fly }: PaperCubeProps) {
-  const outline = outlineProp ?? V.outline ?? 'off'
-  const A: AsciiParams = { cell: 9, reach: 0.05, bias: 3, scatter: 0.5, color: '#ece8df', ...V.ascii, ...ascii }
-  const SIZE = V.size
-  const isHeat = V.shader === 'heat'
-  const fieldMode = V.field === 'cube' ? 3 : 2
+export type PaperCubeProps = {
+  /** mask size: 1024, or 768 on narrow screens */
+  size: number
+  /** paper's window scale */
+  scale: number
+  spin: boolean
+  /** idle spin, rad/s */
+  spinSpeed: number
+  /** idle turns: on, the pause between them (ms), the chance one is a burst of two or three */
+  auto: boolean
+  autoInterval: number
+  combo: number
+  rubik: React.RefObject<RubikHandle | null>
+  fly: React.RefObject<FlyHandle | null>
+}
+
+export function PaperCube({ size: SIZE, scale: scale0, spin, spinSpeed, auto, autoInterval, combo, rubik, fly }: PaperCubeProps) {
   const root = useRef<THREE.Group>(null!)
   const maskScene = useRef<THREE.Scene>(null!)
   const { gl, camera, size } = useThree()
@@ -509,174 +299,74 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
   const R = useMemo(
     () => ({
       mask: rt(SIZE, true, 4),
+      maskE: rt(SIZE), // mask with occlusion-edge seams cut in
       a: rt(SIZE),
-      contour: rt(SIZE),
       inner: rt(SIZE),
-      bigA: rt(SIZE / V.bigDiv),
-      bigB: rt(SIZE / V.bigDiv),
-      big: rt(SIZE / V.bigDiv),
       combined: rt(SIZE),
-      maskE: rt(SIZE), // mask with occlusion-edge seams cut in (liquid / smoke)
-      still: rt(256, true, 4), // the un-turned cube's silhouette (a plain box on layer 1) for the still ascii outline
+      still: rt(256, true, 4), // the un-turned cube's silhouette (a plain box on layer 1) for the ascii outline
       // poisson: solved at 256 with float targets; max reduced by halving eight times
       pA: frt(256),
       pB: frt(256),
       pMask: rt(256),
       red: [128, 64, 32, 16, 8, 4, 2, 1].map(frt),
     }),
-    [SIZE, V.bigDiv],
+    [SIZE],
   )
-  // fusion needs a second mask and two screen-size outputs
-  const dpr = gl.getPixelRatio()
-  const F = useMemo(
-    () =>
-      V.fuse
-        ? { mask2: rt(SIZE, true, 4), combined2: rt(SIZE), out1: rt2(Math.round(size.width * dpr), Math.round(size.height * dpr)), out2: rt2(Math.round(size.width * dpr), Math.round(size.height * dpr)) }
-        : null,
-    [V.fuse, SIZE, size.width, size.height, dpr],
-  )
-  useEffect(() => () => { if (F) Object.values(F).forEach((t) => t.dispose()) }, [F])
   const Q = useMemo(() => {
     const scene = new THREE.Scene()
     const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2))
     scene.add(mesh)
-    const raw = (fragmentShader: string, uniforms: Record<string, THREE.IUniform>, vertexShader = QUAD_VERT) =>
-      new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader, fragmentShader, uniforms })
+    const raw = (fragmentShader: string, uniforms: Record<string, THREE.IUniform>, vertexShader = QUAD_VERT) => new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader, fragmentShader, uniforms })
     return {
       scene,
       cam,
       mesh,
       blur: raw(BLUR, { t: { value: null }, dir: { value: new THREE.Vector2() }, radius: { value: 1 }, ch: { value: new THREE.Vector4(1, 0, 0, 0) } }),
-      combineHeat: raw(COMBINE_HEAT, { contour: { value: null }, big: { value: null }, inner: { value: null } }),
-      combineField: raw(COMBINE_FIELD, { mask: { value: null } }),
       combinePoisson: raw(COMBINE_POISSON, { mask: { value: null }, u: { value: null }, umax: { value: null } }),
-      poisson: raw(POISSON, { u: { value: null }, mask: { value: null }, ids: { value: null }, texel: { value: 1 / 256 }, thresh: { value: 0.5 } }),
+      poisson: raw(POISSON, { u: { value: null }, mask: { value: null }, ids: { value: null }, texel: { value: 1 / 256 }, thresh: { value: CUBE.poissonThresh } }),
       reduceMax: raw(REDUCE_MAX, { t: { value: null }, texel: { value: 1 / 128 } }),
-      downMin: raw(DOWNMIN, { t: { value: null }, texel: { value: 1 / 1024 }, taps: { value: 4 } }),
       edge: raw(EDGE, { t: { value: null }, texel: { value: 1 / 1024 } }),
-      copy: raw(COPY, { t: { value: null } }),
-      face: raw(FACE_FRAG, { mode: { value: 0 }, k: { value: 0.75 }, uHalf: { value: 1.5 }, uSeam: { value: 0 }, uSeamUv: { value: 1 }, uSeamSym: { value: 0 }, uId: { value: 0 }, uIdOut: { value: 0 }, uCamZ: { value: 11 }, uCapCos: { value: 0.999 }, uRootInv: { value: new THREE.Matrix4() } }, FACE_VERT),
-      final: raw(finalFragment(V.shader), finalUniforms(), FINAL_VERT),
-      final2: V.fuse ? raw(finalFragment(V.fuse), finalUniforms(), FINAL_VERT) : null,
-      composite: raw(COMPOSITE, { a: { value: null }, b: { value: null } }),
+      face: raw(FACE_FRAG, { k: { value: CUBE.fieldK }, uSeam: { value: CUBE.seam }, uId: { value: 0 }, uIdOut: { value: 0 }, uCamZ: { value: CUBE.camZ }, uRootInv: { value: new THREE.Matrix4() } }, FACE_VERT),
+      final: raw(finalFragment(), finalUniforms(), FINAL_VERT),
     }
-  // shader sources in the deps: a hot reload of this file must rebuild the materials, not keep the old GLSL
-  }, [V.shader, V.fuse, FACE_FRAG, FACE_VERT])
-
+  }, [])
   useEffect(
     () => () => {
       Object.values(R).forEach((t) => (Array.isArray(t) ? t.forEach((x) => x.dispose()) : t.dispose()))
       Q.mesh.geometry.dispose()
-      ;[Q.blur, Q.combineHeat, Q.combineField, Q.combinePoisson, Q.poisson, Q.reduceMax, Q.downMin, Q.edge, Q.copy, Q.face, Q.final, Q.final2, Q.composite].forEach((m) => m?.dispose())
+      ;[Q.blur, Q.combinePoisson, Q.poisson, Q.reduceMax, Q.edge, Q.face, Q.final].forEach((m) => m.dispose())
     },
     [R, Q],
   )
 
-  // the flight zooms paper's window (u_scale) so the cube can fill the whole viewport, not just the mask square
   const zoom = useRef(1)
-  // capture: the site's section page draws the cube's live image on its tiles (same GL context, so a render target is shared)
   const captureOn = useRef(false)
-  const settled = useRef(0)
-  const merge = useRef(false)
-  const sweep = useRef(0)
-  const frozen = useRef<number | null>(null)
-  const lastT = useRef(0)
+  const asleep = useRef(false)
+  const dpr = gl.getPixelRatio()
   const shot = useMemo(() => rt2(Math.round(size.width * dpr), Math.round(size.height * dpr)), [size.width, size.height, dpr])
   useEffect(() => () => shot.dispose(), [shot])
-  const scale0 = typeof params.scale === 'number' ? params.scale : 0.75
-  useImperativeHandle(fly, () => ({ root: root.current, camera: camera as THREE.PerspectiveCamera, half: V.rubikGap + 0.5, scale0, zoom: (k) => { zoom.current = k; Q.final.uniforms.u_scale.value = scale0 * k; if (Q.final2) Q.final2.uniforms.u_scale.value = (scale0 / IMG) * k }, ascii: (k) => { Q.final.uniforms.u_asciiMul.value = k }, flat: (k, color) => { Q.final.uniforms.u_flat.value = k; const n = parseInt(color.slice(1), 16); Q.final.uniforms.u_flatColor.value.set(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255) },
-    stretch: (x, y) => { Q.final.uniforms.u_stretch.value.set(x, y); if (Q.final2) Q.final2.uniforms.u_stretch.value.set(x, y) },
-    settle: (k, mode = 'gradient') => {
-      settled.current = k
-      Q.final.uniforms.u_flatMode.value = mode === 'frozen' ? 2 : mode === 'solid' ? 1 : 0
-      Q.final.uniforms.u_flat.value = k
-      // gradient: the cubies overlap a little (0.92 of a cubie) so the rounded corners leave no holes, the seams fade, the field merges;
-      // solid: the cube's geometry is left alone (the page layer welds the seams)
-      const m = mode === 'gradient' ? 1 + (0.92 / V.rubikGap - 1) * k : 1
-      rubik?.current?.spacing(m)
-      Q.face.uniforms.uHalf.value = 1.5 * V.rubikGap * m
-      Q.face.uniforms.uSeam.value = V.seam * (mode === 'gradient' ? 1 - k : 1)
-      merge.current = mode === 'gradient' && k > 0.5
-    },
-    sweep: (extra) => { sweep.current = extra },
-    freeze: (on) => { frozen.current = on ? lastT.current : null },
-    capture: (on) => { captureOn.current = on }, shot: shot.texture }), [camera, V.rubikGap, scale0, Q, shot]) // the paper pass writes to the screen raw: the hex as-is, not THREE's linear conversion
-  // preset params -> uniforms
-  useEffect(() => {
-    const u = Q.final.uniforms
-    applyParams(u, params)
-    u.u_scale.value = scale0 * zoom.current
-    u.u_halo.value = V.halo ? 1 : 0
-    u.u_shade.value = V.shade
-    u.u_fuse.value = V.fuse ? 1 : 0
-    u.u_gain.value = gain
-    u.u_alpha.value = alpha
-    u.u_outline.value = outline === 'line' ? 1 : outline === 'glow' ? 2 : outline === 'ascii' ? 3 : 0
-    u.u_asciiCell.value = A.cell * gl.getPixelRatio()
-    u.u_asciiReach.value = A.reach
-    u.u_asciiBias.value = A.bias
-    u.u_asciiScatter.value = A.scatter
-    u.u_asciiColor.value.set(...new THREE.Color(A.color).toArray())
-    u.u_asciiColor2.value.set(...new THREE.Color(A.color2 ?? A.color).toArray())
-    u.u_asciiGlyphs.value = A.glyphs === 'marks' ? 1 : A.glyphs === 'code' ? 2 : 0
-    u.u_asciiSquash.value = A.squash ?? 0
-    u.u_asciiDither.value = A.dither ?? 0
-    u.u_asciiFade.value = A.fade ?? 0
-    u.u_asciiGlow.value = A.glow ?? 0
-    u.u_outlineW.value = V.shader === 'heat' ? 0.0045 : 0.008 // heat samples the mask through its 57% window
-    u.u_outlineColor.value.set(...new THREE.Color(outlineColor).toArray())
-    if (Q.final2 && V.fuse) {
-      const u2 = Q.final2.uniforms
-      applyParams(u2, presetNamed(V.fuse, V.fusePreset).params)
-      // same camera and mask as the heat pass: heat shows the mask's central 57% window through its scale,
-      // so the full mask spans scale / 0.571 of the screen for the fused pass
-      u2.u_scale.value = (scale0 / IMG) * zoom.current
-      u2.u_halo.value = 0
-      u2.u_shade.value = V.shade
-      u2.u_gain.value = gain
-      u2.u_alpha.value = alpha
-    }
-    Q.face.uniforms.k.value = V.fieldK
-    const grad = u.u_flatMode.value < 0.5
-    const m = grad ? 1 + (0.92 / V.rubikGap - 1) * settled.current : 1
-    Q.face.uniforms.uHalf.value = 1.5 * V.rubikGap * m
-    Q.face.uniforms.uSeam.value = V.seam * (grad ? 1 - settled.current : 1)
-    u.u_flat.value = settled.current
-    Q.face.uniforms.uSeamUv.value = V.seamSpace === 'geometry' ? 0 : V.seamSpace === 'cube' ? 2 : 1
-    Q.face.uniforms.uCapCos.value = V.capCos
-    Q.face.uniforms.uSeamSym.value = V.seamSym ? 1 : 0
-    Q.face.uniforms.uCamZ.value = V.camZ
-  }, [params, Q, V, gain, alpha, outline, outlineColor, A.cell, A.reach, A.bias, A.scatter, A.color, A.color2, A.glyphs, A.squash, A.dither, A.fade, A.glow, gl])
+  useEffect(() => { Q.final.uniforms.u_scale.value = scale0 * zoom.current; Q.final.uniforms.u_asciiCell.value = CUBE.ascii.cell * dpr }, [Q, scale0, dpr])
+  useImperativeHandle(fly, () => ({
+    root: root.current,
+    camera: camera as THREE.PerspectiveCamera,
+    half: CUBE.gap + 0.5,
+    scale0,
+    zoom: (k) => { zoom.current = k; Q.final.uniforms.u_scale.value = scale0 * k },
+    ascii: (k) => { Q.final.uniforms.u_asciiMul.value = k },
+    stretch: (x, y) => { Q.final.uniforms.u_stretch.value.set(x, y) },
+    capture: (on) => { captureOn.current = on },
+    shot: shot.texture,
+    sleep: (on) => { asleep.current = on },
+  }), [camera, scale0, Q, shot])
 
   const pass = (mat: THREE.RawShaderMaterial, target: THREE.WebGLRenderTarget | null) => {
     Q.mesh.material = mat
     gl.setRenderTarget(target)
     gl.render(Q.scene, Q.cam)
   }
-  const boxBlur = (src: THREE.WebGLRenderTarget, tmp: THREE.WebGLRenderTarget, dst: THREE.WebGLRenderTarget, radius: number, passes: number) => {
-    const texel = 1 / src.width
-    let input = src
-    for (let p = 0; p < passes; p++) {
-      Q.blur.uniforms.radius.value = radius
-      Q.blur.uniforms.t.value = input.texture
-      Q.blur.uniforms.dir.value.set(texel, 0)
-      pass(Q.blur, tmp)
-      Q.blur.uniforms.t.value = tmp.texture
-      Q.blur.uniforms.dir.value.set(0, texel)
-      pass(Q.blur, dst)
-      input = dst
-    }
-  }
-  // one bilinear tap per destination texel (radius 0)
-  const downsample = (src: THREE.WebGLRenderTarget, dst: THREE.WebGLRenderTarget) => {
-    Q.blur.uniforms.radius.value = 0
-    Q.blur.uniforms.t.value = src.texture
-    Q.blur.uniforms.dir.value.set(0, 0)
-    pass(Q.blur, dst)
-  }
   // square render of the cube into a mask target: clear = (1, 0, 0) = seam / outside, no alpha, no shade
-  const renderMask = (target: THREE.WebGLRenderTarget, mode: number, idOut = false, layerMask = 1) => {
+  const renderMask = (target: THREE.WebGLRenderTarget, idOut: boolean, layerMask = 1) => {
     Q.face.uniforms.uIdOut.value = idOut ? 1 : 0
     const cam = camera as THREE.PerspectiveCamera
     const prevLayers = cam.layers.mask
@@ -686,7 +376,6 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
     cam.updateProjectionMatrix()
     const prevClear = gl.getClearColor(new THREE.Color())
     const prevAlpha = gl.getClearAlpha()
-    Q.face.uniforms.mode.value = mode
     gl.setClearColor(new THREE.Color(1, 0, 0), 1)
     gl.setRenderTarget(target)
     gl.clear()
@@ -698,107 +387,62 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
   }
 
   useFrame((state, dt) => {
+    if (asleep.current) return
     if (spin) root.current.rotation.y += dt * spinSpeed
     root.current.updateMatrixWorld()
     Q.face.uniforms.uRootInv.value.copy(root.current.matrixWorld).invert()
-    const speed = typeof params.speed === 'number' ? (params.speed as number) : 1
-    const frame = typeof params.frame === 'number' ? (params.frame as number) : 0 // paper's time offset (seconds)
-    const px = (r: number, w: number) => Math.max(1, Math.round((r / 1750) * w))
 
-    // 1. mask, 2. their preprocess
-    renderMask(R.mask, isHeat ? 0 : fieldMode, V.field === 'poisson' && !merge.current)
-    if (outline === 'ascii' && A.still) renderMask(R.still, isHeat ? 0 : fieldMode, false, 2)
-    // liquid / smoke: cut hairline seams at occlusion edges, then everything below reads maskE
-    const M = isHeat ? R.mask : R.maskE
-    if (!isHeat) {
-      Q.edge.uniforms.t.value = R.mask.texture
-      Q.edge.uniforms.texel.value = 1 / SIZE
-      pass(Q.edge, R.maskE)
+    // 1. the mask (cubie ids in R), and the un-turned silhouette for the outline
+    renderMask(R.mask, true)
+    renderMask(R.still, false, 2)
+    // 2. occlusion edges cut in; everything below reads maskE
+    Q.edge.uniforms.t.value = R.mask.texture
+    Q.edge.uniforms.texel.value = 1 / SIZE
+    pass(Q.edge, R.maskE)
+    // 3. the alpha brought to 256 for the solver (a box filter, then one bilinear tap), Jacobi warm-started from last frame,
+    //    the max reduced, the field normalised
+    Q.blur.uniforms.ch.value.set(0, 1, 0, 0)
+    Q.blur.uniforms.radius.value = Math.max(1, Math.round(SIZE / 512))
+    Q.blur.uniforms.t.value = R.maskE.texture
+    Q.blur.uniforms.dir.value.set(1 / SIZE, 0)
+    pass(Q.blur, R.a)
+    Q.blur.uniforms.t.value = R.a.texture
+    Q.blur.uniforms.dir.value.set(0, 1 / SIZE)
+    pass(Q.blur, R.inner)
+    Q.blur.uniforms.ch.value.set(1, 0, 0, 0)
+    Q.blur.uniforms.radius.value = 0
+    Q.blur.uniforms.t.value = R.inner.texture
+    Q.blur.uniforms.dir.value.set(0, 0)
+    pass(Q.blur, R.pMask)
+    Q.poisson.uniforms.mask.value = R.pMask.texture
+    Q.poisson.uniforms.ids.value = R.maskE.texture
+    let a = R.pA, b = R.pB
+    for (let i = 0; i < CUBE.poissonIters; i++) {
+      Q.poisson.uniforms.u.value = a.texture
+      pass(Q.poisson, b)
+      ;[a, b] = [b, a]
     }
-    if (isHeat) {
-      boxBlur(R.mask, R.a, R.contour, px(V.blur.contour, SIZE), 1)
-      boxBlur(R.mask, R.a, R.inner, px(V.blur.inner, SIZE), 3)
-      downsample(R.mask, R.bigA)
-      boxBlur(R.bigA, R.bigB, R.big, px(V.blur.big, SIZE / V.bigDiv), 3)
-      Q.combineHeat.uniforms.contour.value = R.contour.texture
-      Q.combineHeat.uniforms.big.value = R.big.texture
-      Q.combineHeat.uniforms.inner.value = R.inner.texture
-      pass(Q.combineHeat, R.combined)
-    } else if (V.field === 'poisson') {
-      // bring the alpha to 256 for the solver, then iterate Jacobi (warm-started from last frame), reduce the
-      // max, normalise. 'min' keeps a hairline seam as a hole; 'blur' (box filter + bilinear, the v1-v11 look)
-      // lets thin seams close so neighbouring cubies share a field. Both write to rgb, so .g works.
-      if (V.poissonDown === 'min') {
-        Q.downMin.uniforms.t.value = M.texture
-        Q.downMin.uniforms.texel.value = 1 / SIZE
-        Q.downMin.uniforms.taps.value = SIZE / 256
-        pass(Q.downMin, R.pMask)
-      } else {
-        Q.blur.uniforms.ch.value.set(0, 1, 0, 0)
-        boxBlur(M, R.a, R.inner, Math.max(1, Math.round(SIZE / 512)), 1)
-        Q.blur.uniforms.ch.value.set(1, 0, 0, 0)
-        downsample(R.inner, R.pMask)
-      }
-      Q.poisson.uniforms.mask.value = R.pMask.texture
-      Q.poisson.uniforms.ids.value = M.texture
-      Q.poisson.uniforms.thresh.value = V.poissonThresh
-      let a = R.pA, b = R.pB
-      for (let i = 0; i < V.poissonIters; i++) {
-        Q.poisson.uniforms.u.value = a.texture
-        pass(Q.poisson, b)
-        ;[a, b] = [b, a]
-      }
-      let src: THREE.WebGLRenderTarget = a
-      for (const dst of R.red) {
-        Q.reduceMax.uniforms.t.value = src.texture
-        Q.reduceMax.uniforms.texel.value = 0.25 / dst.width // ± half a source texel around the destination centre
-        pass(Q.reduceMax, dst)
-        src = dst
-      }
-      Q.combinePoisson.uniforms.mask.value = M.texture
-      Q.combinePoisson.uniforms.u.value = a.texture
-      Q.combinePoisson.uniforms.umax.value = R.red[R.red.length - 1].texture
-      pass(Q.combinePoisson, R.combined)
-    } else {
-      Q.combineField.uniforms.mask.value = M.texture
-      pass(Q.combineField, R.combined)
+    let src: THREE.WebGLRenderTarget = a
+    for (const dst of R.red) {
+      Q.reduceMax.uniforms.t.value = src.texture
+      Q.reduceMax.uniforms.texel.value = 0.25 / dst.width
+      pass(Q.reduceMax, dst)
+      src = dst
     }
+    Q.combinePoisson.uniforms.mask.value = R.maskE.texture
+    Q.combinePoisson.uniforms.u.value = a.texture
+    Q.combinePoisson.uniforms.umax.value = R.red[R.red.length - 1].texture
+    pass(Q.combinePoisson, R.combined)
 
-    if (debug !== 'off') {
-      Q.copy.uniforms.t.value = (debug === 'mask' ? R.mask : R.combined).texture
-      pass(Q.copy, null)
-      return
-    }
-
-    // 3. their fragment over the screen
+    // 4. their fragment over the screen (or into the capture)
     const u = Q.final.uniforms
     u.u_image.value = R.combined.texture
-    u.u_mask.value = M.texture
-    u.u_asciiMask.value = (A.still ? R.still : M).texture
-    lastT.current = frozen.current ?? state.clock.elapsedTime * speed + frame + sweep.current
-    u.u_time.value = lastT.current
+    u.u_mask.value = R.maskE.texture
+    u.u_asciiMask.value = R.still.texture
+    u.u_time.value = state.clock.elapsedTime * LIQUID.speed
     u.u_aspect.value = size.width / size.height
-    u.u_resolution.value.set(size.width * gl.getPixelRatio(), size.height * gl.getPixelRatio())
-    const out = captureOn.current ? shot : null
-    if (!(V.fuse && F && Q.final2)) {
-      pass(Q.final, out)
-      return
-    }
-    // fusion: heat -> out1; second mask with per-face plates and seams as holes -> fused shader -> out2; composite
-    pass(Q.final, F.out1)
-    renderMask(F.mask2, fieldMode)
-    Q.combineField.uniforms.mask.value = F.mask2.texture
-    pass(Q.combineField, F.combined2)
-    const u2 = Q.final2.uniforms
-    u2.u_image.value = F.combined2.texture
-    u2.u_mask.value = F.mask2.texture
-    u2.u_time.value = state.clock.elapsedTime * speed + frame
-    u2.u_aspect.value = size.width / size.height
-    u2.u_resolution.value.copy(u.u_resolution.value)
-    pass(Q.final2, F.out2)
-    Q.composite.uniforms.a.value = F.out1.texture
-    Q.composite.uniforms.b.value = F.out2.texture
-    pass(Q.composite, out)
+    u.u_resolution.value.set(size.width * dpr, size.height * dpr)
+    pass(Q.final, captureOn.current ? shot : null)
   }, 1)
 
   return (
@@ -807,10 +451,10 @@ export function PaperCube({ version: V, params, spin, spinSpeed = 0.35, auto = f
       {/* the mask scene: never rendered by R3F, only by the manual passes above */}
       <scene ref={maskScene}>
         <group ref={root} rotation={[0.5, -0.7, 0]}>
-          <RubikMask ref={rubik} gap={V.rubikGap} rounded={V.rubikRound} material={Q.face} auto={auto} autoInterval={autoInterval} combo={combo} />
-          {/* the un-turned cube's shape, layer 1 only: the still ascii outline measures from this */}
+          <RubikMask ref={rubik} gap={CUBE.gap} rounded={CUBE.round} material={Q.face} auto={auto} autoInterval={autoInterval} combo={combo} />
+          {/* the un-turned cube's shape, layer 1 only: the ascii outline measures from this */}
           <mesh layers-mask={2} material={Q.face}>
-            <boxGeometry args={[3 * V.rubikGap, 3 * V.rubikGap, 3 * V.rubikGap]} />
+            <boxGeometry args={[3 * CUBE.gap, 3 * CUBE.gap, 3 * CUBE.gap]} />
           </mesh>
         </group>
       </scene>

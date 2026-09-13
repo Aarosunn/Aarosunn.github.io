@@ -1,6 +1,6 @@
 /**
- * A Rubik's cube for the mask scene of PaperCube: 27 cubies sharing one mask material, quarter-turn
- * layer animation (pivot-attach quarter turns), integrity-checkable positions.
+ * A Rubik's cube for the mask scene of PaperCube: 27 rounded cubies sharing one mask material, quarter-turn layer
+ * animation (pivot-attach quarter turns), positions snapped after every turn so error never accumulates.
  */
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import * as THREE from 'three'
@@ -22,7 +22,7 @@ export const parseAlg = (alg: string): Move[] =>
       const [axis, layer, d] = FACE[t[0]]
       return { axis, layer, dir: (t.includes("'") ? -d : d) as 1 | -1, quarters: t.includes('2') ? 2 : 1 }
     })
-/** the famous ones, keys j k l on the site and in the lab */
+/** the famous ones: keys j k l on the home page */
 export const ALGS: Record<string, string> = {
   'T perm': "R U R' U' R' F R2 U' R' U' R U R' F'",
   'U perm': "R U' R U R U R U' R' U' R2",
@@ -32,18 +32,7 @@ export type RubikHandle = {
   turn: (axis?: Axis, layer?: -1 | 0 | 1, dir?: 1 | -1) => Promise<void>
   /** an algorithm in standard notation (or moves) at speedcubing pace, the cube locked for its whole run */
   run: (alg: string | Move[], duration?: number) => Promise<void>
-  /** logical state (slot + orientation per cubie) as a string, for identity checks */
-  state: () => string
-  positions: () => number[][]
-  /** largest deviation of any cubie's rotation matrix element from {-1, 0, 1} (0 = every cubie sits on an exact quarter turn) */
-  orientationError: () => number
-  /** largest distance between a cubie mesh and its grid slot (parent must be the root, not the pivot) */
-  placementError: () => number
-  /** debug: per-cubie logical slot, mesh position, parent ok */
-  dump: () => { pos: number[]; mesh: number[]; parentOk: boolean }[]
   busy: () => boolean
-  /** the cubies' spacing as a multiplier on `gap` (1 = as built, 1/gap = touching); applied at once when no turn is running */
-  spacing: (m: number) => void
 }
 type Cubie = { mesh: THREE.Mesh; pos: THREE.Vector3 }
 /** turn feel: a layer under a finger flick is the step response of an underdamped second-order system: no velocity
@@ -60,7 +49,7 @@ const response = (zeta: number, w: number, duration: number, recoil: number): Fe
   return { duration, f, peak, recoil }
 }
 /** deck / idle turns: 0.5 s, 1.2° overshoot; algorithms: 0.18 s (~5 turns a second), 0.4°;
- *  screen: the section transitions' cube (CubeScreen), a speedcuber's hands: 0.15 s a turn, a smaller recoil */
+ *  screen: the section page's cube, a speedcuber's hands: 0.15 s a turn */
 export const FEEL = { turn: response(0.78, 7, 0.5, 0.018), fast: response(0.85, 8, 0.18, 0.008), screen: response(0.86, 9, 0.15, 0.004) }
 const AXES: Axis[] = ['x', 'y', 'z']
 // snap a cubie onto the nearest exact quarter-turn orientation by rounding its rotation matrix, so
@@ -71,23 +60,16 @@ const snapMesh = (m: THREE.Mesh) => {
   for (let i = 0; i < 16; i++) e[i] = Math.round(e[i])
   m.quaternion.setFromRotationMatrix(r)
 }
-const orientationError = (m: THREE.Mesh) => {
-  const e = new THREE.Matrix4().makeRotationFromQuaternion(m.quaternion).elements
-  let worst = 0
-  for (let i = 0; i < 12; i++) worst = Math.max(worst, Math.abs(e[i] - Math.round(e[i])))
-  return worst
-}
 
 /** combo: the chance an idle turn is instead a burst of two or three quick turns (a speedcuber's fingers) */
-export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.Material; auto: boolean; autoInterval?: number; combo?: number; rounded?: number; onTurn?: () => void }>(
-  function RubikMask({ gap, material, auto, autoInterval = 900, combo = 0, rounded = 0, onTurn }, ref) {
+export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.Material; auto: boolean; autoInterval?: number; combo?: number; rounded: number }>(
+  function RubikMask({ gap, material, auto, autoInterval = 900, combo = 0, rounded }, ref) {
     const root = useRef<THREE.Group>(null!)
     const pivot = useRef<THREE.Group>(null!)
     const cubies = useRef<Cubie[]>([])
     const busy = useRef(false)
     const alive = useRef(true)
     const pending = useRef<(() => void) | null>(null)
-    const spacing = useRef(1)
     const tween = useRef<gsap.core.Tween | null>(null)
     // a tween still in flight when we unmount must not touch dead refs, and its promise must still settle
     useEffect(() => {
@@ -159,19 +141,18 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
               slice.forEach((c) => {
                 root.current.attach(c.mesh)
                 c.pos.applyAxisAngle(rot, angle).round()
-                c.mesh.position.copy(c.pos).multiplyScalar(gap * spacing.current)
+                c.mesh.position.copy(c.pos).multiplyScalar(gap)
                 snapMesh(c.mesh)
                 c.mesh.updateMatrix()
                 c.mesh.updateMatrixWorld(true)
               })
               pending.current = null
-              onTurn?.()
               res()
             },
           })
         })
       },
-      [gap, onTurn],
+      [gap],
     )
     const turn = useMemo<RubikHandle['turn']>(
       () => (axis, layer, dir) => {
@@ -202,22 +183,7 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
       [turnOne],
     )
 
-    useImperativeHandle(
-      ref,
-      () => ({
-        turn,
-        run,
-        state: () => JSON.stringify(cubies.current.map((c) => [...c.pos.toArray(), ...new THREE.Matrix4().makeRotationFromQuaternion(c.mesh.quaternion).elements.slice(0, 11).map(Math.round)])),
-        positions: () => cubies.current.map((c) => c.pos.toArray()),
-        orientationError: () => Math.max(0, ...cubies.current.map((c) => orientationError(c.mesh))),
-        dump: () => cubies.current.map((c) => ({ pos: c.pos.toArray(), mesh: c.mesh.position.toArray().map((n) => +n.toFixed(3)), parentOk: c.mesh.parent === root.current })),
-        placementError: () =>
-          Math.max(0, ...cubies.current.map((c) => (c.mesh.parent === root.current ? c.mesh.position.distanceTo(c.pos.clone().multiplyScalar(gap)) : 9))),
-        busy: () => busy.current,
-        spacing: (m) => { spacing.current = m; if (!busy.current) cubies.current.forEach((c) => { if (c.mesh.parent === root.current) c.mesh.position.copy(c.pos).multiplyScalar(gap * m) }) },
-      }),
-      [turn, run, gap],
-    )
+    useImperativeHandle(ref, () => ({ turn, run, busy: () => busy.current }), [turn, run])
 
     useEffect(() => {
       if (!auto) return
@@ -247,28 +213,9 @@ export const RubikMask = forwardRef<RubikHandle, { gap: number; material: THREE.
     return (
       <group ref={root}>
         <group ref={pivot} />
-        {cells.map((p, i) =>
-          rounded > 0 ? (
-            <RoundedBox
-              key={i}
-              args={[1, 1, 1]}
-              radius={rounded}
-              smoothness={3}
-              position={[p.x * gap, p.y * gap, p.z * gap]}
-              material={material}
-              ref={(m: THREE.Mesh | null) => track(i, m)}
-            />
-          ) : (
-            <mesh
-              key={i}
-              position={[p.x * gap, p.y * gap, p.z * gap]}
-              material={material}
-              ref={(m) => track(i, m)}
-            >
-              <boxGeometry args={[1, 1, 1]} />
-            </mesh>
-          ),
-        )}
+        {cells.map((p, i) => (
+          <RoundedBox key={i} args={[1, 1, 1]} radius={rounded} smoothness={3} position={[p.x * gap, p.y * gap, p.z * gap]} material={material} ref={(m: THREE.Mesh | null) => track(i, m)} />
+        ))}
       </group>
     )
   },
