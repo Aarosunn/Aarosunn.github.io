@@ -1,8 +1,8 @@
-# Build the site and publish it to GitHub Pages on every push to master.
+# Build the site and publish it to GitHub Pages on every push to main.
 name: pages
 on:
   push:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
