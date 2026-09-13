@@ -38,6 +38,8 @@ const WAKE = 0.6
 /** the florals' canvas is GROUP_OVER times taller than its layout footprint (`--fh` in styles.css) and the camera that much
  *  farther, so the flowers keep their size with headroom above and below */
 const GROUP_OVER = 1.5
+/** the home page lists at most this many of a section's projects, then an ellipsis (the section itself has them all) */
+const LIST_CAP = 7
 /** a double click or double tap on the cube runs the next of the famous algorithms at speedcubing pace */
 const ALG_CYCLE = ['T perm', 'U perm', 'Sune']
 const DOUBLE_TAP = 350
@@ -275,7 +277,7 @@ export function Site() {
             <p>{s.blurb}</p>
             <ul>
               {s.notes?.map((n) => <li key={n} className="note">{n}</li>)}
-              {projectsOf(s.id).map((p) => {
+              {projectsOf(s.id).slice(0, LIST_CAP).map((p) => {
                 const openIt = (e: React.SyntheticEvent) => { e.stopPropagation(); setActive(i); openProject(p) }
                 return (
                   <li key={p.title} role="button" tabIndex={0} onClick={openIt} onKeyDown={(e) => e.key === 'Enter' && openIt(e)}>
@@ -283,6 +285,7 @@ export function Site() {
                   </li>
                 )
               })}
+              {projectsOf(s.id).length > LIST_CAP && <li className="more" title="the rest are inside">…</li>}
             </ul>
           </section>
         ))}
