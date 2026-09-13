@@ -178,6 +178,7 @@ button:focus-visible {
 }
 .sec ul {
   list-style: none;
+  padding: 0; /* flush with the text above, the bullet at the edge */
   display: grid;
   gap: 3px;
   color: var(--text);
