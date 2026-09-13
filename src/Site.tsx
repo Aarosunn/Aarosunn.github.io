@@ -40,8 +40,8 @@ const WAKE = 0.6
 /** the florals' canvas is GROUP_OVER times taller than its layout footprint (`--fh` in styles.css) and the camera that much
  *  farther, so the flowers keep their size with headroom above and below */
 const GROUP_OVER = 1.5
-/** the GitHub and LinkedIn marks either side of the deck (the lab's v1 pillow at 96, Aaron's pick) */
-const ICON_PX = 96
+/** the GitHub and LinkedIn marks either side of the deck (the lab's v1 pillow, 72 at Aaron's ask) */
+const ICON_PX = 72
 /** the home page lists at most this many of a section's projects, then an ellipsis (the section itself has them all) */
 const LIST_CAP = 7
 /** a double click or double tap on the cube runs the next of the famous algorithms at speedcubing pace */
