@@ -32,13 +32,13 @@ export type Project = {
 
 export const SITE = {
   name: 'aarcube',
-  intro: 'Aaron. Engineer of small machines and large gradients.',
+  intro: 'Aaron Sun',
   /** the About corner's portrait: an ascii bust for now, a webcam one day */
   portrait: true,
 }
 
 export const SECTIONS: Section[] = [
-  { id: 'about', title: 'About', blurb: 'Computer engineering at Michigan. Silicon to screens, one build at a time.', notes: ['currently: this site, a cube that is also a menu', 'reading: signals, shaders, synth design'] },
+  { id: 'about', title: 'About', blurb: 'Undergraduate Computer Engineering student at the University of Michigan enthralled by anything and everything in tech, whether that\u2019s with full-stack, AI/ML, hardware, AR, BCIs, computational chemistry, or quantum computing.' },
   { id: 'code', title: 'Code', blurb: 'Tools, systems and experiments that ship.' },
   { id: 'hardware', title: 'Hardware', blurb: 'Boards, firmware and the signals between them.' },
   { id: 'creatives', title: 'Creatives', blurb: 'Edits, motion and sound. The page will one day cut to music.' },
