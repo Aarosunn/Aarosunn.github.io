@@ -22,6 +22,6 @@ export const SITE_TRANSITIONS: SiteVersion[] = [
   { name: 's3', flight: 'v5', join: 'stretch', page: 'solid', grain: false, settle: 'solid', weldIn: true, note: 's2, then the laser weld closes the cube\'s seams and the liquid settles on the cube\'s dark mint after one last sweep' },
   // s4 (2026-09-12, replacing the frozen shot, "I like nothing about s4"): s2's arrival, then the liquid fades to a faint live layer
   // over the site's own dark ground (the aura's glows through it), its pale areas tinted to the mint so they dim to teal rather than grey, the seams narrow, tiles sample only their plates (no seam glints)
-  { name: 's4', flight: 'v5', join: 'stretch', page: 'solid', grain: false, settle: 'none', ghost: { alpha: 0.15, tint: '#9de8d4', gap: 0.045 }, note: 's2, then the live liquid fades to a faint layer over the site\'s dark ground and the seams narrow' },
+  { name: 's4', flight: 'v5', join: 'stretch', page: 'solid', grain: false, settle: 'none', ghost: { alpha: 0, tint: '#9de8d4', gap: 0 }, note: 's2, then the liquid fades out and the seams close: the page is the site\'s own dark ground' },
 ]
 export const SITE_TRANSITION_OF = (name: string) => SITE_TRANSITIONS.find((v) => v.name === name)

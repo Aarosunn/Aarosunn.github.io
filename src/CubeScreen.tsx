@@ -172,7 +172,8 @@ export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: strin
   const state = useRef({ cube: solvedCube(blank), busy: false, depth: cw, project: blank ? -1 : 0, landed: false })
   const groups = useRef<THREE.Group[]>([])
   const seams = useRef<THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>[]>([])
-  const body = useMemo(() => new THREE.MeshBasicMaterial({ color: '#0b0e13' }), [])
+  // the cubies' bodies: in the liquid look the page's own ground, so fully faded tiles (Site s4) leave nothing of the cube
+  const body = useMemo(() => new THREE.MeshBasicMaterial({ color: liquid ? (colors.bg === 'transparent' ? sc.bg : colors.bg) : '#0b0e13' }), [liquid, colors.bg, sc.bg])
   /** the cubies as objects for the current state and depth (depth = the coming turn's axis extent) */
   const build = (depth: number) => {
     const g = root.current
