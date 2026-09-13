@@ -12,7 +12,8 @@ import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import gsap from 'gsap'
 import { PaperCube, type FlyHandle } from './PaperCube'
-import { ScreenCube, type ScreenHandle } from './ScreenCube'
+import { EDGE, ScreenCube, type ScreenHandle } from './ScreenCube'
+import type { Rect } from './page'
 import { ALGS, type RubikHandle } from './RubikMask'
 import { XrayFlower3D } from './XrayFlower3D'
 import { AsciiPortrait } from './Ascii'
@@ -58,6 +59,7 @@ export function Site() {
   const [section, setSection] = useState<number | null>(null)
   const [start, setStart] = useState(0) // which of the section's projects the page opens on
   const [pageIx, setPageIx] = useState(0) // which of `projects` is on the front (from `start`, then each next)
+  const [rects, setRects] = useState<Record<number, Rect[]>>({}) // where each page drew its pictures, for the links laid over them
   // one array per section: a fresh array each render would rebuild the screen cube's textures and reset it mid-trip
   const projects = useMemo(() => { if (section === null) return PROJECTS; const l = projectsOf(SECTIONS[section].id); return [...l.slice(start), ...l.slice(0, start)] }, [section, start])
   const [flying, setFlying] = useState(false)
@@ -105,6 +107,7 @@ export function Site() {
     setActive(i)
     setStart(at)
     setPageIx(0)
+    setRects({})
     setSection(i)
     setFlying(true)
     setHidden(true)
@@ -275,12 +278,17 @@ export function Site() {
       <Canvas dpr={[1, 1.5]} camera={{ position: [0, 0, CUBE.camZ], fov: FOV }} gl={{ antialias: true, powerPreference: 'high-performance' }}>
         <PaperCube size={narrow ? 768 : CUBE.size} scale={narrow ? LIQUID.scale * 0.53 : LIQUID.scale} spin={!reduced && !still} spinSpeed={0.12} auto={!reduced && !away} autoInterval={3600} combo={0.35} rubik={rubik} fly={fly} />
         {/* the section page: the screen cube drawn in this same canvas, its tiles sampling the shader cube's captured image */}
-        {section !== null && fly.current && <ScreenCube key={section} ref={grid} projects={projects} liquid={fly.current.shot} />}
+        {section !== null && fly.current && <ScreenCube key={section} ref={grid} projects={projects} liquid={fly.current.shot} onRects={(ix, r) => setRects((m) => ({ ...m, [ix]: r }))} />}
       </Canvas>
       {section !== null && (
         <div className="section-page" ref={overlay}>
           <button className="wordmark home" onClick={home} aria-label="home">{SITE.name}</button>
           {projects[pageIx]?.link && !flying && <a className="page-link" href={projects[pageIx].link.href} target="_blank" rel="noreferrer">{projects[pageIx].link.label} ↗</a>}
+          {/* the pictures of a linked page are the link too: an anchor over each one (the page is scaled up by EDGE about its centre) */}
+          {projects[pageIx]?.link && !flying && (rects[pageIx] ?? []).map((r, k) => {
+            const cx = window.innerWidth / 2, cy = window.innerHeight / 2
+            return <a key={k} className="page-hot" href={projects[pageIx].link!.href} target="_blank" rel="noreferrer" aria-label={projects[pageIx].link!.label} style={{ left: cx + (r.x - cx) * EDGE, top: cy + (r.y - cy) * EDGE, width: r.w * EDGE, height: r.h * EDGE }} />
+          })}
           <div className="page-hint"><span>{SECTIONS[section].title.toLowerCase()}</span><button onClick={nextProject}>next (n)</button><button onClick={home}>home (esc)</button></div>
         </div>
       )}

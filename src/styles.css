@@ -405,6 +405,9 @@ body:has(.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -
   animation: rise 0.6s var(--ease) 0.3s both;
 }
 .page-link:hover { color: var(--accent); }
+/* an invisible anchor over a picture on a linked page; a hairline in the accent on hover */
+.page-hot { position: fixed; z-index: 2; pointer-events: auto; border-radius: 4.5%; cursor: pointer; }
+.page-hot:hover { box-shadow: 0 0 0 1px var(--accent); }
 .page-hint {
   position: fixed;
   right: 40px;

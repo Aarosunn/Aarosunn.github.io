@@ -13,7 +13,7 @@ import * as THREE from 'three'
 import gsap from 'gsap'
 import type { Project } from './content'
 import { FEEL } from './RubikMask'
-import { pageTexture } from './page'
+import { pageTexture, type Rect } from './page'
 import { THEME } from './theme'
 
 export type ScreenHandle = {
@@ -43,7 +43,7 @@ const PLATES = 0.1
 const PLATE_GAP = 0.08
 const ROUND = 0.08
 const ROUND_INNER = 0.022
-const EDGE = 1 / (1 - PLATE_GAP / 3)
+export const EDGE = 1 / (1 - PLATE_GAP / 3)
 
 const VERT = /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`
 const FRAG = /* glsl */ `
@@ -104,7 +104,7 @@ function turn(cube: Cubie[], axis: 'x' | 'y', layer: number, dir: 1 | -1) {
   })
 }
 
-export const ScreenCube = forwardRef<ScreenHandle, { projects: Project[]; liquid: THREE.Texture }>(function ScreenCube({ projects, liquid }, ref) {
+export const ScreenCube = forwardRef<ScreenHandle, { projects: Project[]; liquid: THREE.Texture; onRects?: (ix: number, rects: Rect[]) => void }>(function ScreenCube({ projects, liquid, onRects }, ref) {
   const { size, gl } = useThree()
   const W = size.width, H = size.height
   const cw = W / 3, ch = H / 3
@@ -126,7 +126,10 @@ export const ScreenCube = forwardRef<ScreenHandle, { projects: Project[]; liquid
     gl.render(scene.current, camera)
     gl.setClearColor(prev, prevA); gl.autoClear = auto
   }, 2)
-  const textures = useMemo(() => projects.map((p) => pageTexture(p, W, H)), [W, H, projects]) // pictures repaint their texture as they load
+  const rectsRef = useRef(onRects)
+  rectsRef.current = onRects
+  // pictures repaint their texture as they load, and report where they went
+  const textures = useMemo(() => projects.map((p, i) => pageTexture(p, W, H, (r) => rectsRef.current?.(i, r))), [W, H, projects])
   useEffect(() => () => textures.forEach((t) => t.dispose()), [textures])
   const root = useRef<THREE.Group>(null!)
   const state = useRef({ cube: solvedCube(), busy: false, depth: cw, project: 0 })

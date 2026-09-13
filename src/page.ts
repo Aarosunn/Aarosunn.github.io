@@ -14,8 +14,11 @@ const load = (src: string) => {
   return p
 }
 
-/** the texture paints at once with the text; when the project's pictures have loaded it paints again and calls `onLoad` */
-export function pageTexture(p: Project, w: number, h: number, onLoad?: () => void) {
+export type Rect = { x: number; y: number; w: number; h: number }
+
+/** the texture paints at once with the text; when the project's pictures have loaded it paints again and reports where each
+ *  picture went (css px on the page), so a link can be laid over it */
+export function pageTexture(p: Project, w: number, h: number, onRects?: (rects: Rect[]) => void) {
   const c = document.createElement('canvas')
   // 2× on a retina screen, 1× otherwise: a page texture is the whole viewport, so this is most of the GPU memory used
   const s = Math.min(2, Math.max(1, Math.round(window.devicePixelRatio || 1)))
@@ -25,11 +28,11 @@ export function pageTexture(p: Project, w: number, h: number, onLoad?: () => voi
   const tex = new THREE.CanvasTexture(c)
   tex.colorSpace = THREE.SRGBColorSpace
   tex.minFilter = THREE.LinearFilter
-  if (p.images?.length) Promise.all(p.images.map(load)).then((ims) => { paintPage(c, p, w, h, ims); tex.needsUpdate = true; onLoad?.() }).catch(() => {})
+  if (p.images?.length) Promise.all(p.images.map(load)).then((ims) => { const rects = paintPage(c, p, w, h, ims); tex.needsUpdate = true; onRects?.(rects) }).catch(() => {})
   return tex
 }
 
-export function paintPage(c: HTMLCanvasElement, p: Project, w: number, h: number, images: HTMLImageElement[]) {
+export function paintPage(c: HTMLCanvasElement, p: Project, w: number, h: number, images: HTMLImageElement[]): Rect[] {
   const s = c.width / w
   const g = c.getContext('2d')!
   g.setTransform(s, 0, 0, s, 0, 0)
@@ -59,7 +62,8 @@ export function paintPage(c: HTMLCanvasElement, p: Project, w: number, h: number
     if (g.measureText(q).width > maxW) { g.fillText(line, left, y); line = wd; y += body * 1.5 } else line = q
   }
   g.fillText(line, left, y)
-  if (!withPics) return
+  const rects: Rect[] = []
+  if (!withPics) return rects
   // the pictures, in justified rows: every picture in a row is scaled to the row's height so the row fills the width exactly
   // (like a gallery wall), three to a row on a wide page, two on a tall one; if the rows outgrow the area they shrink together
   // the tall page keeps clear of the hint buttons along the bottom (they sit in the last 9 %)
@@ -89,8 +93,10 @@ export function paintPage(c: HTMLCanvasElement, p: Project, w: number, h: number
       g.strokeStyle = 'rgba(242, 245, 247, 0.16)'
       g.lineWidth = 1
       g.beginPath(); g.roundRect(rx + 0.5, ry + 0.5, dw - 1, rh - 1, rad); g.stroke()
+      rects.push({ x: rx, y: ry, w: dw, h: rh })
       rx += dw + gap
     })
     ry += rh + gap
   })
+  return rects
 }
