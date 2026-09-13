@@ -198,8 +198,9 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     const g = grid.current, gh = sv.ghost
     if (!g || !gh) return Promise.resolve()
     const a = { v: on ? 0 : 1 }, white = new THREE.Color(1, 1, 1), mint = new THREE.Color(gh.tint), c = new THREE.Color()
-    gsap.to(a, { v: on ? 1 : 0, duration, ease: 'power2.inOut', onUpdate: () => g.setAlpha(1 + (gh.alpha - 1) * a.v, c.copy(white).lerp(mint, a.v)) })
-    return g.seams(from, on ? gh.gap : LANDED_SEAM, duration)
+    const fade = new Promise<void>((res) => gsap.to(a, { v: on ? 1 : 0, duration, ease: 'power2.inOut', onUpdate: () => g.setAlpha(1 + (gh.alpha - 1) * a.v, c.copy(white).lerp(mint, a.v)), onComplete: res }))
+    // s6: the seams live inside the tiles (the paper's own), the tiles always touch
+    return gh.plates !== undefined ? fade : g.seams(from, on ? gh.gap : LANDED_SEAM, duration)
   }
   const gh0 = () => sv.ghost?.gap ?? 0
   const waking = useRef(false)
@@ -360,7 +361,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
       <Canvas key={version} dpr={[1, 1.5]} camera={{ position: [0, 0, PV.camZ], fov: 30 }} gl={{ antialias: true }}>
         <PaperCube version={PV} params={params} spin={!reduced && !still} spinSpeed={0.12} auto={!reduced && !away} autoInterval={3600} combo={0.35} rubik={rubik} fly={fly} />
         {/* s2's page: the screen cube drawn in this same canvas, its tiles sampling the shader cube's captured image */}
-        {sv.join === 'stretch' && section !== null && fly.current && <ScreenCube key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} weld projects={projects} blank={false} look={sv.page} heroDraw={false} liquid={fly.current.shot} live={false} inset={sv.weldIn || sv.ghost ? LANDED_INSET : 0} />}
+        {sv.join === 'stretch' && section !== null && fly.current && <ScreenCube key={section} ref={grid} v={PAGE} scheme={scheme} recoil={false} weld projects={projects} blank={false} look={sv.page} heroDraw={false} liquid={fly.current.shot} live={false} inset={sv.ghost?.plates ?? (sv.weldIn || sv.ghost ? LANDED_INSET : 0)} corner={sv.ghost?.corner ?? 0} />}
       </Canvas>
       {/* the section page: the screen as a cube, faded in over the landing; the wordmark (or escape) flies home */}
       {section !== null && (
