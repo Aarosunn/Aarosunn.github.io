@@ -266,13 +266,18 @@ export function Site() {
   }
   /** the finished projects by section, for the unfinished panel's links */
   const finished = SECTIONS.map((s, i) => ({ s, i, done: projectsOf(s.id).filter(isDone) })).filter((x) => x.done.length)
-  /** the notice with its section's name as a link that flies there */
+  /** the notice with every named section or project as a link that flies there */
   const noticeParts = () => {
-    const sec = SECTIONS.findIndex((x) => x.id === SITE.noticeLink)
-    const name = sec >= 0 ? SECTIONS[sec].title : ''
-    const at = name ? SITE.notice.indexOf(name) : -1
-    if (at < 0) return SITE.notice
-    return <>{SITE.notice.slice(0, at)}<a href="#" onClick={(e) => { e.preventDefault(); go(sec) }}>{name}</a>{SITE.notice.slice(at + name.length)}</>
+    const names = Object.keys(SITE.noticeLinks).filter((n) => SITE.notice.includes(n))
+    if (!names.length) return SITE.notice
+    const parts = SITE.notice.split(new RegExp(`(${names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`))
+    return parts.map((t, k) => {
+      const l = SITE.noticeLinks[t]
+      if (!l) return t
+      const sec = SECTIONS.findIndex((x) => x.id === l.section)
+      const at = l.project ? Math.max(0, projectsOf(l.section).findIndex((p) => p.title === l.project)) : 0
+      return <a key={k} href="#" onClick={(e) => { e.preventDefault(); go(sec, at) }}>{t}</a>
+    })
   }
   const panelRight = open && (open.section === 'about' || open.section === 'creatives')
 

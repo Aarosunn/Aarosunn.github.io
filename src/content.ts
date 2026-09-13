@@ -40,9 +40,10 @@ export const SITE = {
   intro: 'Aaron Sun',
   /** the About corner's portrait: an ascii bust for now, a webcam one day */
   portrait: true,
-  /** a small notice on the home page (empty string = none); the section named in `noticeLink` is a link into it */
-  notice: 'Recently created, still moving in. Check out Creatives for my design portfolio.',
-  noticeLink: 'creatives' as SectionId,
+  /** a small notice on the home page (empty string = none); every name in `noticeLinks` that appears in it becomes a link:
+   *  a section flies into it, a project flies to its page */
+  notice: 'Recently created, still moving in. Check out Creatives for my design portfolio, and Electric Vehicle and Robot Tour under Hardware.',
+  noticeLinks: { Creatives: { section: 'creatives' }, 'Electric Vehicle': { section: 'hardware', project: 'Electric Vehicle' }, 'Robot Tour': { section: 'hardware', project: 'Robot Tour' } } as Record<string, { section: SectionId; project?: string }>,
   /** what an unfinished project says when clicked on the home page (the finished ones are listed under it as links) */
   unfinished: 'This page is not written up yet. The finished ones so far:',
   /** the two marks either side of the deck, in the cube's material */
@@ -80,8 +81,8 @@ export const PROJECTS: Project[] = [
   { section: 'code', title: 'Scioly+' },
   { section: 'code', title: 'Euchre' },
   { section: 'code', title: 'Gradient Descent Visualizer' },
-  { section: 'hardware', title: 'Robot Tour', images: ['/media/robot-tour.jpg'] },
   { section: 'hardware', title: 'Electric Vehicle', images: ['/media/electric-vehicle.jpg'] },
+  { section: 'hardware', title: 'Robot Tour', images: ['/media/robot-tour.jpg'] },
   { section: 'hardware', title: 'Traffic Light Controller', icon: 'verilog' },
   { section: 'hardware', title: 'Sequential Calculator', icon: 'verilog' },
   { section: 'creatives', title: 'Art', images: ['/media/portrait.jpg', '/media/scholastic1.jpg', '/media/oil.jpg', '/media/sculpture.jpg', '/media/sail.jpg', '/media/sketch.jpg'] },
