@@ -202,6 +202,7 @@ button:focus-visible {
 /* the right-hand corners sit at the right edge as blocks of one width, their text left-aligned with bullets on the left like the others */
 .sec-code { grid-area: 2 / 3; justify-self: end; align-self: start; margin-top: 6vh; width: min(300px, 100%); animation-delay: 0.6s; }
 .sec-hardware { grid-area: 3 / 3; justify-self: end; align-self: end; margin-bottom: 4vh; width: min(300px, 100%); animation-delay: 0.7s; }
+.sec-creatives { grid-area: 3 / 1; justify-self: start; align-self: end; margin-bottom: 4vh; animation-delay: 0.8s; }
 
 .portrait {
   display: inline-block;
