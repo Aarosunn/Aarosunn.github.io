@@ -11,7 +11,7 @@ export type Section = {
   title: string
   /** one line under the title on the home page */
   blurb: string
-  /** lines listed instead of projects (About has no projects) */
+  /** plain lines listed above the section's projects */
   notes?: string[]
 }
 
@@ -45,6 +45,14 @@ export const SECTIONS: Section[] = [
 ]
 
 export const PROJECTS: Project[] = [
+  // about: where Aaron has worked, newest first (titles first)
+  { section: 'about', title: 'Jaseci' },
+  { section: 'about', title: 'CLAWS' },
+  { section: 'about', title: 'Algoverse' },
+  { section: 'about', title: 'Thinkneuro' },
+  { section: 'about', title: 'ELISA Labs' },
+  { section: 'about', title: 'InspiritAI' },
+  { section: 'about', title: 'Shiga-Michigan Program' },
   // code, in Aaron's order (titles first; years, blurbs and links to come)
   { section: 'code', title: 'Conduit' },
   { section: 'code', title: 'Tokenizer in C' },
