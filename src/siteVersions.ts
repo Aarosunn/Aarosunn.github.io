@@ -18,6 +18,8 @@ export type SiteVersion = { name: string; flight: string; join: 'fade' | 'stretc
      *  inside its edges (the seams trimmed narrower), every plate drawn as a rounded rectangle of corner radius `round` (of a
      *  cell), and `bare`: the turns without the break and the weld (no seam lines, the gaps never open) */
     plates?: number; round?: number; bare?: boolean;
+    /** the black gap the tile shader draws between plates (fraction of a tile; with `plates` past the paper's rim it is the whole gap) */
+    plateGap?: number;
     /** the outer half-seams pushed off the viewport (the page scaled up by that much), and the text staying through a turn */
     noEdge?: boolean; textStays?: boolean }; note: string }
 
@@ -37,7 +39,9 @@ export const SITE_TRANSITIONS: SiteVersion[] = [
   // straight edges (still slightly round), but close the gaps slightly": s5 with the tiles touching and showing the paper's own
   // plates and seams (s2), the seams trimmed by sampling .03 of a cell inside; no gap tweens. Then "no more divided lines no
   // weld, also try making all edges slightly rounded": every plate a rounded rectangle, the turns bare. Then "I still see a border,
-  // also dont let text fade out": the plate mask a soft fall-off, the outer half-seams off the viewport, the text kept through the turn
-  { name: 's6', flight: 'v5', join: 'stretch', page: 'solid', grain: false, settle: 'none', ghost: { alpha: 0, tint: '#9de8d4', gap: 0, wake: true, plates: 0.03, round: 0.08, bare: true, noEdge: true, textStays: true }, note: 's5 with s2\'s plates in the tiles, the seams a little narrower, every plate rounded, turns without seam lines or weld' },
+  // also dont let text fade out": the plate mask a soft fall-off, the outer half-seams off the viewport, the text kept through the turn.
+  // Then "there literally is a faded border": the tiles sample only the bright plate (past the paper's seam and its blurred rim,
+  // .1 of a cell in) and the shader draws the whole gap itself, black and crisp, .08 of a tile
+  { name: 's6', flight: 'v5', join: 'stretch', page: 'solid', grain: false, settle: 'none', ghost: { alpha: 0, tint: '#9de8d4', gap: 0, wake: true, plates: 0.1, plateGap: 0.08, round: 0.08, bare: true, noEdge: true, textStays: true }, note: 's5 with s2\'s plates in the tiles, the seams a little narrower, every plate rounded, turns without seam lines or weld' },
 ]
 export const SITE_TRANSITION_OF = (name: string) => SITE_TRANSITIONS.find((v) => v.name === name)
