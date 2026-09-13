@@ -72,7 +72,8 @@ function Liquid({ path, box, look, hover }: { path: string; box: number; look: I
   const solved = useRef(false)
   useEffect(() => { solved.current = false }, [mask, look.field])
   const speed = useRef(look.speed)
-  useFrame((state) => {
+  const clock = useRef(0) // the liquid's own clock, advanced by dt × speed, so a speed change never jumps the phase
+  useFrame((_, dt) => {
     if (!solved.current) {
       Q.copy.uniforms.t.value = mask
       pass(Q.copy, R.a)
@@ -97,6 +98,7 @@ function Liquid({ path, box, look, hover }: { path: string; box: number; look: I
     }
     // hover eases the speed up and back
     speed.current += ((hover ? look.hoverSpeed : look.speed) - speed.current) * 0.08
+    clock.current += Math.min(dt, 0.05) * speed.current
     const u = Q.final.uniforms
     u.u_image.value = R.combined.texture
     u.u_mask.value = R.a.texture
@@ -104,7 +106,7 @@ function Liquid({ path, box, look, hover }: { path: string; box: number; look: I
     u.u_asciiMul.value = look.ascii ? 1 : 0
     u.u_asciiCell.value = CUBE.ascii.cell * gl.getPixelRatio() * 0.8
     u.u_scale.value = look.scale
-    u.u_time.value = state.clock.elapsedTime * speed.current
+    u.u_time.value = clock.current
     u.u_aspect.value = size.width / size.height
     u.u_resolution.value.set(size.width * gl.getPixelRatio(), size.height * gl.getPixelRatio())
     pass(Q.final, null)
