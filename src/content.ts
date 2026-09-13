@@ -39,9 +39,9 @@ export const SITE = {
 
 export const SECTIONS: Section[] = [
   { id: 'about', title: 'About', blurb: 'Undergraduate Computer Engineering student at the University of Michigan enthralled by anything and everything in tech, whether that\u2019s with full-stack, AI/ML, hardware, AR, BCIs, computational chemistry, or quantum computing.' },
-  { id: 'code', title: 'Code', blurb: 'Tools, systems and experiments that ship.' },
-  { id: 'hardware', title: 'Hardware', blurb: 'Boards, firmware and the signals between them.' },
-  { id: 'creatives', title: 'Creatives', blurb: 'Edits, motion and sound. The page will one day cut to music.' },
+  { id: 'code', title: 'Code', blurb: 'Projects I\u2019m working on.' },
+  { id: 'hardware', title: 'Hardware', blurb: 'Physical engineering projects.' },
+  { id: 'creatives', title: 'Creatives', blurb: 'Art pieces, designs and various other passions.' },
 ]
 
 export const PROJECTS: Project[] = [

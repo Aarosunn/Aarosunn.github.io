@@ -196,7 +196,9 @@ button:focus-visible {
   color: var(--bright);
   outline: none;
 }
-.sec-about { grid-area: 2 / 1; justify-self: start; align-self: start; margin-top: 6vh; animation-delay: 0.5s; }
+.sec-about { grid-area: 2 / 1; justify-self: start; align-self: start; margin-top: 6vh; animation-delay: 0.5s; max-width: 520px; }
+/* the About text runs wide under its title rather than stacking into a tall block */
+.sec-about p { max-width: 58ch; }
 .sec-code { grid-area: 2 / 3; justify-self: end; align-self: start; margin-top: 6vh; text-align: right; animation-delay: 0.6s; }
 .sec-hardware { grid-area: 3 / 3; justify-self: end; align-self: end; margin-bottom: 4vh; text-align: right; animation-delay: 0.7s; }
 .sec-creatives { grid-area: 3 / 1; justify-self: start; align-self: end; margin-bottom: 4vh; animation-delay: 0.8s; }
