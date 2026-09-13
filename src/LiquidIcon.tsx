@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { COMBINE_POISSON, FINAL_VERT, POISSON, QUAD_VERT, REDUCE_MAX, finalFragment, finalUniforms, frt, rt } from './PaperCube'
-import { CUBE, LIQUID } from './cube'
+import { CUBE } from './cube'
 
 export type IconLook = {
   name: string
