@@ -317,6 +317,12 @@ body:has(.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -
   margin-bottom: 12px;
 }
 .panel-meta { color: var(--mute); }
+/* the unfinished panel's list of finished pages: a section name, then its pages as links */
+.panel-links { list-style: none; padding: 0; display: grid; gap: 6px; margin-bottom: 4px; }
+.panel-links li { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.panel-links span { color: var(--mute); margin-right: 4px; }
+.panel-links a { color: var(--bright); text-decoration: none; border-bottom: 1px solid var(--accent); }
+.panel-links a:hover { color: var(--accent); }
 .panel-meta a { color: var(--text); text-decoration: none; border-bottom: 1px solid var(--line); }
 .panel-meta a:hover { color: var(--bright); border-color: var(--mute); }
 .panel-close {
@@ -386,6 +392,19 @@ body:has(.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -
   cursor: pointer;
   pointer-events: auto;
 }
+/* a project's link on its page: bottom left, the one thing on the page that is DOM */
+.page-link {
+  position: fixed;
+  left: 40px;
+  bottom: 28px;
+  z-index: 2;
+  pointer-events: auto;
+  color: var(--bright);
+  text-decoration: none;
+  border-bottom: 1px solid var(--accent);
+  animation: rise 0.6s var(--ease) 0.3s both;
+}
+.page-link:hover { color: var(--accent); }
 .page-hint {
   position: fixed;
   right: 40px;
@@ -435,6 +454,9 @@ body:has(.has-panel .panel-right) canvas { transform: translateX(clamp(-130px, -
     z-index: -1;
   }
   .notice { left: 16px; right: 16px; bottom: auto; top: 56px; max-width: none; }
+  .page-link { left: 16px; bottom: 64px; }
+  .page-hint { right: 16px; bottom: 20px; }
+  .section-page .home { left: 16px; }
   .panel, .panel-left, .panel-right {
     left: 16px;
     right: 16px;

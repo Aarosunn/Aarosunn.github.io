@@ -26,10 +26,13 @@ export type Project = {
   detail?: string
   /** what it is built with, shown on the detail panel */
   stack?: string
-  /** a link the detail panel offers */
+  /** a link shown on the project's page inside the section (the tiles are canvas, so it is a real anchor over them) */
   link?: { label: string; href: string }
   /** a small mark after the title on the home page: 'verilog' draws a square wave (there is no official Verilog logo) */
   icon?: 'verilog'
+  /** pictures for the page inside the section, paths under public/ (one fills the page's right side; up to six make a grid).
+   *  A project with pictures counts as finished: its title on the home page flies straight to its page */
+  images?: string[]
 }
 
 export const SITE = {
@@ -40,6 +43,8 @@ export const SITE = {
   /** a small notice on the home page (empty string = none); the section named in `noticeLink` is a link into it */
   notice: 'Recently created, still moving in. Check out Creatives for my design portfolio.',
   noticeLink: 'creatives' as SectionId,
+  /** what an unfinished project says when clicked on the home page (the finished ones are listed under it as links) */
+  unfinished: 'This page is not written up yet. The finished ones so far:',
 }
 
 export const SECTIONS: Section[] = [
@@ -72,14 +77,16 @@ export const PROJECTS: Project[] = [
   { section: 'code', title: 'Scioly+' },
   { section: 'code', title: 'Euchre' },
   { section: 'code', title: 'Gradient Descent Visualizer' },
-  { section: 'hardware', title: 'Electric Vehicle' },
+  { section: 'hardware', title: 'Robot Tour', images: ['/media/robot-tour.jpg'] },
+  { section: 'hardware', title: 'Electric Vehicle', images: ['/media/electric-vehicle.jpg'] },
   { section: 'hardware', title: 'Traffic Light Controller', icon: 'verilog' },
   { section: 'hardware', title: 'Sequential Calculator', icon: 'verilog' },
-  { section: 'hardware', title: 'Robot Tour' },
-  { section: 'creatives', title: 'Art' },
-  { section: 'creatives', title: 'Web Design' },
-  { section: 'creatives', title: 'Polestar89' },
+  { section: 'creatives', title: 'Art', images: ['/media/portrait.jpg', '/media/scholastic1.jpg', '/media/oil.jpg', '/media/sculpture.jpg', '/media/sail.jpg', '/media/sketch.jpg'] },
+  { section: 'creatives', title: 'Web Design', blurb: 'The Tau Epsilon Kappa site and its rush page.', link: { label: 'tauepsilonkappa.com/rush/FA27', href: 'https://tauepsilonkappa.com/rush/FA27/' }, images: ['/media/tek-rush.jpg'] },
+  { section: 'creatives', title: 'Polestar89', images: ['/media/polestar3.jpg', '/media/polestar1.jpg', '/media/polestar2.jpg', '/media/polestar4.jpg'] },
 ]
 
 /** the projects of one section, in the order written above */
 export const projectsOf = (id: SectionId) => PROJECTS.filter((p) => p.section === id)
+/** finished = has pictures or a link to show */
+export const isDone = (p: Project) => !!p.images?.length || !!p.link

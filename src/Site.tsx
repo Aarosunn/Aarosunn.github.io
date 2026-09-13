@@ -18,7 +18,7 @@ import { XrayFlower3D } from './XrayFlower3D'
 import { AsciiPortrait } from './Ascii'
 import { CUBE, LIQUID } from './cube'
 import { FLORAL } from './florals'
-import { PROJECTS, SECTIONS, SITE, projectsOf, type Project } from './content'
+import { PROJECTS, SECTIONS, SITE, isDone, projectsOf, type Project } from './content'
 
 const FOV = 30 // the mask camera's vertical fov
 /** the flight: whole turns about x and y (the cube ends face-on either way), its length and eases */
@@ -56,8 +56,10 @@ export function Site() {
   // the whole sequence's phase: 'out' while going or coming (nothing else may start), 'in' on the page, null at home
   const phase = useRef<'out' | 'in' | null>(null)
   const [section, setSection] = useState<number | null>(null)
+  const [start, setStart] = useState(0) // which of the section's projects the page opens on
+  const [pageIx, setPageIx] = useState(0) // which of `projects` is on the front (from `start`, then each next)
   // one array per section: a fresh array each render would rebuild the screen cube's textures and reset it mid-trip
-  const projects = useMemo(() => (section === null ? PROJECTS : projectsOf(SECTIONS[section].id)), [section])
+  const projects = useMemo(() => { if (section === null) return PROJECTS; const l = projectsOf(SECTIONS[section].id); return [...l.slice(start), ...l.slice(0, start)] }, [section, start])
   const [flying, setFlying] = useState(false)
   const away = flying || section !== null
   const [hidden, setHidden] = useState(false) // the page around the cube, faded out before take-off and back in on landing home
@@ -93,13 +95,16 @@ export function Site() {
     gsap.to(a, { v: on ? 0 : 1, duration, ease: 'power2.inOut', onUpdate: () => g.setAlpha(a.v), onComplete: res })
   })
 
-  const go = async (i: number) => {
+  /** fly into section i, its page opening on project `at` */
+  const go = async (i: number, at = 0) => {
     const h = fly.current
     if (!h || tl.current || phase.current) return
     phase.current = 'out'
     setOpen(null)
     setNotice(false)
     setActive(i)
+    setStart(at)
+    setPageIx(0)
     setSection(i)
     setFlying(true)
     setHidden(true)
@@ -156,6 +161,7 @@ export function Site() {
     h.sleep(false)
     await ghost(false, reduced ? 0.01 : WAKE)
     await g.next()
+    setPageIx((k) => (k + 1) % projects.length)
     await ghost(true, reduced ? 0.01 : WAKE)
     h.sleep(true)
     waking.current = false
@@ -173,7 +179,7 @@ export function Site() {
   }
   const nav = useRef({ go, home, next: nextProject })
   nav.current = { go, home, next: nextProject }
-  useEffect(() => { window.__aarNav = { go: (i) => nav.current.go(i), home: () => nav.current.home(), next: () => nav.current.next(), busy: () => phase.current === 'out' || waking.current || (grid.current?.busy() ?? false), section: () => section } }, [section])
+  useEffect(() => { window.__aarNav = { go: (i, at) => nav.current.go(i, at), home: () => nav.current.home(), next: () => nav.current.next(), busy: () => phase.current === 'out' || waking.current || (grid.current?.busy() ?? false), section: () => section } }, [section])
 
   // deck stepping: arrows / digits; every step turns one layer
   const step = (i: number) => {
@@ -245,7 +251,15 @@ export function Site() {
     }
   }, [])
 
-  const openProject = (p: Project) => { setOpen(p); rubik.current?.turn() }
+  /** a finished project flies straight to its page; an unfinished one opens the panel pointing at the finished ones */
+  const openProject = (p: Project) => {
+    const sec = SECTIONS.findIndex((x) => x.id === p.section)
+    if (isDone(p)) return go(sec, projectsOf(p.section).indexOf(p))
+    setOpen(p)
+    rubik.current?.turn()
+  }
+  /** the finished projects by section, for the unfinished panel's links */
+  const finished = SECTIONS.map((s, i) => ({ s, i, done: projectsOf(s.id).filter(isDone) })).filter((x) => x.done.length)
   /** the notice with its section's name as a link that flies there */
   const noticeParts = () => {
     const sec = SECTIONS.findIndex((x) => x.id === SITE.noticeLink)
@@ -266,6 +280,7 @@ export function Site() {
       {section !== null && (
         <div className="section-page" ref={overlay}>
           <button className="wordmark home" onClick={home} aria-label="home">{SITE.name}</button>
+          {projects[pageIx]?.link && !flying && <a className="page-link" href={projects[pageIx].link.href} target="_blank" rel="noreferrer">{projects[pageIx].link.label} ↗</a>}
           <div className="page-hint"><span>{SECTIONS[section].title.toLowerCase()}</span><button onClick={nextProject}>next (n)</button><button onClick={home}>home (esc)</button></div>
         </div>
       )}
@@ -302,16 +317,17 @@ export function Site() {
         ))}
         {open && (
           <aside className={`panel ${panelRight ? 'panel-right' : 'panel-left'}`}>
-            <span className="panel-k">{open.year ? `${open.section} · ${open.year}` : open.section}</span>
-            <h3>{open.title}</h3>
-            {(open.detail ?? open.blurb) && <p>{open.detail ?? open.blurb}</p>}
-            {(open.stack || open.link) && (
-              <p className="panel-meta">
-                {open.stack}
-                {open.stack && open.link && ' · '}
-                {open.link && <a href={open.link.href} target="_blank" rel="noreferrer">{open.link.label}</a>}
-              </p>
-            )}
+            <span className="panel-k">{open.section} · {open.title}</span>
+            <h3>Still moving in</h3>
+            <p>{open.detail ?? SITE.unfinished}</p>
+            <ul className="panel-links">
+              {finished.map(({ s, i, done }) => (
+                <li key={s.id}>
+                  <span>{s.title}</span>
+                  {done.map((p) => <a key={p.title} href="#" onClick={(e) => { e.preventDefault(); go(i, projectsOf(s.id).indexOf(p)) }}>{p.title}</a>)}
+                </li>
+              ))}
+            </ul>
             <button className="panel-close" onClick={() => setOpen(null)}>close</button>
           </aside>
         )}
@@ -349,6 +365,6 @@ function Wave() {
 declare global {
   interface Window {
     /** the verify scripts' hook: fly to a section, home, next project, busy while a flight or a turn runs */
-    __aarNav: { go: (i: number) => void; home: () => void; next: () => Promise<void>; busy: () => boolean; section: () => number | null }
+    __aarNav: { go: (i: number, at?: number) => void; home: () => void; next: () => Promise<void>; busy: () => boolean; section: () => number | null }
   }
 }

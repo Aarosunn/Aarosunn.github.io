@@ -126,7 +126,7 @@ export const ScreenCube = forwardRef<ScreenHandle, { projects: Project[]; liquid
     gl.render(scene.current, camera)
     gl.setClearColor(prev, prevA); gl.autoClear = auto
   }, 2)
-  const textures = useMemo(() => projects.map((p) => pageTexture(p, W, H)), [W, H, projects])
+  const textures = useMemo(() => projects.map((p) => pageTexture(p, W, H)), [W, H, projects]) // pictures repaint their texture as they load
   useEffect(() => () => textures.forEach((t) => t.dispose()), [textures])
   const root = useRef<THREE.Group>(null!)
   const state = useRef({ cube: solvedCube(), busy: false, depth: cw, project: 0 })
