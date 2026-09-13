@@ -112,7 +112,8 @@ button:focus-visible {
   pointer-events: none;
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(320px, 40vw) minmax(220px, 1fr);
-  grid-template-rows: auto 1fr 1fr auto;
+  /* the middle rows never grow past their share: a long list overflows toward the centre, the base row stays put */
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto;
   padding: 28px 40px 24px;
   row-gap: 12px;
   transition: opacity 1s var(--ease);
@@ -221,8 +222,8 @@ button:focus-visible {
   animation: none;
   transition: none;
 }
-/* a short window (a laptop with browser chrome): the portrait is what keeps the left column from shrinking */
-@media (max-height: 840px) { .portrait { display: none; } }
+/* under 1000 px tall the portrait would push About's list into Creatives; it is a placeholder until the webcam version */
+@media (max-height: 1000px) { .portrait { display: none; } }
 
 /* the base row: the florals, then the deck */
 .site-base {
