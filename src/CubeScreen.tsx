@@ -26,7 +26,7 @@ export type CubeHandle = ScreenHandle & { clear: () => Promise<void>; stretch: (
   /** the landed cube's seams as real gaps: `weldIn` lights them and runs the branching laser weld while they close; `openGaps` opens them again (scar lit, no laser) */
   weldIn: (duration: number) => Promise<void>; openGaps: (duration: number) => Promise<void>
   /** the liquid's opacity over the page's ground (Site s4: a faint layer), and the seams tweened between two widths (fractions of a tile) */
-  setAlpha: (a: number, tint?: THREE.ColorRepresentation) => void; seams: (from: number, to: number, duration: number) => Promise<void> }
+  setAlpha: (a: number, tint?: THREE.ColorRepresentation) => void; seams: (from: number | null, to: number, duration: number) => Promise<void> }
 
 /** a sticker in the liquid look: the cube's captured image under the page's text */
 const LIQUID_VERT = /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`
@@ -206,11 +206,11 @@ export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: strin
     })
     setGap(gapNow.current)
   }
-  const gapNow = useRef(0)
+  const gapNow = useRef(0), gxNow = useRef(0)
   /** the seams: cubies shrink toward their centres, the seam quads light the gaps on the front plane */
   /** gap: the vertical seams' width (px in root units); gx: the horizontal one (defaults to the same) */
   const setGap = (gap: number, gx = gap) => {
-    gapNow.current = gap
+    gapNow.current = gap; gxNow.current = gx
     groups.current.forEach((grp) => grp.scale.set((cw - gx) / cw, (ch - gap) / ch, 1))
     seams.current.forEach((s, k) => {
       const n = (k % 2) + 1
@@ -389,7 +389,7 @@ export const ScreenCube = forwardRef<CubeHandle, { v: CubeVersion; scheme: strin
       setLive: (on) => { liveRef.current = on },
       setAlpha: (a, tint) => { liquidU.current.alpha = a; if (tint !== undefined) liquidU.current.tint.set(tint); liquidMats.current.forEach((m) => { m.uniforms.uAlpha.value = a }) },
       seams: (from, to, duration) => new Promise<void>((resolve) => {
-        const a = landedGaps(from), b = landedGaps(to)
+        const a = from === null ? { gx: gxNow.current, gy: gapNow.current } : landedGaps(from), b = landedGaps(to) // null: from wherever they are
         const f = { v: 0 }
         setGap(a.gy, a.gx)
         gsap.to(f, { v: 1, duration, ease: 'power2.inOut', onUpdate: () => setGap(a.gy + (b.gy - a.gy) * f.v, a.gx + (b.gx - a.gx) * f.v), onComplete: resolve })

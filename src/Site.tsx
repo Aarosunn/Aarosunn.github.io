@@ -194,13 +194,14 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     setFlying(false)
   }
   /** s4: the tiles' liquid fades to `ghost.alpha` over the page's dark ground while the seams narrow from the landed cube's to `ghost.gap` (back: the reverse) */
-  const ghost = (on: boolean, duration: number) => {
+  const ghost = (on: boolean, duration: number, from: number | null = on ? LANDED_SEAM : gh0()) => {
     const g = grid.current, gh = sv.ghost
     if (!g || !gh) return Promise.resolve()
     const a = { v: on ? 0 : 1 }, white = new THREE.Color(1, 1, 1), mint = new THREE.Color(gh.tint), c = new THREE.Color()
     gsap.to(a, { v: on ? 1 : 0, duration, ease: 'power2.inOut', onUpdate: () => g.setAlpha(1 + (gh.alpha - 1) * a.v, c.copy(white).lerp(mint, a.v)) })
-    return g.seams(on ? LANDED_SEAM : gh.gap, on ? gh.gap : LANDED_SEAM, duration)
+    return g.seams(from, on ? gh.gap : LANDED_SEAM, duration)
   }
+  const gh0 = () => sv.ghost?.gap ?? 0
   const waking = useRef(false)
   /** the next project: s5 wakes the liquid first (tiles back, seams reopened), turns and welds, then fades it out again */
   const nextProject = async () => {
@@ -215,7 +216,7 @@ export function Site({ version: initial = 'v18', scheme = 'icemint', bg = '#0709
     await ghost(false, d)
     await g.next()
     text(1)
-    await ghost(true, d)
+    await ghost(true, d, null) // the weld left the seams shut: fade from there, no reopening
     waking.current = false
   }
   /** 'frozen': the liquid is stopped where it is (freeze) and its highlights pressed down to the dark shades */
